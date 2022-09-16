@@ -253,7 +253,9 @@ class Monitoring():
             self.Reco_MuonTracks.Delete()
             if self.options.FairTask_convRaw:
                 self.options.online.sTree.GetEvent(self.options.online.sTree.GetEntries()-1)
-            for t in self.FairTasks: self.FairTasks[t].ExecuteTask()
+            for t in self.FairTasks: 
+                if not t.GetName()=='simpleTracking': self.FairTasks[t].ExecuteTask()
+                else: self.FairTasks[t].ExecuteTask(options.trackType)
             self.eventTree = self.options.online.sTree
       else: 
             self.eventTree.GetEvent(n)
