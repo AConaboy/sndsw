@@ -123,7 +123,7 @@ class TimeWalk(ROOT.FairTask):
         t_rel=DST0-correctedtime
         name=f'dtvxpred_{fixed_ch}_iteration{self.iteration}'
         if not name in hists:
-           title='Uncorrected T_{0}^{DS}-t_{'+str(SiPM)+'} v x-position;x_{predicted} [cm];T_{0}^{DS}-t_{'+str(SiPM)+' [ns]'
+           title='Uncorrected T_{0}^{DS}-t_{'+str(SiPM)+'} v x-position;x_{predicted} [cm];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
            hists[name]=ROOT.TH2F(name,title,110,-10,100, 160, -20, 20.)
         if not 'DST0' in self.hists:
            hists['DST0']=ROOT.TH1F('DST0','DSH average', 100, 0, 25)
@@ -147,9 +147,9 @@ class TimeWalk(ROOT.FairTask):
         if cdata==-999.: return 0
         SiPM=int(fixed_ch.split('_')[-1])
         correctedtime=muAna.correct_ToF(SiPM, clock, xpred, cdata, self.xref)[1]
-        name=f'dtvqdc_{fixed_ch}_iteration{self.options.iteration}'
+        name=f'dtvqdc_{fixed_ch}_iteration{self.iteration}'
         if not name in hists:
-            title='Uncorrected T_{0}^{DS}-t_{'+str(SiPM)+'} v QDC_{'+str(SiPM)+'};QDC_{'+str(SiPM)+'} [a.u];T_{0}^{DS}-t_{'+str(SiPM)+' [ns]'
+            title='Uncorrected T_{0}^{DS}-t_{'+str(SiPM)+'} v QDC_{'+str(SiPM)+'};QDC_{'+str(SiPM)+'} [a.u];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
             hists[name]=ROOT.TH2F(name, title, 200, 0, 200, 160, -20, 20)
         t_rel=DST0-correctedtime
         self.hists[name].Fill(qdc,t_rel)
@@ -177,11 +177,11 @@ class TimeWalk(ROOT.FairTask):
 
         name=f'dtvxpred_{fixed_ch}_iteration{self.iteration}'
         if not name in hists:
-           title='Corrected T_{0}^{DS}-t_{'+str(SiPM)+'} v x-position;x_{predicted} [cm];T_{0}^{DS}-t_{'+str(SiPM)+' [ns]'
+           title='Corrected T_{0}^{DS}-t_{'+str(SiPM)+'} v x-position;x_{predicted} [cm];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
            hists[name]=ROOT.TH2F(name,title,110,-10,100, 160, -20, 20.)
         name2=f'dtvqdc_{fixed_ch}_iteration{self.options.iteration}'
         if not name in hists:
-            title='Corrected T_{0}^{DS}-t_{'+str(SiPM)+'} v QDC_{'+str(SiPM)+'};QDC_{'+str(SiPM)+'} [a.u];T_{0}^{DS}-t_{'+str(SiPM)+' [ns]'
+            title='Corrected T_{0}^{DS}-t_{'+str(SiPM)+'} v QDC_{'+str(SiPM)+'};QDC_{'+str(SiPM)+'} [a.u];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
             hists[name2]=ROOT.TH2F(name, title, 200, 0, 200, 160, -20, 20)
            
         hists[name].Fill(xpred,t_rel)

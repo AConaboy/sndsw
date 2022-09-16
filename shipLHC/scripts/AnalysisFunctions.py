@@ -383,8 +383,10 @@ def GetdtCalc(xpred, L, cs):
    sumOfInverses=lambda x : sum( [1/i[1] for i in x] )
    return xpred/NL*sumOfInverses(left) - (L-xpred)/NR*sumOfInverses(right)
 
-def Getcscint_i(runNr, fixed_ch, iteration):
-   with open(afswork+'cscintvalues/run'+str(runNr)+'/cscint_'+fixed_ch+'.csv', 'r') as handle:
+def Getcscint(runNr, fixed_ch, iteration):
+   filename=f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'
+   if not os.path.exists(filename): return -999.
+   with open(filename, 'r') as handle:
       reader=csv.reader(handle)
       alldata=[row for row in reader]
       if len(alldata)<iteration or len(alldata) == 0: return -999.
@@ -393,8 +395,9 @@ def Getcscint_i(runNr, fixed_ch, iteration):
          return (float(data[1]), float(data[2]))
 
 def Getcscint_chi2pNDF(runNr,fixed_ch, iteration):
-   # with open(afswork+'rootfiles/run'+str(runNr)+'/cscintvalues/cscint_'+fixed_ch+'.csv', 'r') as handle:
-   with open(afswork+'cscintvalues/run'+str(runNr)+'/cscint_'+fixed_ch+'.csv', 'r') as handle:
+   filename=f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'
+   if not os.path.exists(filename): return -999.
+   with open(filename, 'r') as handle:
       reader=csv.reader(handle)
       alldata=[row for row in reader]
       if len(alldata)<iteration or len(alldata) == 0: return -999.
@@ -425,12 +428,12 @@ def GetLogParams_i(runNr, fixed_ch, iteration):
          data=alldata[iteration-1]
          return (float(data[1]),float(data[2]),float(data[3]),float(data[4]),float(data[5]),float(data[6]))
 
-def GetPolyparams_i(runNr, fixed_ch, iteration):
+def GetPolyparams(runNr, fixed_ch, iteration):
    # print(iteration)
    if iteration==0:
       print('No log params calculated for iteration 0.')
       return 0
-   fname=afswork+'Polyparams/run'+str(runNr)+'/polyparams_'+fixed_ch+'.csv'
+   fname=f'{afswork}Polyparams/run{runNr}/polyparams_{fixed_ch}.csv'
    if not os.path.exists(fname): return -999.
    with open(fname, 'r') as handle:
       reader=csv.reader(handle)
@@ -445,7 +448,7 @@ def GetPolyparams_i(runNr, fixed_ch, iteration):
 
 def Gettimeresolution(runNr, fixed_ch, iteration):
    appendixdict={0:'_uncorrected', 1:'_corrected'}
-   fname=afswork+'TimeResolution/run'+str(runNr)+'/timeresolution_'+fixed_ch+appendixdict[iteration]+'.csv'
+   fname=f'{afswork}TimeResolution/run{runNr}/timeresolution_{fixed_ch}{appendixdict[iteration]}.csv'
    if not os.path.exists(fname): return -999
    with open(fname, 'r') as f:
       reader=csv.reader(f)
@@ -677,7 +680,7 @@ def GoodFitFinder(runNr, subsystem, plane, side):
 
 def GetCutDistributions(runNr, distmodes):
    Allmodes=('yresidual', 'nSiPMs', 'slopes')
-   datafile=afswork+'SelectionCriteria/SelectionCriteria_run'+runNr+'.root'
+   filepath=afswork+'SelectionCriteria/SelectionCriteria_run'+runNr+'.root'
 
    if isinstance(distmodes, str):
       distmodes=(distmodes,)
@@ -687,21 +690,24 @@ def GetCutDistributions(runNr, distmodes):
          print('Use a valid mode.')
          return 0
 
-   file=ROOT.TFile.Open(datafile, 'READ')
+   if not os.path.exists(filepath):filepath=f'{afswork}SelectionCriteria/SelectionCriteria_run004612.root'
+   cutfile=ROOT.TFile.Open(filepath, 'READ')
    dists={}
-
+   
+   keys=[k.GetName() for k in cutfile.GetListOfKeys()]
    for distmode in distmodes:
       if distmode=='yresidual':   
          for s in (1,2):
             for p in range(systemAndPlanes[s]):
                key=str(s*10+p)
                name=key+'_yresidual'
-               hist=file.Get(name).Clone()
+               if name not in keys: continue
+               hist=cutfile.Get(name).Clone()
                hist.SetDirectory(ROOT.gROOT)
                dists[name]=hist
 
       else:
-         hist=file.Get(distmode).Clone()
+         hist=filepath.Get(distmode).Clone()
          hist.SetDirectory(ROOT.gROOT)
          dists[distmode]=hist
 
