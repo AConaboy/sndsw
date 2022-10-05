@@ -9,6 +9,7 @@ import DAQ_monitoring
 import EventDisplay_Task
 import SndlhcMuonReco
 import TimeWalk
+import SelectionCriteria
 
 def pyExit():
     print("Make suicide until solution found for freezing")
@@ -41,6 +42,9 @@ parser.add_argument("-c", "--command", dest="command", help="command", default="
 parser.add_argument("-n", "--nEvents", dest="nEvents", help="number of events", default=-1,type=int)
 parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default=0,type=int)
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
+parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function of log function", required=False)
+parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
+parser.add_argument("--nDSPlanes", dest="nDSPlanes", help="How many DS planes are used in the DS track fit", default=3)
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
@@ -105,23 +109,6 @@ def currentRun():
         break
     return curRun,curPart,start
 
-"""
-if options.auto:
-   options.online = True
-# search for current run
-   if options.runNumber < 0:
-        curRun = ""
-        while curRun.find('run') < 0:
-               curRun,curPart,options.startTime =  currentRun()
-               if curRun.find('run') < 0:
-                   print("no run info, sleep 30sec.",time.ctime())
-                   time.sleep(30)
-        options.runNumber = int(curRun.split('_')[1])
-        lastRun = curRun
-        if options.slowStream:   options.partition = 0   #   monitoring file set to data_0000.root   int(curPart.split('_')[1].split('.')[0])
-        else:                             options.partition = int(curPart.split('_')[1].split('.')[0])
-else:
-"""
 if options.runNumber < 0:
     print("run number required for non-auto mode")
     os._exit(1)
@@ -167,9 +154,17 @@ monitorTasks['Mufi_QDCcorellations']   = Mufi_monitoring.Mufi_largeVSsmall()
 monitorTasks['Scifi_residuals'] = Scifi_monitoring.Scifi_residuals()   # time consuming
 if options.interactive:  monitorTasks['EventDisplay']   = EventDisplay_Task.twod()
 """
-monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
-for m in monitorTasks:
-    monitorTasks[m].Init(options,M)
+if options.Task=='TimeWalk':
+    if not options.mode:
+        print('=='*20+f'\nNo mode given for time walk task. Give mode as c0, tof or tw.\n'+'=='*20)
+        pyExit()
+    monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
+    for m in monitorTasks:
+        monitorTasks[m].Init(options,M)
+elif options.Task=='SelectionCriteria':
+    monitorTasks['SelectionCriteria'] = SelectionCriteria.MuonSelectionCriteria()
+    for m in monitorTasks:
+        monitorTasks[m].Init(options, M)
 c=0
 if not options.auto:   # default online/offline mode
     start, nEvents=options.nStart, options.nEvents
@@ -190,5 +185,7 @@ if not options.auto:   # default online/offline mode
             monitorTasks[m].ExecuteEvent(M.eventTree)
     print(f'{c}/{options.nEvents} with no tracks')
     if 'TimeWalk' in monitorTasks:
-        monitorTasks['TimeWalk'].WriteOutHistograms()
+        if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()
+    if 'SelectionCriteria' in monitorTasks:
+        if not options.debug: monitorTasks['SelectionCriteria'].WriteOutHistograms()
     
