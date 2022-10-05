@@ -91,12 +91,12 @@ class Tracking(ROOT.FairTask):
  def FinishEvent(self):
   pass
 
- def ExecuteTask(self,option='ScifiDS'):
+ def ExecuteTask(self,nPlanes=2, option='ScifiDS'):
     self.trackCandidates = {}
     if not option.find('DS')<0:
            self.clusMufi.Delete()
            self.dsCluster()
-           self.trackCandidates['DS'] = self.DStrack()
+           self.trackCandidates['DS'] = self.DStrack(nPlanes=nPlanes)
     if not option.find('Scifi')<0:
            self.clusScifi.Delete()
            self.scifiCluster()
