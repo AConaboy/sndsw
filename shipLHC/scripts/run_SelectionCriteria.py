@@ -9,7 +9,6 @@ import DAQ_monitoring
 import EventDisplay_Task
 import SndlhcMuonReco
 import TimeWalk
-import SelectionCriteria
 
 def pyExit():
     print("Make suicide until solution found for freezing")
@@ -31,7 +30,7 @@ parser.add_argument("--server", dest="server", help="xrootd server",default=os.e
 parser.add_argument("-r", "--runNumber", dest="runNumber", help="run number", type=int,default=-1)
 parser.add_argument('-p', '--path', dest='path', help='path', type=str, required=False)
 parser.add_argument("-P", "--partition", dest="partition", help="partition of data", type=int,required=False,default=-1)
-parser.add_argument("-d", "--debug", dest="debug", help="debug", default=False)
+parser.add_argument("-d", "--Debug", dest="debug", help="debug", default=False)
 parser.add_argument("-cpp", "--convRawCPP", action='store_true', dest="FairTask_convRaw", help="convert raw data using ConvRawData FairTask", default=False)
 parser.add_argument( "--withCalibration", action='store_true', dest="makeCalibration", help="make QDC and TDC calibration, not taking from raw data", default=False)
 
@@ -43,8 +42,6 @@ parser.add_argument("-n", "--nEvents", dest="nEvents", help="number of events", 
 parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default=0,type=int)
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
 parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function of log function", required=False)
-parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
-parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=2)
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
@@ -145,20 +142,11 @@ if options.postScale==0 and options.nEvents>5E6: options.postScale = 10
 M = Monitor.Monitoring(options,FairTasks)
 monitorTasks = {}
 
-if options.Task=='TimeWalk':
-    if not options.mode:
-        print('=='*20+f'\nNo mode given for time walk task. Give mode as zeroth, tof or tw.\n'+'=='*20)
-        pyExit()
-    monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
-    for m in monitorTasks:
-        monitorTasks[m].Init(options,M)
-elif options.Task=='SelectionCriteria':
-    monitorTasks['SelectionCriteria'] = SelectionCriteria.MuonSelectionCriteria()
-    for m in monitorTasks:
-        monitorTasks[m].Init(options, M)
+monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
+for m in monitorTasks:
+    monitorTasks[m].Init(options,M)
 c=0
 if not options.auto:   # default online/offline mode
-    trackIDdict={'DS':3, 'Scifi':1}
     start, nEvents=options.nStart, options.nEvents
     deciles=[i/10 for i in range(11)]
     for n in range(start,start+nEvents):
@@ -173,14 +161,9 @@ if not options.auto:   # default online/offline mode
         if M.Reco_MuonTracks.GetEntries()!=1: 
             c+=1
             continue
-        # if M.Reco_MuonTracks.GetUniqueID()!=trackIDdict[options.trackType]:
-        #     c+=1
-        #     continue
         for m in monitorTasks:
             monitorTasks[m].ExecuteEvent(M.eventTree)
     print(f'{c}/{options.nEvents} with no tracks')
     if 'TimeWalk' in monitorTasks:
         if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()
-    if 'SelectionCriteria' in monitorTasks:
-        if not options.debug: monitorTasks['SelectionCriteria'].WriteOutHistograms()
     
