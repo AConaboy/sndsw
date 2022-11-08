@@ -38,8 +38,8 @@ class TimeWalk(ROOT.FairTask):
         self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
         self.zPos=self.M.zPos
         self.cutdists=muAna.GetCutDistributions(self.runNr, 'dy', options.nStations)
-        iterationdict={'zeroth':0, 'ToF':1, 'TW':2}
-        self.iteration=iterationdict[options.mode]
+        statedict={'zeroth':'uncorrected', 'ToF':'uncorrected', 'TW':'corrected'}
+        self.state=statedict[options.mode]
 
         self.freq=160.316E6
         self.TDC2ns=1E9/self.freq
@@ -48,7 +48,8 @@ class TimeWalk(ROOT.FairTask):
         self.verticalBarDict={0:1, 1:3, 2:5, 3:6}
         verticalPlanes=list(self.verticalBarDict.values())
         self.xref=42. # To be set as USbarlength/2.
-        self.correctionfunction=lambda ps, qdc, limit: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
+        # self.correctionfunction=lambda ps, qdc, limit: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
+        self.correctionfunction=lambda ps, qdc: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
         self.hists=self.M.h
 
         self.hists['nStations'] = ROOT.TH1F('nStations', 'Number of stations used in track fit;Number of stations used;Counts', 10, 0, 10)
@@ -61,7 +62,7 @@ class TimeWalk(ROOT.FairTask):
             self.CorrectionType=options.CorrectionType
             if options.CorrectionType==1: self.correctionfunction = lambda ps, qdc : 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
             elif options.CorrectionType==5: self.correctionfunction = lambda ps, qdc : ps[0]*ROOT.Log(ps[1]*qdc)+ps[2]
-            elif options.CorrectionType==4: self.correctionfunction = lambda ps, qdc : ps[4]+ ps[3](qdc-ps[0])/( ps[0] + ps[1]*(qdc-ps[0]) + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) 
+            elif options.CorrectionType==4: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[0] + ps[1]*(qdc-ps[0]) + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) 
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -71,37 +72,47 @@ class TimeWalk(ROOT.FairTask):
         hists=self.hists
         
         Reco_MuonTracks=self.M.Reco_MuonTracks
-        theTrack=Reco_MuonTracks[0]
+        inVeto, inDS=False, False
+        for i,track in enumerate(Reco_MuonTracks):
+            if track.GetUniqueID()==1: inVeto=True
+            if track.GetUniqueID()==3: 
+                inDS=True
+                theTrack=Reco_MuonTracks[i]
+                if not theTrack.getFitStatus().isFitConverged(): return
+        if not inDS: return
+
+        # print(f'TRACK TYPE -> {theTrack.GetUniqueID()}')
         fstate=theTrack.getFittedState()
         pos=fstate.getPos()
         mom=fstate.getMom()
 
-        # Returns bool for if the track object is in the acceptance for Veto and US respectively.
-        InVeto, InUS=(muAna.InAcceptance(pos, mom, i, self.MuFilter, self.zPos) for i in (1,2))
-        if not InUS: return 0
-
         # Use the correct subsystems for 1 bar / plane cut
-        if InVeto: tmp=(1,2)
+        if inVeto: tmp=(1,2)
         else: tmp=(2,)
+        # tmp=(2,)
         if not muAna.OneHitPerSystem(event.Digi_MuFilterHits, tmp): return 0
 
         # Get DS event t0
         DST0cc=muAna.GetDSH_average(event.Digi_MuFilterHits)
+        if DST0cc==-999.: return 
+        DST0=DST0cc*6.25
         if not 'DST0' in self.hists:
            self.hists['DST0']=ROOT.TH1F('DST0','DSH average', 100, 0, 25)
-        self.hists['DST0'].Fill(DST0cc*6.25)
-        DST0=self.DST0cut(DST0cc)
-        if DST0==0: return 0
+        self.hists['DST0'].Fill(DST0)
 
         ### Slope cut
         slopeX, slopeY = mom.x()/mom.z(), mom.y()/mom.z()
-        if not TimeWalk.slopecut(mom): return 0
+        if not TimeWalk.slopecut(mom): return
 
         for hit in event.Digi_MuFilterHits:
             detID=hit.GetDetectorID()
             s,p,b=muAna.parseDetID(detID)
-            if s==3: continue
-            if not self.yresidual(detID,pos,mom): continue
+
+            # Only investigate veto hits if there is a Scifi track!
+            if not inVeto and s==1: continue
+
+            if s!=3:
+                if not self.yresidual(detID,pos,mom): continue
 
             zEx=self.zPos['MuFilter'][s*10+p]
             lam=(zEx-pos.z())/mom.z()
@@ -123,6 +134,15 @@ class TimeWalk(ROOT.FairTask):
                 elif self.options.mode=='ToF': self.ToF(fixed_ch,xpred, clock, qdc, DST0)
                 elif self.options.mode=='TW': self.TW(fixed_ch, xpred, clock, qdc, DST0)
 
+    def containsupperbars(self, event):
+        detIDs=[]
+        for hit in event.Digi_MuFilterHits:
+            detID=hit.GetDetectorID()
+            s,p,b=muAna.parseDetID(detID)
+            if s!=2: continue
+            if b>6:detIDs.append(detID)
+        return detIDs
+
     def zeroth(self,fixed_ch,xpred,clock,qdc,DST0):
         hists=self.hists
         
@@ -130,60 +150,59 @@ class TimeWalk(ROOT.FairTask):
 
         correctedtime=clock*6.25
         t_rel=DST0-correctedtime
-        dtvxpred=f'dtvxpred_{fixed_ch}_iteration{self.iteration}'
+        dtvxpred=f'dtvxpred_{fixed_ch}_{self.state}'
         if not dtvxpred in hists:
            title='Uncorrected T_{0}^{DS}-t_{'+str(SiPM)+'} v x-position;x_{predicted} [cm];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
            hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,110,-10,100, 160, -20, 20.)
 
-        SiPMtime=f'tSiPM_{fixed_ch}_iteration{self.iteration}'
+        SiPMtime=f'tSiPM_{fixed_ch}_{self.state}'
         if not SiPMtime in hists:
            hists[SiPMtime]=ROOT.TH1F(SiPMtime,f'Measured SiPM time {fixed_ch};SiPM time [ns];Counts', 100, 0, 25)
-        attlen=f'attlen_{fixed_ch}_iteration{self.iteration}'
+        attlen=f'attlen_{fixed_ch}_{self.state}'
         if not attlen in hists:
             title='Predicted position against QDC_{'+str(SiPM)+'} '+fixed_ch+';x_{predicted} [cm];QDC_{'+str(SiPM)+'} [a.u]'
             hists[attlen]=ROOT.TH2F(attlen,title, 110, -10, 110, 200, 0., 200)
-        # trackposveto0=f'DS muon track position at veto 0;Track x [cm];Track y [cm],'    
         
         self.hists[dtvxpred].Fill(xpred,t_rel)
         self.hists[SiPMtime].Fill(correctedtime)
         self.hists[attlen].Fill(xpred, qdc)
 
     def ToF(self, fixed_ch, xpred, clock, qdc, DST0):
+        
         hists=self.hists
 
-        cdata=muAna.Getcscint(self.runNr, fixed_ch, self.iteration-1)
+        cdata=muAna.Getcscint(self.runNr, fixed_ch, self.state)
         if cdata==-999.: return 0
         SiPM=int(fixed_ch.split('_')[-1])
         correctedtime=muAna.correct_ToF(SiPM, clock, xpred, cdata, self.xref)[1]
-        name=f'dtvqdc_{fixed_ch}_iteration{self.iteration}'
-        if not name in hists:
+        dtvqdc=f'dtvqdc_{fixed_ch}_{self.state}'
+        if not dtvqdc in hists:
             title='Uncorrected T_{0}^{DS}-t_{'+str(SiPM)+'} v QDC_{'+str(SiPM)+'};QDC_{'+str(SiPM)+'} [a.u];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
-            hists[name]=ROOT.TH2F(name, title, 200, 0, 200, 160, -20, 20)
+            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 160, -20, 20)
         t_rel=DST0-correctedtime
-        self.hists[name].Fill(qdc,t_rel)
+        self.hists[dtvqdc].Fill(qdc,t_rel)
 
     def TW(self, fixed_ch, xpred, clock, qdc, DST0):
         hists=self.hists
         
         SiPM=int(fixed_ch.split('_')[-1])
         time=clock*6.25
-        paramsAndErrors,correctionlimits = muAna.GetPolyParams(self.runNr, fixed_ch, self.CorrectionType, 0)
-        chi2pNDF = muAna.Getchi2pNDF(self.runNr, fixed_ch, 0)
-        cdata = muAna.Getcscint(self.runNr, fixed_ch, 0)
+        tmp = muAna.GetPolyParams(self.runNr, fixed_ch, self.CorrectionType, self.state)
+        if tmp==-999.:
+            print(fixed_ch)
+            return
+        paramsAndErrors, correctionlimit=tmp
+
+        chi2pNDF = muAna.Getchi2pNDF(self.runNr, fixed_ch, self.CorrectionType, self.state)
+        cdata = muAna.Getcscint(self.runNr, fixed_ch, self.state)
         
         if paramsAndErrors==-999. or cdata==-999.: return 0
         polyparams = self.correctionparams(paramsAndErrors)
-
-        if chi2pNDF>2:return 0
        
         # Only if qdc is less than the high QDC limit from the fit: apply the correction
         if qdc <= correctionlimit[1]:
-            if len(polyparams)==4:
-                polycorrection = self.correctionfunction(polyparams[0:-1], qdc)
-                correctedtime = time + polycorrection+polyparams[-1]
-            elif len(polyparams)==3:
+            if self.CorrectionType==4:
                 polycorrection = self.correctionfunction(polyparams, qdc)
-                correctedtime = time + polycorrection
         
             correctedtime2 = muAna.correct_ToF(SiPM, clock, xpred, cdata, self.xref)[1] + polycorrection
         
@@ -200,28 +219,27 @@ class TimeWalk(ROOT.FairTask):
             if len(polyparams)==4: print(f'\noffset:{polyparams[-1]}')
             print('---------------\n')
 
-        name=f'dtvxpred_{fixed_ch}_iteration{self.iteration}'
-        if not name in hists:
+        dtvxpred=f'dtvxpred_{fixed_ch}_{self.state}'
+        if not dtvxpred in hists:
            title='Corrected T_{0}^{DS}-t_{'+str(SiPM)+'} v x-position;x_{predicted} [cm];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
-           hists[name]=ROOT.TH2F(name,title,110,-10,100, 160, -20, 20.)
+           hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,110,-10,100, 160, -20, 20.)
         
-        name2=f'dtvqdc_{fixed_ch}_iteration{self.iteration}'
-        if not name2 in hists:
+        dtvqdc=f'dtvqdc_{fixed_ch}{self.state}'
+        if not dtvqdc in hists:
             title='Corrected T_{0}^{DS}-t_{'+str(SiPM)+'} v QDC_{'+str(SiPM)+'};QDC_{'+str(SiPM)+'} [a.u];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
-            hists[name2]=ROOT.TH2F(name2, title, 200, 0, 200, 160, -20, 20)
+            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 160, -20, 20)
 
-        hists[name].Fill(xpred,t_rel)
-        hists[name2].Fill(qdc, t2_rel)
+        hists[dtvxpred].Fill(xpred,t_rel)
+        hists[dtvqdc].Fill(qdc, t2_rel)
 
     def FillDST0(self):
         pass 
-
 
     def WriteOutHistograms(self):
         
         for h in self.M.h:
             if len(h.split('_'))==4:
-                histkey,detID,SiPM,iterationNumber=h.split('_')
+                histkey,detID,SiPM,state=h.split('_')
                 fixed_ch='_'.join((detID,SiPM))
                 hist=self.M.h[h]
                 outpath=f'{self.afswork}/splitfiles/run{self.runNr}/{fixed_ch}/'
@@ -271,3 +289,48 @@ class TimeWalk(ROOT.FairTask):
         return ROOT.TMath.Sqrt((v1.x()-Ex.x())**2+(v1.y()-Ex.y())**2+(v1.z()-Ex.z())**2)
 
 
+# class DStimeresolution(ROOT.FairTask):
+
+#     #def Init(self, options, runtw):
+#     def Init(self, options, monitor):
+       
+#         self.M=monitor
+#         self.options=options
+#         if self.options.path.find('TI18')>0: self.path='TI18'
+#         elif self.options.find('H8')>0: self.path='H8'
+#         run=ROOT.FairRunAna.Instance()
+#         self.trackTask=run.GetTask('simpleTracking')
+
+#         ioman=ROOT.FairRootManager.Instance()
+#         self.OT=ioman.GetSink().GetOutTree()
+   
+#         lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
+#         self.MuFilter=lsOfGlobals.FindObject('MuFilter')
+#         self.Scifi=lsOfGlobals.FindObject('Scifi')
+#         self.runNr = str(options.runNumber).zfill(6)
+#         self.afswork=options.afswork
+#         self.afsuser=options.afsuser
+#         self.outpath=self.afswork
+#         self.EventNumber=-1
+
+#         self.systemAndPlanes = {1:2,2:5,3:7}
+#         self.systemAndBars={1:7,2:10,3:60}
+#         self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
+#         self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
+#         self.zPos=self.M.zPos
+#         self.cutdists=muAna.GetCutDistributions(self.runNr, 'dy', options.nStations)
+#         iterationdict={'zeroth':0, 'ToF':1, 'TW':2}
+#         self.iteration=iterationdict[options.mode]
+
+#         self.freq=160.316E6
+#         self.TDC2ns=1E9/self.freq
+
+#         self.largeSiPMmap={0:0 ,1:1 ,3:2 ,4:3 ,6:4 ,7:5}
+#         self.verticalBarDict={0:1, 1:3, 2:5, 3:6}
+#         verticalPlanes=list(self.verticalBarDict.values())
+#         self.xref=42. # To be set as USbarlength/2.
+#         self.correctionfunction=lambda ps, qdc, limit: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
+#         self.hists=self.M.h
+
+#         self.hists['nStations'] = ROOT.TH1F('nStations', 'Number of stations used in track fit;Number of stations used;Counts', 10, 0, 10)
+#         self.hists['nStations'].Fill(options.nStations)        

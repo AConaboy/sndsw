@@ -6,6 +6,9 @@ afswork='/afs/cern.ch/work/a/aconsnd/Timing/'
 afsuser='/afs/cern.ch/user/a/aconsnd/twfiles/'
 A, B=ROOT.TVector3(), ROOT.TVector3()
 systemAndPlanes = {1:2,2:5,3:6}
+systemAndBars = {1:7,2:10,3:60}
+systemAndChannels = {1:[0,8],2:[2,6],3:[0,1]}
+systemAndSiPMs={1:range(16),2:(0,1,3,4,6,7,8,9,11,12,14,15),3:(1,)}
 verticalBarDict={0:1, 1:3, 2:5, 3:6}
 gelsides={0:'R', 1:'L', 2:'R', 3:'L', 4:'L'}
 
@@ -17,20 +20,27 @@ def BuildBarLengths(MuFilter):
    barlengths={1:Vetobarlength, 2:USbarlength, 3:DSbarlength_hor, 4:DSbarlength_vert}
    return barlengths
 
-def BuildzPos(MuFilter):
-   zPos={}
+def BuildzPos(MuFilter, Scifi):
+   zPos={'MuFilter':{},'Scifi':{}}
    for s in systemAndPlanes:
-      for plane in range(systemAndPlanes[s]):
-         bar = 4
-         p = plane
-         if s==3 and plane%2==0:  
-            bar = 90
-            p = plane//2
-         if s==3 and plane%2==1:
-            bar = 30
-            p = plane//2
-         MuFilter.GetPosition(s*10000+p*1000+bar,A,B)
-         zPos[s*10+plane] = (A.Z()+B.Z())/2.	
+       for plane in range(systemAndPlanes[s]):
+          bar = 4
+          p = plane
+          if s==3 and (plane%2==0 or plane==7): 
+             bar = 90
+             p = plane//2
+          elif s==3 and plane%2==1:
+             bar = 30
+             p = plane//2
+          MuFilter.GetPosition(s*10000+p*1000+bar,A,B)
+          zPos['MuFilter'][s*10+plane] = (A.Z()+B.Z())/2.
+   for s in range(1,6):
+      mat   = 2
+      sipm = 1
+      channel = 64
+      for o in range(2):
+          Scifi.GetPosition(channel+1000*sipm+10000*mat+100000*o+1000000*s,A,B)
+          zPos['Scifi'][s*10+o] = (A.Z()+B.Z())/2.
    return zPos
 
 def IsSmallSiPMchannel(i):
@@ -79,6 +89,7 @@ def dist2BarEnd(MuFilter, detID, nSides, pred, dim):
 		return dyT   
 
 def parseDetID(detID):
+   if not isinstance(detID, int): detID=int(detID)
    subsystem=detID//10000
    if subsystem ==1 or subsystem==2:
       plane=detID%10000//1000
@@ -107,7 +118,7 @@ def fit_langau(hist,o,bmin,bmax):
    F.SetParLimits(1,0,100)
    F.SetParLimits(3,0,10)
 
-   rc = hist.Fit(F,'S','',bmin,bmax)
+   rc = hist.Fit(F,'S'+o,'',bmin,bmax)
    res = rc.Get()
    return res
 
@@ -210,7 +221,7 @@ def TotalChVal_sides(chs):
 
 def GetOverallSiPMNumber(detID, SiPM):
    s, p, b = parseDetID(detID)
-   if s==1: nSiPMs, SiPMs_plane=6, 52 # is it?
+   if s==1: nSiPMs, SiPMs_plane=8, 56 # is it?
    elif s==2: nSiPMs, SiPMs_plane=16, 160
    elif s==3: nSiPMs, SiPMs_plane=1, 60 # wrong
 
@@ -221,13 +232,14 @@ def OneHitPerSystem(hits, systems):
     #hitdict={int(k)+10*int(s):0 for k in range(systemAndPlanes[s]) for s in systems}
     hitdict={}
     for s in systems:
-        for k in range(systemAndPlanes[s]):
-            key=10*s+k
+        for p in range(systemAndPlanes[s]):
+            key=10*s+p
             hitdict[key]=0
     for i, hit in enumerate(hits):
         if not hit.isValid(): continue
         detID=hit.GetDetectorID()
         s, p, b = parseDetID(detID)
+        if s not in systems: continue
         if s==3: continue
         key=10*s+p
         hitdict[key]+=1
@@ -235,6 +247,51 @@ def OneHitPerSystem(hits, systems):
     for key in hitdict:
         if hitdict[key] != 1: return False
     return True
+
+def InAcceptance(pos, mom, subsystem, geoobject, zPos):
+   
+   limits=GetSubsystemZlimits(subsystem, zPos)
+   if limits==0:return 0
+
+   for z in limits:
+      lam=(z-pos.z())/mom.z()
+      Ex=ROOT.TVector3(pos.x()+lam*mom.x(), pos.y()+lam*mom.y(), pos.z()+lam*mom.z())
+      xmin,xmax,ymin,ymax=GetSubsystemXYlimits(subsystem, geoobject)
+      inacc=xmin<Ex.x()<xmax and ymin<Ex.y()<ymax
+      # print(f'{xmin}<{Ex.x()}<{xmax}, {ymin}<{Ex.y()}<{ymax}, {inacc}')
+      if not inacc: return False
+   return True
+
+def GetSubsystemZlimits(subsystem, zPos):
+   if subsystem==0:
+      pass
+   elif subsystem==1:
+      zmin, zmax=zPos['MuFilter'][10], zPos['MuFilter'][11]
+   elif subsystem==2:
+      zmin, zmax=zPos['MuFilter'][20], zPos['MuFilter'][24]
+   elif subsystem==3:
+      zmin, zmax=zPos['MuFilter'][30], zPos['MuFilter'][36]
+   else: return 0
+   return zmin, zmax
+
+def GetSubsystemXYlimits(subsystem,geoobject):
+   if subsystem==0:
+      pass
+   elif subsystem==1:
+      geoobject.GetPosition(10000, A, B)
+      xmin, xmax = B.x(), A.x()
+      ymin = A.y() - geoobject.GetConfParF('MuFilter/VetoBarY')/2.
+      geoobject.GetPosition(10006, A, B)
+      ymax = A.y() + geoobject.GetConfParF('MuFilter/VetoBarY')/2.
+   elif subsystem==2:
+      geoobject.GetPosition(20000, A, B)
+      xmin, xmax = B.x(), A.x()
+      ymin = A.y() - geoobject.GetConfParF('MuFilter/UpstreamBarY')/2.
+      geoobject.GetPosition(20009, A, B)
+      ymax = A.y() + geoobject.GetConfParF('MuFilter/UpstreamBarY')/2.
+   elif subsystem==3: 
+      pass
+   return xmin, xmax, ymin, ymax
 
 def getNUSPlanes(hits):
    
@@ -308,7 +365,7 @@ def GetBarSlice(L, sliceL, xpred):
 def GetSiPMNumberInSystem_LandR(detID, SiPM): # 20000 SiPM 8 -> 8
     s, p, b = parseDetID(detID)
     if s==1: 
-        nSiPMs, SiPMs_plane=12, 84 # is it? 
+        nSiPMs, SiPMs_plane=16, 112 # is it? 
         return SiPM+nSiPMs*b+p*SiPMs_plane
     elif s==2:
         nSiPMs, SiPMs_plane=16, 160
@@ -336,6 +393,7 @@ def GetSiPMNumberInPlane_LTR(detID, SiPM):
    return SiPM+b*8
 
 def GetSiPMNumberInSystem_LTR(detID, SiPM): # 20000 SiPM 8 -> 400
+   if not isinstance(SiPM, int): SiPM=int(SiPM)
    s, p, b = parseDetID(detID)
    if s==1: nSiPMs, SiPMs_plane=6, 52 # is it?
    elif s==2: nSiPMs, SiPMs_plane=8, 80
@@ -400,27 +458,40 @@ def GetdtCalc(xpred, L, cs):
    sumOfInverses=lambda x : sum( [1/i[1] for i in x] )
    return xpred/NL*sumOfInverses(left) - (L-xpred)/NR*sumOfInverses(right)
 
-def Getcscint(runNr, fixed_ch, iteration):
-    if not os.path.exists(afswork+'cscintvalues/run'+str(runNr)+'/cscint_'+fixed_ch+'.csv'): return -999.
-    with open(afswork+'cscintvalues/run'+str(runNr)+'/cscint_'+fixed_ch+'.csv', 'r') as handle:
-        reader=csv.reader(handle)
-        alldata=[row for row in reader]
-        if len(alldata)<int(iteration) or len(alldata) == 0: return -999.
-        else:
-            data=alldata[int(iteration)]
-            return (float(data[1]), float(data[2]))
+def Getcscint(runNr, fixed_ch, state):
 
-def Getcscint_chi2pNDF(runNr,fixed_ch,iteration):
+   iteration=0 if state=='uncorrected' else 1
+   if not os.path.exists(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'): 
+      print(f'path issue: {afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv')
+      return -999.
+   with open(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
+      reader=csv.reader(handle)
+      alldata=[row for row in reader]
+      if len(alldata)<iteration+1 or len(alldata) == 0: 
+         print(f'{fixed_ch} Len issue')
+         return -999.
+      try:
+         data=alldata[iteration]
+      except IndexError:
+         print(f'{fixed_ch} IndexError')
+      return (float(data[1]), float(data[2]))
+
+def Getcscint_chi2pNDF(runNr,fixed_ch,state):
+   iteration=0 if state=='uncorrected' else 1
    # with open(afswork+'rootfiles/run'+str(runNr)+'/cscintvalues/cscint_'+fixed_ch+'.csv', 'r') as handle:
    with open(afswork+'cscintvalues/run'+str(runNr)+'/cscint_'+fixed_ch+'.csv', 'r') as handle:
       reader=csv.reader(handle)
       alldata=[row for row in reader]
-      if len(alldata)<iteration or len(alldata) == 0: return -999.
-      else:
+      # if len(alldata)<iteration or len(alldata) == 0: return -999.
+      if len(alldata)<iteration+1: return -999.
+      try:
          data=alldata[iteration]
-         return float(data[-2])/int(data[-1])
+      except IndexError:
+         print(f'{fixed_ch} IndexError')
+      return float(data[-2])/int(data[-1])
 
-def Getcscintdict(runNr, subsystem, iteration):
+def Makecscintdict(runNr, subsystem, state):
+   iteration=0 if state=='uncorrected' else 1
    path=f'{afswork}/cscintvalues/run{runNr}/'
    res={}
    for filename in os.listdir(path):
@@ -430,7 +501,7 @@ def Getcscintdict(runNr, subsystem, iteration):
       with open(path+filename, 'r') as handle:
          reader=csv.reader(handle)
          alldata=[row for row in reader]
-         if len(alldata)<iteration:
+         if len(alldata)<iteration or alldata==[]:
             print(filename)
             continue
          data=alldata[iteration]
@@ -439,7 +510,8 @@ def Getcscintdict(runNr, subsystem, iteration):
    sorted_d={k:v for k,v in sorted_tuples}
    return sorted_d
    
-def GetAvgcscint(path, detID, SiPMs, iteration):
+def GetAvgcscint(path, detID, SiPMs, state):
+   iteration=0 if state=='uncorrected' else 1
    cs=[]
    for SiPM in SiPMs:
       fixed_ch=('_').join( (str(detID), str(SiPM)) ) 
@@ -450,40 +522,40 @@ def GetAvgcscint(path, detID, SiPMs, iteration):
    cbar_err = ROOT.TMath.Sqrt( sum( [i[1]**2 for i in cs] ) )
    return cbar, cbar_err
 
-def GetPolyParams(runNr, fixed_ch, n, iteration):
-    
-   filelengths={1:11,2:13,3:15,5:9}
+def GetPolyParams(runNr, fixed_ch, n, state):
+   iteration=0 if state=='uncorrected' else 1
+   filelengths={1:11, 2:13, 3:15, 4:13, 5:9}
    if not os.path.exists(f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv'): return -999.
    with open(f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv', 'r') as f:
       reader=csv.reader(f)
       alldata=[r for r in reader]
-      if alldata==[]:return -999
-      #print(f'All data {fixed_ch}, len:{len(alldata[iteration-1])}: {alldata}')
-      data=alldata[int(iteration) - 1]
-   # print('=='*15,f'\nlen(data):{len(data)}\n','=='*15)
+      if len(alldata)==0:return -999
+      data=alldata[iteration]
    if len(data)!=filelengths[n]: return -999
      
    params=[float(i) for i in data[1:-2]]
    limits=[float(i) for i in data[-2:]]
    return params,limits
 
-def Gettimeresolution(runNr, fixed_ch, iteration):
-   appendixdict={0:'_uncorrected', 1:'_corrected'}
-   fname=afswork+'TimeResolution/run'+str(runNr)+'/timeresolution_'+fixed_ch+appendixdict[iteration]+'.csv'
+def Gettimeresolution(runNr, fixed_ch, state):
+   iteration=0 if state=='uncorrected' else 1
+   fname=f'{afswork}TimeResolution/run{runNr}/timeresolution_{fixed_ch}.csv'
    if not os.path.exists(fname): return -999
    with open(fname, 'r') as f:
       reader=csv.reader(f)
       alldata=[row for row in reader]
-      data=alldata[0]
-      if math.isnan(float(data[0])): return -999.
+      if len(alldata)<iteration+1: return -999.
+      data=alldata[iteration]
+      # if math.isnan(float(data[0])): return -999.
    timeresolution=float(data[1]), float(data[2])
    return timeresolution
 
-def FitForMPV(runNr, fixed_ch, iteration):
+def FitForMPV(runNr, fixed_ch, state):
+   iteration=0 if state=='uncorrected' else 1
    fname=f'{afswork}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
    if not os.path.exists(fname): return -999.
    f=ROOT.TFile.Open(fname, 'READ')
-   histname=f'dtvqdc_{fixed_ch}_iteration{iteration}'
+   histname=f'dtvqdc_{fixed_ch}_{state}'
    if not histname in [k.GetName() for k in f.GetListOfKeys()]: return -999
    tmp=f.Get(histname)
    hist=tmp.Clone()
@@ -497,48 +569,53 @@ def FitForMPV(runNr, fixed_ch, iteration):
    chi2, NDF= res.Chi2(), res.Ndf()
    return (MPV, MPV_err, chi2, NDF)
 
-def Getchi2_info(runNr, fixed_ch, n, iteration):
-    fname=f'{afswork}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
-    if not os.path.exists(fname): return -999.
-    with open(fname, 'r') as handle:
-        reader=csv.reader(handle)
-        alldata=[row for row in reader]
-        if len(alldata)==0 or len(alldata)<iteration: return -999.
-        data=alldata[iteration-1]
-        try:
-            chi2info=int(data[0]), float(data[1]), int(data[2])
-        except ValueError:
-            print(f'Non-integer NDF for {fixed_ch}')
-            return -999.
-    return chi2info
+def Getchi2_info(runNr, fixed_ch, n, state):
+   iteration=0 if state=='uncorrected' else 1
 
-def Getchi2pNDF(runNr, fixed_ch, n, iteration):
-    fname=f'{afswork}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
-    if not os.path.exists(fname): return -999.
-    with open(fname, 'r') as handle:
-        reader=csv.reader(handle)
-        alldata=[row for row in reader]
-        if len(alldata)==0 or len(alldata)<iteration: return -999.
-        data=alldata[iteration-1]
-        try:
-            chi2pNDF=float(data[1])/int(data[2])
-        except ValueError:
-            print(f'Non-integer NDF for {fixed_ch}')
-            return -999.
-    return chi2pNDF
+   fname=f'{afswork}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
+   if not os.path.exists(fname): return -999.
+   with open(fname, 'r') as handle:
+      reader=csv.reader(handle)
+      alldata=[row for row in reader]
+      if len(alldata)==0 or len(alldata)<iteration: return -999.
+      data=alldata[iteration-1]
+      try:
+            chi2info=int(data[0]), float(data[1]), int(data[2])
+      except ValueError:
+         print(f'Non-integer NDF for {fixed_ch}')
+         return -999.
+   return chi2info
+
+def Getchi2pNDF(runNr, fixed_ch, n, state):
+
+   iteration=0 if state=='uncorrected' else 1   
+   fname=f'{afswork}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
+   if not os.path.exists(fname): return -999.
+   with open(fname, 'r') as handle:
+      reader=csv.reader(handle)
+      alldata=[row for row in reader]
+      if len(alldata)==0 or len(alldata)<iteration: return -999.
+      data=alldata[iteration-1]
+      try:
+         chi2pNDF=float(data[1])/int(data[2])
+      except ValueError:
+         print(f'Non-integer NDF for {fixed_ch}')
+         return -999.
+   return chi2pNDF
 
 def GetNDF(runNr, fixed_ch, iteration):
-    fname=afswork+'chi2s/run'+str(runNr)+'/chi2s_'+fixed_ch+'.csv'
-    if not os.path.exists(fname): return -999.
-    with open(fname, 'r') as handle:
-        reader=csv.reader(handle)
-        alldata=[row for row in reader]
-        if len(alldata)==0 or len(alldata)<iteration: return -999.
-        data=alldata[iteration-1]
-    return int(data[2])
+   fname=afswork+'chi2s/run'+str(runNr)+'/chi2s_'+fixed_ch+'.csv'
+   if not os.path.exists(fname): return -999.
+   with open(fname, 'r') as handle:
+      reader=csv.reader(handle)
+      alldata=[row for row in reader]
+      if len(alldata)==0 or len(alldata)<iteration: return -999.
+      data=alldata[iteration-1]
+   return int(data[2])
 
-def GetBadchi2pNDFdict(runNr, subsystem, iteration):
-   #path=afswork+'chi2s/run'+str(runNr)+'/'
+def GetBadchi2pNDFdict(runNr, subsystem, state):
+
+   iteration=0 if state=='uncorrected' else 1
    path=f'{afswork}/chi2s/run{runNr}/'
    res={}
    for filename in os.listdir(path):
@@ -559,11 +636,14 @@ def GetBadchi2pNDFdict(runNr, subsystem, iteration):
    sorted_d={k:v for k,v in sorted_tuples}
    return sorted_d
 
-def Makechi2pNDFdict(runNr, subsystem, iteration):
+def Makechi2pNDFdict(runNr, subsystem, n, state):
+   
+   iteration=0 if state=='uncorrected' else 1
    #path=afswork+'chi2s/run'+str(runNr)+'/'
    path=f'{afswork}/chi2s/run{runNr}/'
    res={}
    for filename in os.listdir(path):
+      if filename.split('_')[0].find(f'chi2s{n}') ==-1: continue
       #fixed_ch=filename[filename.find(str(subsystem)):filename.find('.csv')]
       fixed_ch=f'{filename.split("_")[1]}_{filename.split("_")[2].split(".")[0]}'
       if fixed_ch[0]!=str(subsystem): continue
@@ -632,7 +712,7 @@ def GetMPV(runNr, fixed_ch, iteration):
 
 def MakeFixedCh(fixed):
    fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
-   return str(fixed_subsystem)+str(fixed_plane)+'00'+str(fixed_bar)+'_'+str(fixed_SiPM)
+   return f'{str(fixed_subsystem)}{str(fixed_plane)}00{str(fixed_bar)}_{str(fixed_SiPM)}'
 
 def correct_ToF(SiPM, clock, xpred, cs, xref):
    
@@ -651,7 +731,7 @@ def correct_ToF(SiPM, clock, xpred, cs, xref):
 
    return (SiPM, corrected_t)
 
-def GoodFitFinder(runNr, subsystem, plane, side):
+def GoodFitFinder(runNr, n, subsystem, plane, side):
    
    SiPMsdict={'left':(0,1,3,4,6,7), 'right':(8,9,11,12,14,15)}
    chi2s={}
@@ -659,17 +739,17 @@ def GoodFitFinder(runNr, subsystem, plane, side):
    for bar in range(10):
       for SiPM in SiPMsdict[side]:
          fixed_ch = MakeFixedCh((subsystem, plane, bar, SiPM))
-         chi2pNDF = Getchi2pNDF(runNr,fixed_ch, 1)
+         chi2pNDF = Getchi2pNDF(runNr,fixed_ch, n, 1)
          if chi2pNDF==-999.:continue
          #chi2pNDF=data[-1]
          chi2s[chi2pNDF]=(bar, SiPM)
             
    return chi2s
 
-def GetCutDistributions(runNr, distmodes):
-   Allmodes=('yresidual', 'nSiPMs', 'slopes')
-   filename=f'{afswork}SelectionCriteria/SelectionCriteria_run{runNr}.root'
-   if not os.path.exists(filename): filename=f'{afswork}SelectionCriteria/SelectionCriteria_run004612.root'
+def GetCutDistributions(runNr, distmodes=('dy', 'slopes', 'nSiPMs'), nStations=2):
+   Allmodes=('dy', 'nSiPMs', 'slopes')
+   filename=f'{afswork}rootfiles/run{runNr}/SelectionCriteria.root'
+   if not os.path.exists(filename): filename=f'{afswork}rootfiles/run004813/SelectionCriteria.root'
 
    if isinstance(distmodes, str):
       distmodes=(distmodes,)
@@ -683,20 +763,21 @@ def GetCutDistributions(runNr, distmodes):
    dists={}
 
    for distmode in distmodes:
-      if distmode=='yresidual':   
+      if distmode=='dy' or distmode=='nSiPMs':
          for s in (1,2):
             for p in range(systemAndPlanes[s]):
                key=str(s*10+p)
-               name=key+'_yresidual'
+               name=f'{distmode}_{key}_{nStations}stations'
                hist=f.Get(name).Clone()
                hist.SetDirectory(ROOT.gROOT)
                dists[name]=hist
 
-      else:
-         hist=f.Get(distmode).Clone()
+      elif distmode=='slopes':
+         hist=f.Get(f'{distmode}_{nStations}stations').Clone()
          hist.SetDirectory(ROOT.gROOT)
          dists[distmode]=hist
 
+   f.Close()
    return dists
 
 def adjacentplaneschi2s(runNr, subsystem, plane, side):
@@ -780,5 +861,35 @@ def checkFitStatus(fitter):
     for attribute in ('hist', 'graph'): 
         if isinstance(getattr(fitter, attribute), float)==True: return False
     return True
+
+def GetCanvas(runNr, fixed_ch, mode, iteration):
+    filename=f'{afswork}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
+    infile=ROOT.TFile.Open(filename, 'read')
+    name=f'{mode}_{fixed_ch}_{iteration}'
+    if not hasattr(infile, name):
+        print(f'No canvas with name: {name} available in file')
+        return 
+    og_canv=infile.Get(name)
+    canv.og_canv.Clone()
+    canv.SetDirectory(ROOT.gROOT)
+    infile.Close()
+    return canv
+
+def WriteCanvasesToFile(runNr, mode, iteration, subsystems=(1,2)):
+    pathtodir=f'{afswork}Results/{runNr}'
+    if not os.path.exists(pathtodir):
+        os.mkdir(pathtodir)
+    outfilename=pathtodir+f'run{runNr}_results.root'
+    outfile=ROOT.TFile.Open(outfilename, 'recreate')
+    files = [f'{afswork}run{runNr}/timewalk_{MakeFixedCh((s,p,b,SiPM))}.root' for s in subsystems for p in range(systemAndPlanes[s]) for p in range(systemAndBars[s]) for b in range(systemAndBars[s]) for SiPM in systemAndSiPMs[s] ]
+    for i, infile in enumerate(files):
+        fixed_ch=infile[infile.find('timewalk')+len('timewalk_'):infile.find('.root')]
+        canv=GetCanvas(runNr, fixed_ch, mode, iteration)
+        if not canv: 
+            print(f'No {mode} canvas for {fixed_ch}')
+            continue
+        outfile.WriteObject(canv, canv.GetName(), 'kOverwrite')
+    print(f'{i+1} canvases written to outfilename')
+    outfile.Close()
 
    

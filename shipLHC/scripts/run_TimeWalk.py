@@ -42,7 +42,7 @@ parser.add_argument("-c", "--command", dest="command", help="command", default="
 parser.add_argument("-n", "--nEvents", dest="nEvents", help="number of events", default=-1,type=int)
 parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default=0,type=int)
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
-parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function of log function", required=False)
+parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function of log function", default=4, type=int, required=False)
 parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
 parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=2)
 
@@ -170,12 +170,9 @@ if not options.auto:   # default online/offline mode
             print(progstr, '\n')
 
 # assume for the moment file does not contain fitted tracks
-        if M.Reco_MuonTracks.GetEntries()!=1: 
+        if M.Reco_MuonTracks.GetEntries()==0: 
             c+=1
             continue
-        # if M.Reco_MuonTracks.GetUniqueID()!=trackIDdict[options.trackType]:
-        #     c+=1
-        #     continue
         for m in monitorTasks:
             monitorTasks[m].ExecuteEvent(M.eventTree)
     print(f'{c}/{options.nEvents} with no tracks')
