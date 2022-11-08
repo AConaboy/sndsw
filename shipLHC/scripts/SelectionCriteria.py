@@ -48,6 +48,9 @@ class MuonSelectionCriteria(ROOT.FairTask):
 
         slopetitle = 'Track slopes;slope x [rad];slope y [rad]'
         self.hists[f'slopes_{self.nStations}stations'] = ROOT.TH2F(f'slopes_{self.nStations}stations',slopetitle, 300, -1.5, 1.5, 300, -1.5, 1.5)
+        
+        self.hists['DST0']=ROOT.TH1F('DST0','DSH average', 100, 0, 25)
+
         for subsystem in (1,2):
             for plane in range(self.systemAndPlanes[subsystem]):
                 
@@ -63,6 +66,9 @@ class MuonSelectionCriteria(ROOT.FairTask):
     def ExecuteEvent(self, event):
         
         hists=self.hists
+
+        DST0cc=muAna.GetDSH_average(event.Digi_MuFilterHits)
+        self.hists['DST0'].Fill(DST0cc*6.25)
 
         if 'slopes' in self.histtypes:
             Reco_MuonTracks=self.M.Reco_MuonTracks
