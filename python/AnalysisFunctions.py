@@ -91,17 +91,39 @@ def dist2BarEnd(MuFilter, detID, nSides, pred, dim):
 def parseDetID(detID):
    if not isinstance(detID, int): detID=int(detID)
    subsystem=detID//10000
-   if subsystem ==1 or subsystem==2:
+   if subsystem in (1,2,3):
       plane=detID%10000//1000
       bar=detID%1000
       return subsystem, plane, bar
-   if subsystem == 3:
-      bar=detID%1000
-      if bar>59:
-         plane=verticalBarDict[detID%10000//1000]
-      elif bar<60:
-         plane=2*detID%10000//1000
-      return subsystem, plane, bar
+
+def MakeFixedCh(fixed):
+   fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
+   if fixed_subsystem in (1,2,3):
+      return f'{str(fixed_subsystem)}{str(fixed_plane)}{str(fixed_bar).zfill(3)}_{str(fixed_SiPM)}'
+
+def GetDSHaverage(hits, nPlanes=3):
+   stations={k:{} for k in range(7)}
+   for i,hit in enumerate(hits):
+      detID=hit.GetDetectorID()
+      s,p,b=parseDetID(detID)
+      if s!=3:continue
+      if b>59: continue
+      stations[p][i]=hit
+   # if not all( len(stations[p*2])==1 for p in range(nPlanes) ): # Either the 2 or 3 horizontal DS planes.
+   if not all( [len(stations[p])==1 for p in range(nPlanes)] ):
+      return -999.
+   ts=[0.,0]
+   for p in range(nPlanes):
+      hit=stations[p][list(stations[p].keys())[0]]
+      tdcs=hit.GetAllTimes()
+      if len(tdcs) != 2: 
+         return -999.
+      for item in tdcs: 
+         SiPM, tdc = item
+         ts[0]+=tdc
+         ts[1]+=1
+   dsh_average=ts[0]/ts[1]
+   return dsh_average
 
 def fit_langau(hist,o,bmin,bmax):
    params = {0:'Width(scale)',1:'mostProbable',2:'norm',3:'sigma'}
@@ -363,23 +385,19 @@ def GetBarSlice(L, sliceL, xpred):
    return slice_num   
 
 def GetSiPMNumberInSystem_LandR(detID, SiPM): # 20000 SiPM 8 -> 8
-    s, p, b = parseDetID(detID)
-    if s==1: 
-        nSiPMs, SiPMs_plane=16, 112 # is it? 
-        return SiPM+nSiPMs*b+p*SiPMs_plane
-    elif s==2:
-        nSiPMs, SiPMs_plane=16, 160
-        return SiPM+nSiPMs*b+p*SiPMs_plane
-    elif s==3: # Count left and right horizontal SiPMs consecutively
-        nSiPMs, SiPMs_hor_plane, SiPMs_vert_plane=1, 120, 60
-        if p not in verticalPlanes:
-            total_SiPM = (p//2)*SiPMs_hor_plane+(p//2)*SiPMs_vert_plane+SiPM+2*b
-            return total_SiPM
-    else:
-        if p==1: return SiPMs_hor_plane+b 
-        elif p==3: return 2*SiPMs_hor_plane+SiPMs_vert_plane+b
-        elif p==5: return 3*SiPMs_hor_plane+2*SiPMs_vert_plane+b
-        elif p==6: return 3*SiPMs_hor_plane+3*SiPMs_vert_plane+b    
+   if not isinstance(SiPM, int): SiPM=int(SiPM)
+   s, p, b = parseDetID(int(detID))
+   if s==1: 
+      nSiPMs, SiPMs_plane=16, 112 # is it? 
+      return int(SiPM)+nSiPMs*b+p*SiPMs_plane
+   elif s==2:
+      nSiPMs, SiPMs_plane=16, 160
+      return SiPM+nSiPMs*b+p*SiPMs_plane
+   elif s==3: # Count left and right horizontal SiPMs consecutively
+      nSiPMs, SiPMs_hor_plane, SiPMs_vert_plane=1, 120, 60
+      if p not in verticalPlanes:
+         total_SiPM = (p//2)*SiPMs_hor_plane+(p//2)*SiPMs_vert_plane+SiPM+2*b
+         return total_SiPM   
          
 def GetSiPMNumberInPlane_LandR(detID, SiPM):
     s, p, b = parseDetID(detID)
@@ -404,30 +422,6 @@ def GetSiPMNumberInSystem_LTR(detID, SiPM): # 20000 SiPM 8 -> 400
    elif SiPM>=nSiPMs:
       SiPM_r=400+SiPM%nSiPMs
       return SiPM_r+nSiPMs*b+p*SiPMs_plane
-
-def GetDSH_average(hits, nPlanes=3):
-   stations={k:{} for k in range(7)}
-   for i,hit in enumerate(hits):
-      detID=hit.GetDetectorID()
-      s,p,b=parseDetID(detID)
-      if b>59: continue
-      if s!=3:continue
-      stations[p][i]=hit
-   if not all( len(stations[p*2])==1 for p in range(nPlanes) ): # Either the 2 or 3 horizontal DS planes.
-      return -999.
-   ts=[0.,0]
-   for i in range(nPlanes):
-      p=i*2
-      hit=stations[p][list(stations[p].keys())[0]]
-      tdcs=hit.GetAllTimes()
-      if len(tdcs) != 2: 
-         return -999.
-      for item in tdcs: 
-         SiPM, tdc = item
-         ts[0]+=tdc
-         ts[1]+=1
-   dsh_average=ts[0]/ts[1]
-   return dsh_average
 
 def GetDeltaT(times, one_channel=None):
    # nSiPMs=aHit.GetnSiPMs()
@@ -462,7 +456,7 @@ def Getcscint(runNr, fixed_ch, state):
 
    iteration=0 if state=='uncorrected' else 1
    if not os.path.exists(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'): 
-      print(f'path issue: {afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv')
+      # print(f'path issue: {afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv')
       return -999.
    with open(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
       reader=csv.reader(handle)
@@ -525,8 +519,9 @@ def GetAvgcscint(path, detID, SiPMs, state):
 def GetPolyParams(runNr, fixed_ch, n, state):
    iteration=0 if state=='uncorrected' else 1
    filelengths={1:11, 2:13, 3:15, 4:13, 5:9}
-   if not os.path.exists(f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv'): return -999.
-   with open(f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv', 'r') as f:
+   fname=f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv'
+   if not os.path.exists(fname): return -999.
+   with open(fname, 'r') as f:
       reader=csv.reader(f)
       alldata=[r for r in reader]
       if len(alldata)==0:return -999
@@ -639,7 +634,6 @@ def GetBadchi2pNDFdict(runNr, subsystem, state):
 def Makechi2pNDFdict(runNr, subsystem, n, state):
    
    iteration=0 if state=='uncorrected' else 1
-   #path=afswork+'chi2s/run'+str(runNr)+'/'
    path=f'{afswork}/chi2s/run{runNr}/'
    res={}
    for filename in os.listdir(path):
@@ -654,7 +648,6 @@ def Makechi2pNDFdict(runNr, subsystem, n, state):
             print(filename)
             continue
          data=alldata[iteration-1]
-         #chi2pNDF=data.pop()
          chi2pNDF=float(data[1])/int(data[2])
       res[fixed_ch]=chi2pNDF
    sorted_tuples=sorted(res.items(), key=lambda x:x[1])
@@ -710,9 +703,6 @@ def GetMPV(runNr, fixed_ch, iteration):
       res=data[iteration-1]
    return float(res[0])
 
-def MakeFixedCh(fixed):
-   fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
-   return f'{str(fixed_subsystem)}{str(fixed_plane)}00{str(fixed_bar)}_{str(fixed_SiPM)}'
 
 def correct_ToF(SiPM, clock, xpred, cs, xref):
    
