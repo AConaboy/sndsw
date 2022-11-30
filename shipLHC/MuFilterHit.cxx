@@ -8,6 +8,8 @@
 #include "TGeoBBox.h"
 #include <TRandom.h>
 #include <iomanip> 
+#include <iostream>
+#include <fstream>
 
 using std::cout;
 using std::endl;

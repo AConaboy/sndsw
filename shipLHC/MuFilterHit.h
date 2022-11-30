@@ -45,6 +45,7 @@ class MuFilterHit : public SndlhcHit
     int GetPlane(){return int(fDetectorID/1000)%10;}
     bool isVertical();
     bool isShort(Int_t);
+    // TString MakeFixedChannel();
   private:
 
     Float_t flag;   ///< flag
