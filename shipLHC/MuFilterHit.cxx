@@ -7,6 +7,8 @@
 #include "TGeoBBox.h"
 #include <TRandom.h>
 #include <iomanip> 
+#include <iostream>
+#include <fstream>
 
 Double_t speedOfLight = TMath::C() *100./1000000000.0 ; // from m/sec to cm/ns
 // -----   Default constructor   -------------------------------------------
@@ -170,18 +172,116 @@ std::map<Int_t,Float_t> MuFilterHit::GetAllSignals(Bool_t mask,Bool_t positive)
 // -----   Public method Get List of time measurements   -------------------------------------------
 std::map<Int_t,Float_t> MuFilterHit::GetAllTimes(Bool_t mask)
 {
-          std::map<Int_t,Float_t> allTimes;
-          for (unsigned int s=0; s<nSides; ++s){
-              for (unsigned int j=0; j<nSiPMs; ++j){
-               unsigned int channel = j+s*nSiPMs;
-               if (signals[channel]> 0){
-                 if (!fMasked[channel] || !mask){
-                    allTimes[channel] = times[channel];
-                    }
-                }
-              }
-          }
-          return allTimes;
+  std::map<Int_t,Float_t> allTimes;
+  for (unsigned int s=0; s<nSides; ++s){
+    for (unsigned int j=0; j<nSiPMs; ++j){
+     unsigned int channel = j+s*nSiPMs;
+     if (signals[channel]> 0){
+       if (!fMasked[channel] || !mask)
+        {
+        allTimes[channel] = times[channel];
+        }
+      }
+    }
+  }
+  return allTimes;
+}
+
+// Only works for veto and US for now
+// std::vector<Int_t> MuFilterHit::parseDetID(Int_t detID){
+//     std::vector<Int_t> res;
+//     Int_t subsystem, plane, bar;
+//     subsystem=detID/10000;
+//     plane=detID%10000/1000;
+//     bar=detID%1000;
+//     res.push_back(subsystem);
+//     res.push_back(plane);
+//     res.push_back(bar);
+//     cout<<"subsystem: "<<res[0]<<" plane: "<<res[1]<<" bar: "<<res[2]<<endl;
+//     return res;
+// }
+
+std::vector<Float_t> adv_tokenizer(std::string s, char del, std::string state ="uncorrected")
+{
+  std::vector<Float_t> res;
+  std::stringstream ss(s);
+  std::string word;
+  while (!ss.eof()) {
+    std::getline(ss, word, del);
+    if (word==state) {continue;}
+    // std::cout<<"word: "<<word<<std::endl;
+    res.push_back(std::stof(word));
+  }
+  res.pop_back();res.pop_back();
+  return res;
+}
+
+// std::vector<Float_t> GetTWParams(std::string runNr, Int_t fDetectorID, Int_t SiPM, std::string state = "uncorrected"){
+std::vector<Float_t> MuFilterHit::GetTWParams(std::string runNr, Int_t channel, std::string state /*="uncorrected"*/)
+{
+    // std::cout<<"Started GetTWParams function"<<std::endl;
+    // std::vector<Int_t> spb=parseDetID(fDetectorID);
+    std::string detID=std::to_string(fDetectorID);
+    // variables for reading csv
+
+    std::vector<Float_t> params;
+    std::ifstream fin;
+    std::string fname, line, word, temp;
+            
+    fname="/eos/experiment/sndlhc/users/aconsnd/Polyparams/run"+runNr+"/polyparams4_"+detID+"_"+std::to_string(channel)+".csv";
+    // std::cout<<"Defined path. Now opening file to read."<<std::endl;
+    // std::cout<<"path: "<<fname<<std::endl;
+
+    fin.open(fname);
+    // while (!fin.eof()) {
+    fin >> line;
+    // }
+    fin.close();
+
+    // std::cout<<"Entire line: "<<line<<std::endl;
+    if (line=="") {return params;}
+    std::vector<Float_t> row=adv_tokenizer(line,',');
+    params=row;
+    return params;
+}
+
+Float_t MuFilterHit::TWCorrection(std::vector<Float_t> params, Float_t qdc)
+{
+  Int_t qdc_low, qdc_high;
+  // qdc_high=params.pop(); qdc_low=params[-1]
+  qdc_high=params[params.size()-1];qdc_low=params[params.size()-2];
+  std::vector<Float_t> cps;
+  for (int i=0; i<=10;++i)
+  {
+    if (i%2==0)
+    {
+      cps.push_back(params[i]);
+    }
+    else {continue;}
+  }
+  Float_t x_offset=qdc-cps[0];
+  Float_t correction=cps[3]*x_offset/(cps[0]+cps[1]*x_offset+cps[2]*x_offset*x_offset);
+  return correction;
+}
+
+// -----   Public method Get List of TW corrected times IN NANOSECONDS  -------------------------------------------
+std::map<Int_t,Float_t> MuFilterHit::GetTWCorrectedTimes(Bool_t mask, std::string runNr)
+{
+  // std::string runNr;
+  std::map<Int_t,Float_t> allTimes;
+  for (unsigned int s=0; s<nSides; ++s){
+    for (unsigned int j=0; j<nSiPMs; ++j){
+     unsigned int channel = j+s*nSiPMs;
+      if (signals[channel]> 0){
+        if (!fMasked[channel] || !mask){
+          std::vector<Float_t> params = MuFilterHit::GetTWParams(runNr, channel);
+          Float_t TWCorrection = MuFilterHit::TWCorrection(params, signals[channel]);
+          allTimes[channel] = times[channel]*6.25+TWCorrection;
+        }
+      }
+    }
+  }
+  return allTimes;
 }
 
 // -----   Public method Get time difference mean Left - mean Right   -----------------
