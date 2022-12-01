@@ -69,6 +69,8 @@ class TimeWalk(ROOT.FairTask):
     def ExecuteEvent(self, event):
 
         hists=self.hists
+
+
         
         Reco_MuonTracks=self.M.Reco_MuonTracks
         inVeto, inDS=False, False
@@ -102,6 +104,9 @@ class TimeWalk(ROOT.FairTask):
         if not TimeWalk.slopecut(mom): return
 
         for hit in event.Digi_MuFilterHits:
+            nLeft, nRight=muAna.GetnFiredSiPMs(hit)
+            if not TimeWalk.nSiPMscut(hit, nLeft, nRight): continue
+
             detID=hit.GetDetectorID()
             s,p,b=muAna.parseDetID(detID)
             
@@ -198,20 +203,25 @@ class TimeWalk(ROOT.FairTask):
 
         ### TW corrected time then ToF & TW corrected time        
         TWcorrectedtime=time+polycorrection
-        if options.debug==1:
+        ToFTWcorrectedtime=ToFcorrectedtime+polycorrection
+
+        if self.options.debug==1:
             # DigiCorrectedTWtimes=hit.GetTWCorrectedTimes(runNr=self.runNr)
             # DigiCorrectedTWtime=muAna.GetChannelVal(SiPM, DigiCorrectedTWtimes)
             params=hit.GetTWParams(self.runNr, SiPM)
             DigiTWcorrection=hit.TWCorrection(params, qdc)
+            DigiTWcorrectedtime=time+DigiTWcorrection
+            DigiTWToFcorrectedtime=ToFcorrectedtime+DigiTWcorrection
 
+            DigiTWToFt_rel = DST0-DigiTWToFcorrectedtime
+            DigiTWt_rel = DST0-DigiTWcorrectedtime
 
-
-        ToFTWcorrectedtime=ToFcorrectedtime+polycorrection
-
+            ###### Investigate whether the hit class method and my implementation of TW correction give the same results
+            # print(f'Digi correction: {DigiTWcorrectedtime}\nMy correction: {TWcorrectedtime}\n')
 
         ### Times wrt to DS horizontal average
-        ToFTWt_rel=DST0 - ToFTWcorrectedtime
-        TWt_rel=DST0 - TWcorrectedtime
+        ToFTWt_rel=DST0-ToFTWcorrectedtime
+        TWt_rel=DST0-TWcorrectedtime
 
         ### Make histograms
         dtvxpred=f'dtvxpred_{fixed_ch}_corrected'
@@ -229,22 +239,19 @@ class TimeWalk(ROOT.FairTask):
         if not SiPMtime in hists:
            hists[SiPMtime]=ROOT.TH1F(SiPMtime,f'Measured SiPM time {fixed_ch};SiPM time [ns];Counts', 500, 0, 25)
 
-        if options.debug==1:
-            digimethod=f'dtvxpred_{fixed_ch}_DigiMethodCorrected'
+        if self.options.debug==1:
+            # digimethod=f'dtvxpred_{fixed_ch}_DigiMethodCorrected'
+            digimethod=f'dtvqdc_{fixed_ch}_DigiMethodCorrected'
             if not digimethod in hists:
                 title='MuFilterHit TW correction method T_{0}^{DS}-t_{'+str(SiPM)+'} v QDC_{'+str(SiPM)+'};QDC_{'+str(SiPM)+'} [a.u];T_{0}^{DS}-t_{'+str(SiPM)+'} [ns]'
-                hists[digimethod]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 800, -20, 20)
-
-
+                hists[digimethod]=ROOT.TH2F(digimethod, title, 200, 0, 200, 800, -20, 20)
 
         ### Fill histograms 
         hists[dtvxpred].Fill(xpred,TWt_rel)
         hists[dtvqdc].Fill(qdc, ToFTWt_rel)
         hists[SiPMtime].Fill(TWcorrectedtime)
 
-        if options.debug==1: hists[digimethod].Fill()
-
-    def CorrectTimes(self, ) 
+        if self.options.debug==1: hists[digimethod].Fill(qdc, DigiTWToFt_rel)
 
     def WriteOutHistograms(self):
         
@@ -277,6 +284,17 @@ class TimeWalk(ROOT.FairTask):
         #if dymin or dy 
         if dy>dy_max or dy<dy_min: return 0 
         else: return 1 
+
+    @staticmethod
+    def nSiPMscut(hit, nLeft, nRight):
+        s,p,b=muAna.parseDetID(hit.GetDetectorID())
+        if s==1: 
+            if nLeft<6 or nRight<6: return False
+        elif s==2:
+            if nLeft<4 or nRight<4: return False
+        elif s==3: 
+            pass 
+        return True 
     
     @staticmethod
     def dycut(hist, nsig=1):    

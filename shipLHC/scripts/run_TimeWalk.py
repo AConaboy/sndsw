@@ -31,7 +31,7 @@ parser.add_argument("--server", dest="server", help="xrootd server",default=os.e
 parser.add_argument("-r", "--runNumber", dest="runNumber", help="run number", type=int,default=-1)
 parser.add_argument('-p', '--path', dest='path', help='path', type=str, required=False)
 parser.add_argument("-P", "--partition", dest="partition", help="partition of data", type=int,required=False,default=-1)
-parser.add_argument("-d", "--debug", dest="debug", help="debug", default=False)
+parser.add_argument("-d", "--debug", dest="debug", help="debug", type=int, default=False)
 parser.add_argument("-cpp", "--convRawCPP", action='store_true', dest="FairTask_convRaw", help="convert raw data using ConvRawData FairTask", default=False)
 parser.add_argument( "--withCalibration", action='store_true', dest="makeCalibration", help="make QDC and TDC calibration, not taking from raw data", default=False)
 
