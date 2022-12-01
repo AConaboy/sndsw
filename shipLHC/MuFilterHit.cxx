@@ -179,20 +179,7 @@ std::map<Int_t,Float_t> MuFilterHit::GetAllTimes(Bool_t mask)
   return allTimes;
 }
 
-// Only works for veto and US for now
-// std::vector<Int_t> MuFilterHit::parseDetID(Int_t detID){
-//     std::vector<Int_t> res;
-//     Int_t subsystem, plane, bar;
-//     subsystem=detID/10000;
-//     plane=detID%10000/1000;
-//     bar=detID%1000;
-//     res.push_back(subsystem);
-//     res.push_back(plane);
-//     res.push_back(bar);
-//     cout<<"subsystem: "<<res[0]<<" plane: "<<res[1]<<" bar: "<<res[2]<<endl;
-//     return res;
-// }
-
+// Parse line of csv file using a provided delimiter, del. 
 std::vector<Float_t> adv_tokenizer(std::string s, char del, std::string state ="uncorrected")
 {
   std::vector<Float_t> res;
@@ -201,58 +188,53 @@ std::vector<Float_t> adv_tokenizer(std::string s, char del, std::string state ="
   while (!ss.eof()) {
     std::getline(ss, word, del);
     if (word==state) {continue;}
-    // std::cout<<"word: "<<word<<std::endl;
     res.push_back(std::stof(word));
   }
   res.pop_back();res.pop_back();
   return res;
 }
 
-// std::vector<Float_t> GetTWParams(std::string runNr, Int_t fDetectorID, Int_t SiPM, std::string state = "uncorrected"){
+// Fetch time walk parameters for a given channel and given run number. Run number dependence *hopefully* not necessary.
+// the 'state' argument allows for a second iteration of the time walk correction to be implemented however it probably isn't necessary.
 std::vector<Float_t> MuFilterHit::GetTWParams(std::string runNr, Int_t channel, std::string state /*="uncorrected"*/)
 {
-    // std::cout<<"Started GetTWParams function"<<std::endl;
-    // std::vector<Int_t> spb=parseDetID(fDetectorID);
     std::string detID=std::to_string(fDetectorID);
+    
     // variables for reading csv
-
     std::vector<Float_t> params;
     std::ifstream fin;
     std::string fname, line, word, temp;
             
-    fname="/eos/experiment/sndlhc/users/aconsnd/Polyparams/run"+runNr+"/polyparams4_"+detID+"_"+std::to_string(channel)+".csv";
-    // std::cout<<"Defined path. Now opening file to read."<<std::endl;
-    // std::cout<<"path: "<<fname<<std::endl;
-
+    fname="/eos/experiment/sndlhc/users/aconsnd/TWparameters/run"+runNr+"/polyparams4_"+detID+"_"+std::to_string(channel)+".csv";
     fin.open(fname);
-    // while (!fin.eof()) {
     fin >> line;
-    // }
     fin.close();
 
-    // std::cout<<"Entire line: "<<line<<std::endl;
-    if (line=="") {return params;}
-    std::vector<Float_t> row=adv_tokenizer(line,',');
+    if (line=="") {return params;} // If no params available, return vector of zeros.
+    std::vector<Float_t> row=adv_tokenizer(line,','); // Delimiter is a comma, no space!
     params=row;
     return params;
 }
 
+// Calculate time walk correction with parameters in hand.
 Float_t MuFilterHit::TWCorrection(std::vector<Float_t> params, Float_t qdc)
 {
+  // Last 2 entries in the csv file are the limits over which the fit was performed. 
   Int_t qdc_low, qdc_high;
-  // qdc_high=params.pop(); qdc_low=params[-1]
   qdc_high=params[params.size()-1];qdc_low=params[params.size()-2];
+  
   std::vector<Float_t> cps;
   for (int i=0; i<=10;++i)
   {
-    if (i%2==0)
+    if (i%2==0) // The entries in the csv file are: param[i], error_param[i]
     {
       cps.push_back(params[i]);
     }
     else {continue;}
   }
-  Float_t x_offset=qdc-cps[0];
-  Float_t correction=cps[3]*x_offset/(cps[0]+cps[1]*x_offset+cps[2]*x_offset*x_offset);
+  Float_t x_offset=qdc-cps[0]; // Offset in x
+  Float_t correction=cps[3]*x_offset/(cps[0]+cps[1]*x_offset+cps[2]*x_offset*x_offset); 
+  // The final parameter in the function is a vertical offset required for fitting however this should not be applied in the fit.
   return correction;
 }
 
@@ -266,9 +248,9 @@ std::map<Int_t,Float_t> MuFilterHit::GetTWCorrectedTimes(Bool_t mask, std::strin
      unsigned int channel = j+s*nSiPMs;
       if (signals[channel]> 0){
         if (!fMasked[channel] || !mask){
-          std::vector<Float_t> params = MuFilterHit::GetTWParams(runNr, channel);
-          Float_t TWCorrection = MuFilterHit::TWCorrection(params, signals[channel]);
-          allTimes[channel] = times[channel]*6.25+TWCorrection;
+          std::vector<Float_t> params = MuFilterHit::GetTWParams(runNr, channel); // Read parameters from the file
+          Float_t TWCorrection = MuFilterHit::TWCorrection(params, signals[channel]); // Determine correction using the fetched parameters
+          allTimes[channel] = times[channel]*6.25+TWCorrection; // Factor of 6.25 for clock cycles -> nanoseconds conversion.
         }
       }
     }
