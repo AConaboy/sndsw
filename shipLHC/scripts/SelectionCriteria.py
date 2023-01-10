@@ -46,8 +46,10 @@ class MuonSelectionCriteria(ROOT.FairTask):
         self.hists['nStations'] = ROOT.TH1F('nStations', 'Number of stations used in track fit;Number of stations used;Counts', 10, 0, 10)
         self.hists['nStations'].Fill(options.nStations)
 
-        slopetitle = 'Track slopes;slope x [rad];slope y [rad]'
-        self.hists[f'slopes_{self.nStations}stations'] = ROOT.TH2F(f'slopes_{self.nStations}stations',slopetitle, 300, -1.5, 1.5, 300, -1.5, 1.5)
+        subnamedict={1:'Veto', 2:'US'}
+        for i in (1, 2):
+            slopetitle = f'{subnamedict[i]} track slopes;slope x [rad];slope y [rad]'
+            self.hists[f'{subnamedict[i]}_slopes_{self.nStations}stations'] = ROOT.TH2F(f'{subnamedict[i]}_slopes_{self.nStations}stations',slopetitle, 300, -1.5, 1.5, 300, -1.5, 1.5)
         
         self.hists['DST0']=ROOT.TH1F('DST0','DSH average', 100, 0, 25)
 
@@ -67,44 +69,55 @@ class MuonSelectionCriteria(ROOT.FairTask):
         
         hists=self.hists
 
+        tracks={}
+        Reco_MuonTracks = self.M.Reco_MuonTracks
+        inVeto, inDS=False, False
+        for i,track in enumerate(Reco_MuonTracks):
+            if track.GetUniqueID()==1: 
+                inVeto=True
+                tracks[1]=Reco_MuonTracks[i]
+            if track.GetUniqueID()==3:
+                inDS=True
+                tracks[2]=Reco_MuonTracks[i]
+        if not inDS: return
+
+        fstates={i:tracks[i].getFittedState() for i in tracks}
+        # pos=fstate.getPos()
+        posvectors={i:fstates[i].getPos() for i in fstates}
+        # mom=fstate.getMom()
+        momvectors={i:fstates[i].getMom() for i in fstates}
+
+        # Use the correct subsystems for 1 bar / plane cut
+        if inVeto: tmp=(1,2)
+        else: tmp=(2,)
+        if not muAna.OneHitPerSystem(event.Digi_MuFilterHits, tmp): return        
+
         DST0cc=muAna.GetDSH_average(event.Digi_MuFilterHits)
         self.hists['DST0'].Fill(DST0cc*6.25)
 
         if 'slopes' in self.histtypes:
-            Reco_MuonTracks=self.M.Reco_MuonTracks
-            theTrack=Reco_MuonTracks[0] # For new software update I have to check the unique_ID of the track
-            fstate=theTrack.getFittedState()
-            pos=fstate.getPos()
-            mom=fstate.getMom()
-
             ### Fill slope hist
-            slopeX, slopeY = mom.x()/mom.z(), mom.y()/mom.z()
-            hists[f'slopes_{self.nStations}stations'].Fill(slopeX, slopeY)
+            slopes={i:(momvectors[i].x()/momvectors[i].z(), momvectors[i].y()/momvectors[i].z()) for i in momvectors}
+            [hists[f'{subnamedict[i]}slopes_{self.nStations}stations'].Fill(*slopes[i]) for i in slopes] 
 
         # Returns bool for if the track object is in the acceptance for Veto and US respectively.
-        InVeto, InUS=(muAna.InAcceptance(pos, mom, i, self.MuFilter, self.zPos) for i in (1,2))
-        if not InUS: return 0
-
-        # Use the correct subsystems for 1 bar / plane cut
-        if InVeto: tmp=(1,2)
-        else: tmp=(2,)
-        if not muAna.OneHitPerSystem(event.Digi_MuFilterHits, tmp): return 0
 
         for hit in event.Digi_MuFilterHits:
+
             detID=hit.GetDetectorID()
             s,p,b=muAna.parseDetID(detID)
             if s==3: continue
 
             if 'slopes' in self.histtypes:
                 zEx=self.zPos['MuFilter'][s*10+p]
-                lam=(zEx-pos.z())/mom.z()
-                Ex=ROOT.TVector3(pos.x()+lam*mom.x(), pos.y()+lam*mom.y(), pos.z()+lam*mom.z())
+                lam=(zEx-posvectors[s].z())/momvectors[s].z()
+                Ex=ROOT.TVector3(posvectors[s].x()+lam*momvectors[s].x(), posvectors[s].y()+lam*momvectors[s].y(), posvectors[s].z()+lam*momvectors[s].z())
 
                 xpred=self.xpred(v1,Ex)
                 xpred_R=-xpred
 
                 ### Fill y-residual histogram
-                self.Fillyresidual(detID,pos,mom,Ex)
+                self.Fillyresidual(detID,posvectors[s],momvectors[s],Ex)
 
             ### Fill nSiPMs histogram
             self.FillnSiPMs(detID, hit)

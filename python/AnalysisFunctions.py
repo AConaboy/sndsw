@@ -12,6 +12,19 @@ systemAndSiPMs={1:range(16),2:(0,1,3,4,6,7,8,9,11,12,14,15),3:(1,)}
 verticalBarDict={0:1, 1:3, 2:5, 3:6}
 gelsides={0:'R', 1:'L', 2:'R', 3:'L', 4:'L'}
 
+def DSHcheck(detID):
+   s,p,b=parseDetID(detID)
+   if s!=3:return False 
+   if p<3 and b<60:  return True
+   elif p==3 and b<60: return True
+   else: return False
+
+def DSVcheck(detID):
+   s,p,b=parseDetID(detID)
+   if s==3 and p<3 and b>59: return True 
+   elif s==3 and p==3: return True 
+   else: return False
+
 def BuildBarLengths(MuFilter):
    Vetobarlength = MuFilter.GetConfParF('MuFilter/VetoBarX')
    USbarlength = MuFilter.GetConfParF('MuFilter/UpstreamBarX')
@@ -48,15 +61,23 @@ def IsSmallSiPMchannel(i):
 	else: return False
 
 def GetSide(fixed_ch):
-    detID, SiPM = fixed_ch.split('_')
-    s,p,b=parseDetID(int(detID))
-    if s==2:
-        if int(SiPM)<8: side='left'
-        elif int(SiPM)>7: side='right'
-    elif s==1:
-        if int(SiPM)<6: side='left'
-        elif int(SiPM)>5: side='right'
-    return side
+   detID, SiPM = fixed_ch.split('_')
+   s,p,b=parseDetID(int(detID))
+   if s==2:
+      if int(SiPM)<8: side='left'
+      elif int(SiPM)>7: side='right'
+   elif s==1:
+      if int(SiPM)<6: side='left'
+      elif int(SiPM)>5: side='right'
+   elif s==3:
+      s,p,b=parseDetID(int(detID))
+      if p!=3 and b<60 and int(SiPM)==0: side='left'
+      elif p!=3 and b<60 and int(SiPM)==1: side='right'
+      elif p!=3 and b>59 and int(SiPM)==0: side='top'
+      elif p==3 and int(SiPM)==0: side='top'
+      else: print('huh?')
+
+   return side
 
 def IsGel(fixed_ch):
    detID, SiPM = fixed_ch.split('_')
@@ -96,6 +117,11 @@ def parseDetID(detID):
       bar=detID%1000
       return subsystem, plane, bar
 
+def MakeDetID(fixed):
+   fixed_subsystem, fixed_plane, fixed_bar = fixed
+   if fixed_subsystem in (1,2,3):
+      return int(f'{str(fixed_subsystem)}{str(fixed_plane)}{str(fixed_bar).zfill(3)}')
+
 def MakeFixedCh(fixed):
    fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
    if fixed_subsystem in (1,2,3):
@@ -124,6 +150,18 @@ def GetDSHaverage(hits, nPlanes=3):
          ts[1]+=1
    dsh_average=ts[0]/ts[1]
    return dsh_average
+
+def ATLAStrack(hits, DST0):
+   for hit in hits:
+      detID=hit.GetDetectorID()
+      s,p,b=parseDetID(detID)
+      if s==2 and p==0:
+         US1hit=hit
+         break
+   averageUS1TDC=GetAverageTDC(US1hit)
+   if averageUS1TDC < DST0: return True 
+   else: return False
+
 
 def fit_langau(hist,o,bmin,bmax):
    params = {0:'Width(scale)',1:'mostProbable',2:'norm',3:'sigma'}
@@ -192,14 +230,15 @@ def langaufun(x,par):
       return (par[2] * step * summe * invsq2pi / par[3])
 
 	      
-def GetAvgT(mufiHit, side='both'):
+def GetAverageTDC(mufiHit, side='both'):
    value=[0, 0]
    count=[0, 0]
    nSiPMs=mufiHit.GetnSiPMs()
    times=mufiHit.GetAllTimes()
    s, p, b = parseDetID(mufiHit.GetDetectorID())
    for element in times:
-      SiPM, time = element 
+      SiPM, time = element
+      if s==2 and IsSmallSiPMchannel(SiPM):continue
       if SiPM<nSiPMs:
          value[0]+=time
          count[0]+=1
@@ -222,9 +261,6 @@ def GetAvgT(mufiHit, side='both'):
          return average
       elif side == 'L': return value[0]/count[0]
       elif side == 'R': return value[1]/count[1]
-
-   # elif s == 3 and b > 59: 
-   #    return
 
 def GetChannelVal(SiPM, chs):
 	for entry in chs:
@@ -387,17 +423,44 @@ def GetBarSlice(L, sliceL, xpred):
 def GetSiPMNumberInSystem_LandR(detID, SiPM): # 20000 SiPM 8 -> 8
    if not isinstance(SiPM, int): SiPM=int(SiPM)
    s, p, b = parseDetID(int(detID))
-   if s==1: 
+   if s==1:
       nSiPMs, SiPMs_plane=16, 112 # is it? 
       return int(SiPM)+nSiPMs*b+p*SiPMs_plane
    elif s==2:
       nSiPMs, SiPMs_plane=16, 160
       return SiPM+nSiPMs*b+p*SiPMs_plane
+   
    elif s==3: # Count left and right horizontal SiPMs consecutively
-      nSiPMs, SiPMs_hor_plane, SiPMs_vert_plane=1, 120, 60
-      if p not in verticalPlanes:
-         total_SiPM = (p//2)*SiPMs_hor_plane+(p//2)*SiPMs_vert_plane+SiPM+2*b
-         return total_SiPM   
+      nSiPMs_bar_hor, nSiPMs_bar_ver=2, 1
+      nSiPMs_plane_hor, nSiPMs_plane_ver=120, 60
+      # p=verticalBarDict[p]
+      # tmp=(p-1) if p!=0 else 0
+      # if SiPM>59:
+      #    nsipm=tmp*nSiPMs_plane_hor+p*nSiPMs_plane_ver+nSiPMs_ver*b+SiPM
+      # elif SiPM<60:
+      #    nsipm=p*nSiPMs_plane_ver+tmp*nSiPMs_plane_hor+nSiPMs_hor*b+SiPM
+      # return nsipm
+      if b>59:
+         tmp=p+1
+         horizontalSiPMs=(p+1)*nSiPMs_plane_hor
+         verticalSiPMs=p*nSiPMs_plane_ver
+         total=horizontalSiPMs+verticalSiPMs+(b-60)*nSiPMs_bar_ver
+      elif b<60 and p==3:
+         horizontalSiPMs=p*nSiPMs_plane_hor
+         verticalSiPMs=p*nSiPMs_plane_ver
+         total=horizontalSiPMs+verticalSiPMs+b*nSiPMs_bar_ver
+      elif b<60 and p!=3:
+         horizontalSiPMs=p*nSiPMs_plane_hor
+         verticalSiPMs=p*nSiPMs_plane_ver
+         total=horizontalSiPMs+verticalSiPMs+b*nSiPMs_bar_hor+SiPM
+      return total
+         
+
+
+      # nSiPMs, SiPMs_hor_plane, SiPMs_vert_plane=1, 120, 60
+      # if p not in verticalPlanes:
+      #    total_SiPM = (p//2)*SiPMs_hor_plane+(p//2)*SiPMs_vert_plane+SiPM+2*b
+      #    return total_SiPM   
          
 def GetSiPMNumberInPlane_LandR(detID, SiPM):
     s, p, b = parseDetID(detID)
@@ -457,13 +520,13 @@ def Getcscint(runNr, fixed_ch, state):
    iteration=0 if state=='uncorrected' else 1
    if not os.path.exists(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'): 
       # print(f'path issue: {afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv')
-      return -999.
+      return -999
    with open(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
       reader=csv.reader(handle)
       alldata=[row for row in reader]
       if len(alldata)<iteration+1 or len(alldata) == 0: 
          print(f'{fixed_ch} Len issue')
-         return -999.
+         return -999
       try:
          data=alldata[iteration]
       except IndexError:
@@ -491,7 +554,12 @@ def Makecscintdict(runNr, subsystem, state):
    for filename in os.listdir(path):
       #fixed_ch=filename[filename.find(str(subsystem)):filename.find('.csv')]
       fixed_ch=f'{filename.split("_")[1]}_{filename.split("_")[2].split(".")[0]}'
-      if fixed_ch[0]!=str(subsystem): continue
+      detID=int(fixed_ch.split('_')[0])
+      s,p,b=parseDetID(detID)
+      if s!=subsystem: continue
+      if s==3 and DSVcheck(detID): 
+         print(detID)
+         continue
       with open(path+filename, 'r') as handle:
          reader=csv.reader(handle)
          alldata=[row for row in reader]
@@ -503,6 +571,25 @@ def Makecscintdict(runNr, subsystem, state):
    sorted_tuples=sorted(res.items(), key=lambda x:x[1])
    sorted_d={k:v for k,v in sorted_tuples}
    return sorted_d
+
+def Maketimeresolutiondict(runNr, subsystem, state):
+   iteration=0 if state=='uncorrected' else 1
+   path=f'{afswork}TimeResolution/run{runNr}/'
+   res={}
+   for filename in os.listdir(path):
+      fixed_ch=f'{filename.split("_")[1]}_{filename.split("_")[2].split(".")[0]}'
+      if fixed_ch[0]!=str(subsystem): continue
+      with open(path+filename, 'r') as handle:
+         reader=csv.reader(handle)
+         alldata=[row for row in reader]
+         if len(alldata)<iteration or alldata==[]:
+            print(filename)
+            continue
+         data=alldata[iteration]
+      res[fixed_ch]=(float(data[1]), float(data[2]))
+   sorted_tuples=sorted(res.items(), key=lambda x:x[1][0])
+   sorted_d={k:v for k,v in sorted_tuples}
+   return sorted_d   
    
 def GetAvgcscint(path, detID, SiPMs, state):
    iteration=0 if state=='uncorrected' else 1
@@ -516,12 +603,11 @@ def GetAvgcscint(path, detID, SiPMs, state):
    cbar_err = ROOT.TMath.Sqrt( sum( [i[1]**2 for i in cs] ) )
    return cbar, cbar_err
 
-def GetPolyParams(runNr, fixed_ch, n, state):
+def GetPolyParams(runNr, fixed_ch, n, state='uncorrected'):
    iteration=0 if state=='uncorrected' else 1
    filelengths={1:11, 2:13, 3:15, 4:13, 5:9}
-   fname=f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv'
-   if not os.path.exists(fname): return -999.
-   with open(fname, 'r') as f:
+   if not os.path.exists(f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv'): return -999.
+   with open(f'{afswork}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv', 'r') as f:
       reader=csv.reader(f)
       alldata=[r for r in reader]
       if len(alldata)==0:return -999
@@ -644,6 +730,7 @@ def Makechi2pNDFdict(runNr, subsystem, n, state):
       with open(path+filename, 'r') as handle:
          reader=csv.reader(handle)
          alldata=[row for row in reader]
+         if len(alldata)==0 or len(alldata)<iteration: return -999.
          if len(alldata)<iteration:
             print(filename)
             continue
@@ -686,13 +773,6 @@ def GetXcalculated(dt, L, cs, wanted=None):
 
    return xcalc
 
-def Getuncorrectedcscint(runNr, fixed_ch):
-   with open(afswork+'uncorrectedcscintvalues/run'+str(runNr)+'/'+fixed_ch+'.csv', r) as h:
-      reader=csv.reader(h)
-      data=[row for row in reader]
-      res=data[0]
-   return res
-
 def GetMPV(runNr, fixed_ch, iteration):
    fname=f'{afswork}MPVs/run{runNr}/MPV_{fixed_ch}.csv'
    if not os.path.exists(fname): return -999.
@@ -703,29 +783,41 @@ def GetMPV(runNr, fixed_ch, iteration):
       res=data[iteration-1]
    return float(res[0])
 
+def GetToFcorrection(SiPM, xpred, cs, xref):
+   c_SiPM=float(cs[0])
+   ToFcorrection=abs((xpred-xref)/c_SiPM)
+   return ToFcorrection
+
+def ApplyToFCorrection(SiPM, ToF, clock, xpred, xref):
+   
+   time=clock*6.25
+   if SiPM<8:
+      if xpred >= xref: corrected_t = time-ToF
+      else: corrected_t = time+ToF
+   else: 
+      if xpred >= xref: corrected_t = time+ToF
+      else: corrected_t = time-ToF
+   return (SiPM, corrected_t)
 
 def correct_ToF(SiPM, clock, xpred, cs, xref):
    
    # fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
    time=clock*6.25
-
    c_SiPM=float(cs[0])
    ToFcorrection=abs((xpred-xref)/c_SiPM)
+   # Does not work for DS! 
    if SiPM<8:
       if xpred >= xref: corrected_t = time - ToFcorrection
       else: corrected_t = time + ToFcorrection
-   
    else: 
       if xpred >= xref: corrected_t = time + ToFcorrection
       else: corrected_t = time - ToFcorrection
-
    return (SiPM, corrected_t)
 
 def GoodFitFinder(runNr, n, subsystem, plane, side):
    
    SiPMsdict={'left':(0,1,3,4,6,7), 'right':(8,9,11,12,14,15)}
    chi2s={}
-   
    for bar in range(10):
       for SiPM in SiPMsdict[side]:
          fixed_ch = MakeFixedCh((subsystem, plane, bar, SiPM))
