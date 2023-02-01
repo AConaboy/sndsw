@@ -5,25 +5,30 @@ import ROOT,os,csv, math
 afswork='/afs/cern.ch/work/a/aconsnd/Timing/'
 afsuser='/afs/cern.ch/user/a/aconsnd/twfiles/'
 A, B=ROOT.TVector3(), ROOT.TVector3()
-systemAndPlanes = {1:2,2:5,3:6}
+systemAndPlanes = {1:2,2:5,3:7}
 systemAndBars = {1:7,2:10,3:60}
 systemAndChannels = {1:[0,8],2:[2,6],3:[0,1]}
 systemAndSiPMs={1:range(16),2:(0,1,3,4,6,7,8,9,11,12,14,15),3:(1,)}
 verticalBarDict={0:1, 1:3, 2:5, 3:6}
 gelsides={0:'R', 1:'L', 2:'R', 3:'L', 4:'L'}
 
-def DSHcheck(detID):
+def DSHcheck(detID): # True if detID is a horizontal bar
    s,p,b=parseDetID(detID)
-   if s!=3:return False 
+   if s!=3: return False 
    if p<3 and b<60:  return True
-   elif p==3 and b<60: return True
+   # elif p==3 and b<60: return True
    else: return False
 
-def DSVcheck(detID):
+def DSVcheck(detID): # True if detID is a vertical bar
    s,p,b=parseDetID(detID)
-   if s==3 and p<3 and b>59: return True 
-   elif s==3 and p==3: return True 
+   if s!=3: return False
+   if p<3 and b>59: return True 
+   elif p==3: return True 
    else: return False
+
+def GetListOfChannels(subsystem): #Only returns horizontal channels for the DS (s==3)
+   channels=[f'{MakeFixedCh((subsystem, plane, bar, SiPM))}' for plane in range(systemAndPlanes[subsystem]) for bar in range(systemAndBars[subsystem]) for SiPM in systemAndSiPMs[subsystem] ]
+   return channels
 
 def BuildBarLengths(MuFilter):
    Vetobarlength = MuFilter.GetConfParF('MuFilter/VetoBarX')
@@ -133,22 +138,22 @@ def GetDSHaverage(hits, nPlanes=3):
       detID=hit.GetDetectorID()
       s,p,b=parseDetID(detID)
       if s!=3:continue
-      if b>59: continue
+      if b>59: continue # The bar IDs in DS4V start at 60 so the vertical bars are not contaminating here.
       stations[p][i]=hit
    # if not all( len(stations[p*2])==1 for p in range(nPlanes) ): # Either the 2 or 3 horizontal DS planes.
    if not all( [len(stations[p])==1 for p in range(nPlanes)] ):
       return -999.
-   ts=[0.,0]
+   # ts=[0.,0] # 1st element to sum tdcs, 2nd element to count channels (always equal to 6)
+   total=0.
    for p in range(nPlanes):
       hit=stations[p][list(stations[p].keys())[0]]
       tdcs=hit.GetAllTimes()
-      if len(tdcs) != 2: 
-         return -999.
+      if len(tdcs) != 2: return -999. # Event selection: only accept events with BOTH SiPMs firing on 1 scintillator
+      # for all 3 horizontal DS planes.
       for item in tdcs: 
          SiPM, tdc = item
-         ts[0]+=tdc
-         ts[1]+=1
-   dsh_average=ts[0]/ts[1]
+         total+=tdc 
+   dsh_average=total/6 # Due to event selection in L146, there are always 6 channels over which to be averaged.
    return dsh_average
 
 def ATLAStrack(hits, DST0):
@@ -285,25 +290,36 @@ def GetOverallSiPMNumber(detID, SiPM):
 
    return SiPM+nSiPMs*b+p*SiPMs_plane   
 
-def OneHitPerSystem(hits, systems):
-    #USPlanes={k:0 for k in range(5)}
-    #hitdict={int(k)+10*int(s):0 for k in range(systemAndPlanes[s]) for s in systems}
+def OneHitPerSystem(hits, systems, verbose=False):
+
     hitdict={}
-    for s in systems:
+    for s in systems: # systems always includes US and DS. Veto is included if a Scifi track is also formed.
         for p in range(systemAndPlanes[s]):
             key=10*s+p
-            hitdict[key]=0
+            hitdict[key]=[]
     for i, hit in enumerate(hits):
         if not hit.isValid(): continue
         detID=hit.GetDetectorID()
         s, p, b = parseDetID(detID)
         if s not in systems: continue
-        if s==3: continue
         key=10*s+p
-        hitdict[key]+=1
+        hitdict[key].append(detID)
 
     for key in hitdict:
-        if hitdict[key] != 1: return False
+        hits=hitdict[key]
+        if key<30 and len(hitdict[key]) != 1: return False
+        elif key>=30 and key<33:
+            if len(hits)!=2:
+                if verbose: print(f'{key}: {hits}')
+                return False 
+            bars=sorted([parseDetID(hit)[2] for hit in hits]) # List of bar numbers sorted by number. 
+            # [horizontal, vertical]
+            if not bars[0]<60 and bars[1]>59: 
+                if verbose: print(f'bars fired for plane {key}: {bars}')
+                return False
+        elif key==33:
+            if not len(hits)==1: return False
+            # if not DSVcheck(hitdict[key]): return False
     return True
 
 def InAcceptance(pos, mom, subsystem, geoobject, zPos):
@@ -519,7 +535,6 @@ def Getcscint(runNr, fixed_ch, state):
 
    iteration=0 if state=='uncorrected' else 1
    if not os.path.exists(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'): 
-      # print(f'path issue: {afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv')
       return -999
    with open(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
       reader=csv.reader(handle)
@@ -533,13 +548,24 @@ def Getcscint(runNr, fixed_ch, state):
          print(f'{fixed_ch} IndexError')
       return (float(data[1]), float(data[2]))
 
-def Getcscint_chi2pNDF(runNr,fixed_ch,state):
+def Getcscint_chi2pNDF_info(runNr,fixed_ch,state):
    iteration=0 if state=='uncorrected' else 1
-   # with open(afswork+'rootfiles/run'+str(runNr)+'/cscintvalues/cscint_'+fixed_ch+'.csv', 'r') as handle:
-   with open(afswork+'cscintvalues/run'+str(runNr)+'/cscint_'+fixed_ch+'.csv', 'r') as handle:
+   with open(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
       reader=csv.reader(handle)
       alldata=[row for row in reader]
-      # if len(alldata)<iteration or len(alldata) == 0: return -999.
+      if len(alldata)<iteration+1: return -999.
+      try:
+         data=alldata[iteration]
+      except IndexError:
+         print(f'{fixed_ch} IndexError')
+      return float(data[-2]),int(data[-1])
+
+def Getcscint_chi2pNDF(runNr,fixed_ch,state):
+   iteration=0 if state=='uncorrected' else 1
+   if not os.path.exists(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'): return -999.
+   with open(f'{afswork}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
+      reader=csv.reader(handle)
+      alldata=[row for row in reader]
       if len(alldata)<iteration+1: return -999.
       try:
          data=alldata[iteration]
@@ -661,7 +687,7 @@ def Getchi2_info(runNr, fixed_ch, n, state):
       if len(alldata)==0 or len(alldata)<iteration: return -999.
       data=alldata[iteration-1]
       try:
-            chi2info=int(data[0]), float(data[1]), int(data[2])
+         chi2info=str(data[0]), float(data[1]), int(data[2])
       except ValueError:
          print(f'Non-integer NDF for {fixed_ch}')
          return -999.
@@ -831,7 +857,7 @@ def GoodFitFinder(runNr, n, subsystem, plane, side):
 def GetCutDistributions(runNr, distmodes=('dy', 'slopes', 'nSiPMs'), nStations=2):
    Allmodes=('dy', 'nSiPMs', 'slopes')
    filename=f'{afswork}rootfiles/run{runNr}/SelectionCriteria.root'
-   if not os.path.exists(filename): filename=f'{afswork}rootfiles/run004813/SelectionCriteria.root'
+   if not os.path.exists(filename): filename=f'{afswork}rootfiles/run005097/SelectionCriteria.root'
 
    if isinstance(distmodes, str):
       distmodes=(distmodes,)
@@ -842,6 +868,12 @@ def GetCutDistributions(runNr, distmodes=('dy', 'slopes', 'nSiPMs'), nStations=2
          return 0
 
    f=ROOT.TFile.Open(filename, 'READ')
+   for distmode in distmodes:
+      if not hasattr(f, distmode):
+         f.Close()
+         filename=f'{afswork}rootfiles/run005097/SelectionCriteria.root'
+         f=ROOT.TFile.Open(filename, 'READ')
+         break
    dists={}
 
    for distmode in distmodes:
@@ -850,11 +882,19 @@ def GetCutDistributions(runNr, distmodes=('dy', 'slopes', 'nSiPMs'), nStations=2
             for p in range(systemAndPlanes[s]):
                key=str(s*10+p)
                name=f'{distmode}_{key}_{nStations}stations'
+               if not hasattr(f, name):
+                  print(f'No hist {name}')
+                  f.Close()
+                  return -999
                hist=f.Get(name).Clone()
                hist.SetDirectory(ROOT.gROOT)
                dists[name]=hist
 
       elif distmode=='slopes':
+         if not hasattr(f, name):
+            f.Close()
+            print(f'No hist {name}')
+            return -999
          hist=f.Get(f'{distmode}_{nStations}stations').Clone()
          hist.SetDirectory(ROOT.gROOT)
          dists[distmode]=hist
