@@ -65,18 +65,6 @@ class Tracking(ROOT.FairTask):
    # offline read only:   converted data in, no output
    # offline read/write:  converted data in, converted data out
 
-   # for scifi tracking
-   self.nPlanes = 3
-   self.nClusters = 5
-   self.sigma=150*u.um
-   self.maxRes=50
-   self.maskPlane=-1
-   # for DS tracking
-   self.DSnPlanes = 3
-   self.DSnHits = 5
-   self.nDSPlanesVert  = self.mufiDet.GetConfParI("MuFilter/NDownstreamPlanes")
-   self.nDSPlanesHor = self.nDSPlanesVert-1
-
    if online:
       self.event = self.sink.GetOutTree()
    else: 
@@ -106,6 +94,7 @@ class Tracking(ROOT.FairTask):
       for aTrack in self.trackCandidates[x]:
            rc = self.fitTrack(aTrack)
            if type(rc)==type(1):
+                # rc==-2: not converged, rc==-1 not consistent
                 print('trackfit failed',rc,aTrack)
            else:
                 i_muon += 1
@@ -460,19 +449,10 @@ class Tracking(ROOT.FairTask):
 
 # approximate covariance
     covM = ROOT.TMatrixDSym(6)
-    for k in hitlist:
-      aCl = hitlist[k]
-      if hasattr(aCl,"GetFirst"):
-        detID = aCl.GetFirst()
-      else:
-        detID = aCl.GetDetectorID()
-      if detID<40000: res = self.sigmaMufiDS_spatial
-      else:  res = self.sigmaScifi_spatial
-      break
-
-    for  i in range(3):   covM[i][i] = res*res
+    res = self.sigmaScifi_spatial # Should this not be Scifi/MufiDS depending on track type?
+    for  i in range(3):   covM[i][i] = res*res 
     for  i in range(3,6): covM[i][i] = ROOT.TMath.Power(res / (4.*2.) / ROOT.TMath.Sqrt(3), 2)
-    rep = ROOT.genfit.RKTrackRep(13)
+    rep = ROOT.genfit.RKTrackRep(13) # Runge-Kutta track representation(q/p, u', v', u, v). q/p:charge/mom, u', v': direction tangents, u,v: positions on a genfit.DetPlane. What is/why 13?
 
 # start state
     state = ROOT.genfit.MeasuredStateOnPlane(rep)
@@ -492,25 +472,24 @@ class Tracking(ROOT.FairTask):
         aCl = hitlist[k]
         if hasattr(aCl,"GetFirst"):
             detID = aCl.GetFirst()
-            aCl.GetPosition(A,B)
+            aCl.GetPosition(A,B) # Fill vectors A and B
             detSys  = 1
-            if detID<40000: detSys=3
+            if detID>50000: detSys=3 # Never True?
         else:
             detID = aCl.GetDetectorID()
-            detSys  = 1
-            if detID<40000: detSys=3
-            if detSys==3: self.mufiDet.GetPosition(detID,A,B)
-            if detSys==1: self.scifiDet.GetSiPMPosition(detID,A,B)
+            if detID//10000 < 2: detSys  = 2 # Not DS track
+            else: detSys  = 3 # DS track
+            self.mufiDet.GetPosition(detID,A,B) 
         distance = 0
         tmp = array('d',[A[0],A[1],A[2],B[0],B[1],B[2],distance])
         unSortedList[A[2]] = [ROOT.TVectorD(7,tmp),detID,k,detSys]
     sorted_z=list(unSortedList.keys())
     sorted_z.sort()
     for z in sorted_z:
-        tp = ROOT.genfit.TrackPoint() # note how the point is told which track it belongs to
+        tp = ROOT.genfit.TrackPoint() 
         hitCov = ROOT.TMatrixDSym(7)
         detSys = unSortedList[z][3]
-        if detSys==3:      
+        if detSys==3:
               res = self.sigmaMufiDS_spatial
               maxDis = 1.0
         elif detSys==2:  
@@ -531,7 +510,14 @@ class Tracking(ROOT.FairTask):
         theTrack.Delete()
         return -2
 # do the fit
-    self.fitter.processTrack(theTrack) # processTrackWithRep(theTrack,rep,True)
+    self.fitter.processTrack(theTrack) # resortHits bool=False by default.
+    # processTrack(theTrack) is inherited from genfit::AbsFitter. 
+    # Uses genfit.processTrackWithRep(track, trackRep, false) with all hits
+    # processTrack(theTrack) starts with the cardinalRep (lowest chi2?) then proceeds to others without sorting.
+    # How is cardinal rep chosen? Does it matter?
+    # From Thomas: processTrackWithRep(theTrack,rep,True)... from Andrew: bool resortHits cannot be passed as True? 
+    # Andrew: according to https://eic.github.io/doxygen/d0/dba/classgenfit_1_1AbsFitter.html#a03e279c67ca889f5fe6480eb8a1691cf)
+    
     fitStatus   = theTrack.getFitStatus()
     if self.Debug: print("Fit result: converged chi2 Ndf",fitStatus.isFitConverged(),fitStatus.getChi2(),fitStatus.getNdf())
     if not fitStatus.isFitConverged() and 0>1:

@@ -44,7 +44,7 @@ parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
 parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function of log function", default=4, type=int, required=False)
 parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
-parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=2)
+parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=3)
 parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int, default=5097)
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')

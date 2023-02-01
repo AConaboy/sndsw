@@ -4,9 +4,10 @@ import rootUtils as ut
 import AnalysisFunctions as muAna
 import SndlhcGeo, SndlhcTracking
 from pathlib import Path
+from array import array
 
 deciles=[i/10 for i in range(11)]
-v1, v2 = ROOT.TVector3(), ROOT.TVector3()
+A, B, locA, locB = ROOT.TVector3(), ROOT.TVector3(), ROOT.TVector3(), ROOT.TVector3()
 
 class TimeWalk(ROOT.FairTask):
 
@@ -15,8 +16,16 @@ class TimeWalk(ROOT.FairTask):
        
         self.M=monitor
         self.options=options
-        if self.options.path.find('TI18')>0: self.path='TI18'
-        elif self.options.find('H8')>0: self.path='H8'
+        if self.options.path.find('commissioning/TI18')>0:
+            self.outpath=options.afswork+'-commissioning/'
+            self.path='TI18'
+        elif self.options.path.find('physics/2022')>0: 
+            self.outpath=options.afswork+'-physics2022/'
+            self.path='TI18'
+        elif self.options.find('H8')>0: 
+            self.outpath=options.afswork+'-H8/'
+            self.path='H8'
+
         run=ROOT.FairRunAna.Instance()
         self.trackTask=run.GetTask('simpleTracking')
 
@@ -26,10 +35,10 @@ class TimeWalk(ROOT.FairTask):
         lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
         self.MuFilter=lsOfGlobals.FindObject('MuFilter')
         self.Scifi=lsOfGlobals.FindObject('Scifi')
+        self.nav=ROOT.gGeoManager.GetCurrentNavigator()
         self.runNr = str(options.runNumber).zfill(6)
         self.afswork=options.afswork
         self.afsuser=options.afsuser
-        self.outpath=self.afswork
         self.EventNumber=-1
 
         self.systemAndPlanes = {1:2,2:5,3:7}
@@ -48,7 +57,10 @@ class TimeWalk(ROOT.FairTask):
         self.verticalBarDict={0:1, 1:3, 2:5, 3:6}
         verticalPlanes=list(self.verticalBarDict.values())
         self.xref=42. # To be set as USbarlength/2.
+        
         self.correctionfunction=lambda ps, qdc: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
+        self.getaverage=lambda d, key, i:sum( [(d[key][i]) for k in range(2) ])/len(d)        
+
         self.hists=self.M.h
 
         self.hists['nStations'] = ROOT.TH1F('nStations', 'Number of stations used in track fit;Number of stations used;Counts', 10, 0, 10)
@@ -106,7 +118,7 @@ class TimeWalk(ROOT.FairTask):
         if not 'DST0' in self.hists:
            self.hists['DST0']=ROOT.TH1F('DST0','DSH average', 100, 0, 25)
 
-        if not muAna.ATLAStrack(event.Digi_MuFilterHits, DST0): return # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
+        # if not muAna.ATLAStrack(event.Digi_MuFilterHits, DST0): return # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
 
         ### Slope cut
         slopeX, slopeY = mom.x()/mom.z(), mom.y()/mom.z()
@@ -127,14 +139,16 @@ class TimeWalk(ROOT.FairTask):
 
             # This function also calls MuFilter.GetPosition with the DetID so it's important even for the DS, where the 
             # y-residual cut is not applied.
-            self.MuFilter.GetPosition(detID,v1,v2)
-            if not self.yresidual(detID,pos,mom): continue
+            self.MuFilter.GetPosition(detID,A,B)
+            self.MuFilter.GetLocalPosition(detID, locA, locB)
+            # if not self.yresidual(detID,pos,mom): continue # Old method
+            if not self.yresidual2(detID,pos,mom): continue
 
             zEx=self.zPos['MuFilter'][s*10+p]
             lam=(zEx-pos.z())/mom.z()
             Ex=ROOT.TVector3(pos.x()+lam*mom.x(), pos.y()+lam*mom.y(), pos.z()+lam*mom.z())
 
-            pred=self.GetDistanceToSiPM(v1,Ex)
+            pred=self.GetDistanceToSiPM(A,Ex)
 
             channels_t=hit.GetAllTimes()
             channels_qdc=hit.GetAllSignals()
@@ -260,7 +274,7 @@ class TimeWalk(ROOT.FairTask):
                 histkey,detID,SiPM,state=h.split('_')
                 fixed_ch='_'.join((detID,SiPM))
                 hist=self.M.h[h]
-                outpath=f'{self.afswork}/splitfiles/run{self.runNr}/{fixed_ch}/'
+                outpath=f'{self.outpath}/splitfiles/run{self.runNr}/{fixed_ch}/'
                 path_obj=Path(outpath)
                 path_obj.mkdir(parents=True, exist_ok=True)
                 
@@ -270,7 +284,7 @@ class TimeWalk(ROOT.FairTask):
                 if self.options.mode=='zeroth':
                     f.WriteObject(self.hists['DST0'], 'DST0', 'kOverwrite')
                 f.Close()
-        print(f'{len(self.M.h)} histograms saved to {self.afswork}/run{self.runNr}')
+        print(f'{len(self.M.h)} histograms saved to {self.outpath}/splitfiles/run{self.runNr}/fixed_ch')
 
     def yresidual(self,detID,pos,mom): 
         s,p,b=muAna.parseDetID(detID) 
@@ -278,13 +292,30 @@ class TimeWalk(ROOT.FairTask):
         z=self.zPos['MuFilter'][key] 
         lam=(z-pos.z())/mom.z() 
         Ex=ROOT.TVector3(pos.x()+lam*mom.x(), pos.y()+lam*mom.y(), pos.z()+lam*mom.z()) 
-        # self.MuFilter.GetPosition(detID,v1,v2)
         if s==3: return True
-        dy=Ex.y()-v1.y() # Needs to be checked 
+        dy=Ex.y()-A.y() # Needs to be checked 
         dy_min, dy_max = TimeWalk.dycut(self.cutdists[f'dy_{key}_{self.options.nStations}stations']) 
-        #if dymin or dy 
         if dy>dy_max or dy<dy_min: return False
         else: return True 
+
+    def yresidual2(self, detID, pos, mom):
+        s,p,b=muAna.parseDetID(detID)
+        key=10*s+p
+        if key>=30: return True
+        z=self.zPos['MuFilter'][key]
+        lam=(z-pos.z())/mom.z()
+        
+        xEx, yEx, zEx=pos.x()+lam*mom.x(), pos.y()+lam*mom.y(), pos.z()+lam*mom.z()
+        Ex=array('d', [xEx, yEx, zEx])
+        locEx=array('d', [0,0,0])
+        self.nav.MasterToLocal(Ex, locEx)
+        locPos=0.5*(locA+locB)
+        barY=self.MuFilter.GetConfParF('MuFilter/UpstreamBarY') if s==2 else self.MuFilter.GetConfParF('MuFilter/DownstreamBarY')
+        dy=locPos[1]-locEx[1]+barY*0.5 # Add half the bar width in y to bring the local position-y to midpoint.
+
+        dy_min, dy_max = TimeWalk.dycut(self.cutdists[f'dy_{key}_{self.options.nStations}stations'])
+        if dy>dy_max or dy<dy_min: return False
+        else: return True
 
     @staticmethod
     def nSiPMscut(hit, nLeft, nRight):
@@ -315,9 +346,22 @@ class TimeWalk(ROOT.FairTask):
         if DST0ns<13.75 or DST0ns>15.45: return 0
         return DST0ns 
     
-    def GetDistanceToSiPM(self,v1,Ex):
-        return ROOT.TMath.Sqrt((v1.x()-Ex.x())**2+(v1.y()-Ex.y())**2+(v1.z()-Ex.z())**2)
+    def GetDistanceToSiPM(self,A,Ex):
+        return ROOT.TMath.Sqrt((A.x()-Ex.x())**2+(A.y()-Ex.y())**2+(A.z()-Ex.z())**2)
 
-    # def ypred(self,v1,Ex):
-    #     return ROOT.TMath.Sqrt((v1.x()-Ex.x())**2+(v1.y()-Ex.y())**2+(v1.z()-Ex.z())**2) 
+    def muonvelocity(self, hits):
+        
+        # title='Average time recorded for single muon tracks in US system;z-position [cm];#bar{t_{bar}} [ns]' 
+        finalhist=ROOT.TH1F('MuonVelocity',title,130,350,480)
+
+        for idx,hit in enumerate(hits):
+            SiPMtimes=[]
+            detID=hit.GetDetectorID()
+            s,p,b=muAna.parseDetID(detID)
+            if s!=2:continue
+            for ch in hit.GetAllTimes():
+                SiPM,clock=ch
+                SiPMtimes.append(t)
+
+
    
