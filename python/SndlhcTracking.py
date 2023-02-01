@@ -3,11 +3,29 @@ from array import array
 import shipunit as u
 A,B = ROOT.TVector3(),ROOT.TVector3()
 
+ROOT.gInterpreter.Declare("""
+#include <KalmanFitterInfo.h>
+#include <Track.h>
+#include <MeasuredStateOnPlane.h>
+#include <stddef.h>     
+
+const genfit::MeasuredStateOnPlane& getFittedState(genfit::Track* theTrack, int nM){
+      try{
+        return theTrack->getFittedState(nM);
+      }
+      catch(genfit::Exception& e){
+        std::cerr<<"Exception "<< e.what() <<std::endl;
+        const genfit::MeasuredStateOnPlane* state(NULL);
+        return *state;
+      }
+}
+""")
+
 class Tracking(ROOT.FairTask):
  " Tracking "
  def Init(self,online=False):
-   geoMat =  ROOT.genfit.TGeoMaterialInterface()
-   bfield     = ROOT.genfit.ConstField(0,0,0)   # constant field of zero
+   geoMat = ROOT.genfit.TGeoMaterialInterface()
+   bfield = ROOT.genfit.ConstField(0,0,0)   # constant field of zero
    fM = ROOT.genfit.FieldManager.getInstance()
    fM.init(bfield)
    ROOT.genfit.MaterialEffects.getInstance().init(geoMat)
@@ -15,27 +33,47 @@ class Tracking(ROOT.FairTask):
    lsOfGlobals  = ROOT.gROOT.GetListOfGlobals()
    self.scifiDet = lsOfGlobals.FindObject('Scifi')
    self.mufiDet = lsOfGlobals.FindObject('MuFilter')
-
+   
    # internal storage of clusters
    self.clusScifi   = ROOT.TObjArray(100)
    self.DetID2Key = {}
-   self.clusMufi   = ROOT.TObjArray(100)
+   self.clusMufi  = ROOT.TObjArray(100)
    
    self.fitter = ROOT.genfit.KalmanFitter()
    self.fitter.setMaxIterations(50)
    #internal storage of fitted tracks
-   self.fittedTracks = ROOT.TObjArray(10)
+   # output is in genfit::track or sndRecoTrack format
+   # default is genfit::Track
+   if hasattr(self, "genfitTrack"): pass
+   else: self.genfitTrack = True
    
+   if self.genfitTrack:
+        self.fittedTracks = ROOT.TObjArray(10)
+   else:
+        self.fittedTracks = ROOT.TClonesArray("sndRecoTrack", 10)
    self.sigmaScifi_spatial = 2*150.*u.um
    self.sigmaMufiUS_spatial = 2.*u.cm
    self.sigmaMufiDS_spatial = 0.3*u.cm
    self.scifi_vsignal = 15.*u.cm/u.ns
+   self.firstScifi_z = 300*u.cm
    self.Debug = False
    self.ioman = ROOT.FairRootManager.Instance()
    self.sink = self.ioman.GetSink()
    # online mode:         raw data in, converted data in output
    # offline read only:   converted data in, no output
    # offline read/write:  converted data in, converted data out
+
+   # for scifi tracking
+   self.nPlanes = 3
+   self.nClusters = 5
+   self.sigma=150*u.um
+   self.maxRes=50
+   self.maskPlane=-1
+   # for DS tracking
+   self.DSnPlanes = 2
+   self.DSnHits = 2
+   self.nDSPlanesVert  = self.mufiDet.GetConfParI("MuFilter/NDownstreamPlanes")
+   self.nDSPlanesHor = self.nDSPlanesVert-1
 
    if online:
       self.event = self.sink.GetOutTree()
@@ -44,7 +82,10 @@ class Tracking(ROOT.FairTask):
 
    self.systemAndPlanes  = {1:2,2:5,3:7}
    return 0
-
+ 
+ def SetTrackClassType(self,genfitTrack):
+     self.genfitTrack = genfitTrack
+ 
  def FinishEvent(self):
   pass
 
@@ -58,6 +99,7 @@ class Tracking(ROOT.FairTask):
            self.clusScifi.Delete()
            self.scifiCluster()
            self.trackCandidates['Scifi'] = self.Scifi_track()
+    i_muon = -1
     for x in self.trackCandidates:
       for aTrack in self.trackCandidates[x]:
            rc = self.fitTrack(aTrack)
@@ -65,11 +107,34 @@ class Tracking(ROOT.FairTask):
                 # rc==-2: not converged, rc==-1 not consistent
                 print('trackfit failed',rc,aTrack)
            else:
+                i_muon += 1
                 if x=='DS':   rc.SetUniqueID(3)
                 if x=='Scifi': rc.SetUniqueID(1)
-                self.fittedTracks.Add(rc)
+                # add the tracks
+                if self.genfitTrack:
+                    self.fittedTracks.Add(rc)
+                else:
+                    # Load items into snd track class object
+                    #if not rc.getFitStatus().isFitConverged(): continue
+                    this_track = ROOT.sndRecoTrack(rc)
+                    pointTimes = []
+                    if x=='DS':
+                       for pnt in rc.getPointsWithMeasurement():
+                           hitID = pnt.getRawMeasurement().getHitId()
+                           aCl = self.clusMufi[hitID]
+                           pointTimes.append(aCl.GetTime())
+                    if x=='Scifi':
+                       for pnt in rc.getPointsWithMeasurement():
+                           hitID = pnt.getRawMeasurement().getHitId()
+                           aCl = self.clusScifi[hitID]
+                           pointTimes.append(aCl.GetTime())
+                    this_track.setRawMeasTimes(pointTimes)
+                    this_track.setTrackType(rc.GetUniqueID())
+                    # Store the track in sndRecoTrack format
+                    self.fittedTracks[i_muon] = this_track
+            
 
- def DStrack(self,nPlanes = 2, nHits = 2):
+ def DStrack(self):
     event = self.event
     trackCandidates = []
     clusters = self.clusMufi
@@ -92,21 +157,42 @@ class Tracking(ROOT.FairTask):
     success = True
     pXWithHits = 0
     pYWithHits = 0
+    clustPer_pX = {}
+    clustPer_pY = {}
+    mask_pX = []
+    mask_pY = []
     for p in range(30,30+self.systemAndPlanes[s]):
-         if len(stations[p])>nHits or len(stations[p])<1: continue
+         if p%2==0 and p<36: clustPer_pY[p]=len(stations[p])
+         else: clustPer_pX[p]=len(stations[p])
+         if len(stations[p])>self.DSnHits or len(stations[p])<1: continue
          if p%2==0 and p<36: pYWithHits+=1
          else: pXWithHits+=1
-    if pXWithHits<nPlanes or pYWithHits<nPlanes: success = False
+    if pXWithHits<self.DSnPlanes or pYWithHits<self.DSnPlanes: success = False
     if success:
  # build trackCandidate
+      # define planes to mask
+      clustPer_pX = dict(sorted(clustPer_pX.items(), key=lambda item: item[1], reverse = True))
+      clustPer_pY = dict(sorted(clustPer_pY.items(), key=lambda item: item[1], reverse = True))
+      # count planes with clusters
+      nX = self.nDSPlanesVert - list(clustPer_pX.values()).count(0)
+      nY = self.nDSPlanesHor - list(clustPer_pY.values()).count(0)
+      # mask busiest planes until there are at least DSnPlanes planes with clusters left
+      for ii in range(nX-self.DSnPlanes):
+        if list(clustPer_pX.values())[ii] >=self.DSnHits:
+           mask_pX.append(list(clustPer_pX.keys())[ii])
+      for ii in range(nY-self.DSnPlanes):
+        if list(clustPer_pY.values())[ii] >=self.DSnHits:
+           mask_pY.append(list(clustPer_pY.keys())[ii])
+
       hitlist = {}
       for p in stations:
+         if p in mask_pX or p in mask_pY: continue
          for k in stations[p]:
              hitlist[k] = stations[p][k]
       trackCandidates.append(hitlist)
     return trackCandidates
 
- def Scifi_track(self,nPlanes = 3, nClusters = 20,sigma=150*u.um,maxRes=50):
+ def Scifi_track(self):
 # check for low occupancy and enough hits in Scifi
         event = self.event
         trackCandidates = []
@@ -121,43 +207,59 @@ class Tracking(ROOT.FairTask):
             detID = cl.GetFirst()
             s  = detID//1000000
             o = (detID//100000)%10
-            stations[s*10+o].append(detID)
-            projClusters[o][detID] = [cl,k]
-            k+=1
+            if self.maskPlane != s:
+                stations[s*10+o].append(detID)
+                projClusters[o][detID] = [cl,k]
+                k+=1
         nclusters = 0
         check = {}
+        ignore = []
         for o in range(2):
             check[o]={}
             for s in range(1,6):
-                if len(stations[s*10+o]) > 0: check[o][s]=1
-                nclusters+=len(stations[s*10+o])
-        if len(check[0])<nPlanes or len(check[1])<nPlanes or nclusters > nClusters: return trackCandidates
+                if len(stations[s*10+o]) > self.nClusters: 
+                  ignore.append(s*10+o)
+                elif len(stations[s*10+o]) > 0 : 
+                  check[o][s] = 1
+                  nclusters+=len(stations[s*10+o])
+        
+        if len(check[0])<self.nPlanes or len(check[1])<self.nPlanes: return trackCandidates
 # build trackCandidate
 # PR logic, fit straight line in x/y projection, remove outliers. Ignore tilt.
         hitlist = {}
         sortedClusters = {}
-        masked = {}
         check[0]=0
         check[1]=0
-        for o in range(2): 
+        for o in range(2):
            sortedClusters[o]=sorted(projClusters[o])
            g = ROOT.TGraph()
            n = 0
+           mean = {}
+           points = {}
            for detID in sortedClusters[o]:
+               s  = detID//1000000
+               if  (s*10+o) in ignore: continue
+               if not s in mean: 
+                  mean[s]=[0,0,0]
                projClusters[o][detID][0].GetPosition(A,B)
                z = (A[2]+B[2])/2.
                if o==0: y = (A[1]+B[1])/2.
                else: y = (A[0]+B[0])/2.
-               g.SetPoint(n,z,y)
-               n+=1
+               points[detID] = [z,y]
+               mean[s][0]+=z
+               mean[s][1]+=y
+               mean[s][2]+=1
+           for s in mean:
+              for n in range(2):
+                 mean[s][n]=mean[s][n]/mean[s][2]
+              g.AddPoint(mean[s][0],mean[s][1])
            rc = g.Fit('pol1','SQ')
            fun = g.GetFunction('pol1')
-           masked[o] = []
-           for i in range(n):
-               z = g.GetPointX(i)
-               res = abs(g.GetPointY(i)-fun.Eval(z))/sigma
-               if res < maxRes:
-                 detID = sortedClusters[o][i]
+           for detID in points:
+               z = points[detID][0]
+               y = points[detID][1]
+               res = abs(y-fun.Eval(z))/self.sigma
+               if res < self.maxRes:
                  k = projClusters[o][detID][1]
                  hitlist[k] = projClusters[o][detID][0]
                  check[o]+=1
@@ -293,8 +395,18 @@ class Tracking(ROOT.FairTask):
 
 # approximate covariance
     covM = ROOT.TMatrixDSym(6)
-    res = self.sigmaScifi_spatial # Should this not be Scifi/MufiDS depending on track type?
-    for  i in range(3):   covM[i][i] = res*res 
+
+    for k in hitlist:
+      aCl = hitlist[k]
+      if hasattr(aCl,"GetFirst"):
+        detID = aCl.GetFirst()
+      else:
+        detID = aCl.GetDetectorID()
+      if detID>50000: res = self.sigmaMufiDS_spatial  # Should this not be Scifi/MufiDS depending on track type?
+      else:  res = self.sigmaScifi_spatial
+      break
+
+    for  i in range(3):   covM[i][i] = res*res
     for  i in range(3,6): covM[i][i] = ROOT.TMath.Power(res / (4.*2.) / ROOT.TMath.Sqrt(3), 2)
     rep = ROOT.genfit.RKTrackRep(13) # Runge-Kutta track representation(q/p, u', v', u, v). q/p:charge/mom, u', v': direction tangents, u,v: positions on a genfit.DetPlane. What is/why 13?
 
@@ -384,26 +496,18 @@ class Tracking(ROOT.FairTask):
       if theTrack.GetUniqueID()>1: return False # for the moment, only the scifi is time calibrated
       fitStatus   = theTrack.getFitStatus()
       if not fitStatus.isFitConverged() : return [100,-100]
-      if theTrack.getFitStatus().getNumIterations()>19: return [100,-100]
-      state = theTrack.getFittedState(0)
+      state = ROOT.getFittedState(theTrack,0)
       pos = state.getPos()
-# start with first measurement
-      M = theTrack.getPointWithMeasurement(0)
-      W      = M.getRawMeasurement()
-      detID = W.getDetId()
-      aHit   = self.event.Digi_ScifiHits[ self.DetID2Key[detID] ]
-      self.scifiDet.GetSiPMPosition(detID,A,B)
-      X = B-pos
-      L0 = X.Mag()/self.scifi_vsignal
-      # need to correct for signal propagation along fibre
-      clkey  = W.getHitId()
-      aCl = self.clusScifi[clkey]
-      T0track = aCl.GetTime() - L0
-      TZero    = aCl.GetTime()
-      Z0track = pos[2]
+      mom = state.getMom()
+      lam = (self.firstScifi_z-pos.z())/mom.z()
+      # nominal first position
+      pos1 = ROOT.TVector3(pos.x()+lam*mom.x(),pos.y()+lam*mom.y(),self.firstScifi_z)
+
       self.Tline = ROOT.TGraph()
+      meanT = 0
       for nM in range(theTrack.getNumPointsWithMeasurement()):
-            state   = theTrack.getFittedState(nM)
+            state = ROOT.getFittedState(theTrack,nM)
+            if not state: continue
             posM   = state.getPos()
             M = theTrack.getPointWithMeasurement(nM)
             W = M.getRawMeasurement()
@@ -417,11 +521,10 @@ class Tracking(ROOT.FairTask):
             L = X.Mag()/self.scifi_vsignal
          # need to correct for signal propagation along fibre
             corTime = self.scifiDet.GetCorrectedTime(detID, aCl.GetTime(), 0)
-            dT = corTime - L - T0track - (posM[2] -Z0track)/u.speedOfLight
-            dZ = posM[2] - Z0track
-            self.Tline.AddPoint(dZ,dT)
+            trajLength = (posM-pos1).Mag()
+            T = corTime - L - trajLength/u.speedOfLight
+            self.Tline.AddPoint(trajLength,T)
       rc = self.Tline.Fit('pol1','SQ')
       fitResult =  rc.Get()
       slope = fitResult.Parameter(1)
-      return [slope,slope/(fitResult.ParError(1)+1E-13)]
-
+      return [slope,slope/(fitResult.ParError(1)+1E-13),fitResult.Parameter(0)]

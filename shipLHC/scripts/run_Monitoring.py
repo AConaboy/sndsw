@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import ROOT,os,sys,subprocess,atexit,time
+import rootUtils as ut
 from XRootD import client
 from XRootD.client.flags import DirListFlags, OpenFlags, MkDirFlags, QueryCode
 import Monitor
@@ -61,6 +62,8 @@ parser.add_argument("--nTracks", dest="nTracks",default=0,type=int)
 parser.add_argument("--save", dest="save", action='store_true',default=False)
 parser.add_argument("--interactive", dest="interactive", action='store_true',default=False)
 
+parser.add_argument("--parallel", dest="parallel",default=1,type=int)
+
 parser.add_argument("--postScale", dest="postScale",help="post scale events, 1..10..100", default=-1,type=int)
 
 options = parser.parse_args()
@@ -74,13 +77,23 @@ if (options.auto and not options.interactive) or options.batch: ROOT.gROOT.SetBa
 # if no geofile given, use defaults according to run number
 
 if options.runNumber < 0  and not options.geoFile: 
-    print('No run number given and no geoFile. Do not know what to do. Exit.')
-    exit()
+     print('No run number given and no geoFile. Do not know what to do. Exit.')
+     exit()
+#RUN0: 7 Apr 2022 - 26 Jul 2022   (Run 4575 started -  test run after replacing emulsions -Ettore)
+#RUN1: 26 Jul 2022 - 13 Sept 2022 (Run 4855 September 14)
+#RUN2: 13 Sept 2022 - 4 Nov 2022 (Run 5172 test run after emulsion replacement)
+#RUN3: 4 Nov 2022  -  
+
 if not options.geoFile:
-    if options.runNumber < 4620:
-        geoFile =  "../geofile_sndlhc_TI18_V3_08August2022.root"
-    if options.runNumber > 4619:
-            geoFile =  "../geofile_sndlhc_TI18_V5_14August2022.root"
+     if options.runNumber < 4575:
+           options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
+     elif options.runNumber < 4855:
+          options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
+     elif options.runNumber < 5172:
+          options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
+     else:
+          options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
+
 # to be extended for future new alignments.
 
 def currentRun():
@@ -126,18 +139,23 @@ if options.runNumber < 0:
     print("run number required for non-auto mode")
     os._exit(1)
 # works only for runs on EOS
-if not options.server.find('eos')<0:
-    runDir = "/eos/experiment/sndlhc/raw_data/commissioning/TI18/data/run_"+str(options.runNumber).zfill(6)
-    jname = "run_timestamps.json"
-    dirlist  = str( subprocess.check_output("xrdfs "+os.environ['EOSSHIP']+" ls "+runDir,shell=True) ) 
-    if jname in dirlist:
-       with client.File() as f:          
-          f.open(options.server+runDir+"/run_timestamps.json")
-          status, jsonStr = f.read()
-       exec("date = "+jsonStr.decode())
-       options.startTime = date['start_time'].replace('Z','')
-       if 'stop_time' in date:
-           options.startTime += " - "+ date['stop_time'].replace('Z','')
+   if not options.server.find('eos')<0:
+      if options.path.find('2022'):
+          rawDataPath = "/eos/experiment/sndlhc/raw_data/physics/2022/"
+      else:
+          rawDataPath = "/eos/experiment/sndlhc/raw_data/commissioning/TI18/data/"
+      runDir = rawDataPath+"run_"+str(options.runNumber).zfill(6)
+      jname = "run_timestamps.json"
+      dirlist  = str( subprocess.check_output("xrdfs "+os.environ['EOSSHIP']+" ls "+runDir,shell=True) ) 
+      if jname in dirlist:
+         with client.File() as f:          
+            f.open(options.server+runDir+"/run_timestamps.json")
+            status, jsonStr = f.read()
+         exec("date = "+jsonStr.decode())
+         options.startTime = date['start_time'].replace('Z','')
+         if 'stop_time' in date:
+             options.startTime += " - "+ date['stop_time'].replace('Z','')
+
 # prepare tasks:
 FairTasks = []
 houghTransform = False # under construction, not yet tested
@@ -152,8 +170,8 @@ else:
     FairTasks.append(trackTask)
 
 if options.nEvents < 0 :   options.nEvents = M.GetEntries()
-if options.postScale==0 and options.nEvents>5E7: options.postScale = 100
-if options.postScale==0 and options.nEvents>5E6: options.postScale = 10
+if options.postScale==0 and options.nEvents>100E6: options.postScale = 100
+if options.postScale==0 and options.nEvents>10E6: options.postScale = 10
 
 M = Monitor.Monitoring(options,FairTasks)
 monitorTasks = {}
@@ -172,9 +190,106 @@ for m in monitorTasks:
     monitorTasks[m].Init(options,M)
 c=0
 if not options.auto:   # default online/offline mode
-    start, nEvents=options.nStart, options.nEvents
-    deciles=[i/10 for i in range(11)]
-    for n in range(start,start+nEvents):
+
+ process = []
+ pid = 0
+ for i in range(options.parallel):
+   if options.parallel==1:
+     nstart,nstop = options.nStart,options.nStart+options.nEvents
+   else:
+     try:
+       pid = os.fork()
+     except OSError:
+       print("Could not create a child process")
+     print('pid',pid,i)
+     if pid!=0:
+          process.append(pid)
+     else:
+         dN = options.nEvents//options.parallel
+         nstart = i*dN
+         nstop =  nstart + dN
+         if i==(options.parallel-1): nstop = options.nEvents
+   if pid == 0:
+    print('start ',i,nstart,nstop)
+    Tcounter = {'Monitor':0}
+    for m in monitorTasks:
+       Tcounter[m] = 0
+
+    for n in range(nstart,nstop):
+     if options.postScale>1:
+        if ROOT.gRandom.Rndm()>1./options.postScale: continue
+     tic = time.perf_counter_ns()
+     event = M.GetEvent(n)
+     toc = time.perf_counter_ns()
+     Tcounter['Monitor']+=toc-tic
+     
+     if not options.online:
+        if n%options.heartBeat == 0:
+            print("--> run/event nr: %i %i %5.2F%%"%(M.eventTree.EventHeader.GetRunId(),n,(n-nstart)/(nstop-nstart)*100))
+# assume for the moment file does not contain fitted tracks
+     for m in monitorTasks:
+        tic = time.perf_counter_ns()
+        monitorTasks[m].ExecuteEvent(M.eventTree)
+        toc = time.perf_counter_ns()
+        Tcounter[m]+=toc-tic
+    for m in monitorTasks:
+          monitorTasks[m].Plot()
+    txt = ''
+    for x in Tcounter: txt+=x+':%5.1Fs '%(Tcounter[x]/1E9)
+    print('timing performance:',txt)
+    if options.parallel>1: # save partitions
+           ut.writeHists(M.h,'tmp'+str(options.runNumber)+'p'+str(i))
+           exit(0)
+ if options.parallel>1: 
+     while process:
+          pid,exit_code = os.wait()
+          if pid == 0: time.sleep(100)
+          else: 
+                print('child process has finished',len(process)-1,pid,exit_code)
+                process.remove(pid)
+     for i in range(options.parallel):
+        tmp = 'tmp'+str(options.runNumber)+'p'+str(i)
+        if tmp in os.listdir('.'):         ut.readHists(M.h,tmp)
+        else: print('file missing ',tmp)
+     M.presenterFile.Close()
+     M.presenterFile = ROOT.TFile('run'+M.runNr+'.root','update')
+
+     for m in monitorTasks:
+          monitorTasks[m].Plot()
+     # check if all events had been processed
+     if not M.h['Etime'].GetEntries() == options.nEvents:
+         print('event count failed! Processed:',M.h['Etime'].GetEntries(),' total number of events:',options.nEvents)
+     else:
+         print('i am finished, all events processed')
+
+ M.publishRootFile()
+ if options.sudo:
+     print(options.runNumber,options.startTime)
+     options.startTime += " #events="+str(options.nEvents)
+     M.updateHtml()
+else: 
+   """ auto mode
+       check for open data file on the online machine
+       analyze N events 
+       re-open file and check for new events, 
+       if none available, 
+         check every 5 seconds: if no new file re-open again
+         if new file, finish run, publish histograms, and restart with new file
+   """
+   N0 = 0
+   if options.slowStream: lastPart = 0   #   reading from second low speed DAQ stream    tmp[len(tmp)-1]
+   nLast = options.nEvents
+   nStart = nLast-options.Nlast
+   if not options.interactive and options.sudo: M.updateHtml()
+   lastFile = M.converter.fiN.GetName()
+   if not options.slowStream:
+     tmp = lastFile.split('/')
+     lastRun  = tmp[len(tmp)-2].replace('monitoring_','')
+     lastPart = tmp[len(tmp)-1]
+
+   M.updateSource(lastFile)
+   while 1>0:
+      for n in range(nStart,nLast):
         event = M.GetEvent(n)
 
         if ((n-start)/nEvents) in deciles:

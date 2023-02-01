@@ -17,7 +17,7 @@ class MuonSelectionCriteria(ROOT.FairTask):
         self.M=monitor
         self.options=options
         if self.options.path.find('TI18')>0: self.path='TI18'
-        elif self.options.find('H8')>0: self.path='H8'
+        elif self.options.path.find('H8')>0: self.path='H8'
         run=ROOT.FairRunAna.Instance()
         self.trackTask=run.GetTask('simpleTracking')
 

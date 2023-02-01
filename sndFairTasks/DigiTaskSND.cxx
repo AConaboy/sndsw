@@ -14,7 +14,6 @@
  #include <iostream>                 // for operator<<, basic_ostream, endl
  #include <algorithm>                // std::sort
  #include <vector>                   // std::vector
- #include "FairEventHeader.h"        // for FairEventHeader
  #include "FairMCEventHeader.h"      // for FairMCEventHeader
  #include "FairLink.h"               // for FairLink
  #include "FairRunSim.h"             // for FairRunSim
@@ -61,7 +60,12 @@ InitStatus DigiTaskSND::Init()
     siPMFibres = scifi->GetFibresMap();
 
     // Get event header
+    // Try classic FairRoot approach first
     fMCEventHeader = static_cast<FairMCEventHeader*> (ioman->GetObject("MCEventHeader."));	
+    // .. with a safety net for trailing dots mischief
+    if ( fMCEventHeader == nullptr ) {
+       fMCEventHeader = static_cast<FairMCEventHeader*>(gROOT->FindObjectAny("MCEventHeader."));
+    }
     // Get input MC points
     fScifiPointArray = static_cast<TClonesArray*>(ioman->GetObject("ScifiPoint"));
     fvetoPointArray = static_cast<TClonesArray*>(ioman->GetObject("vetoPoint"));
@@ -79,11 +83,10 @@ InitStatus DigiTaskSND::Init()
     ioman->Register("EmulsionDetPoint", "EmulsionDetPoints", fvetoPointArray, kTRUE);
     ioman->Register("ScifiPoint", "ScifiPoints", fScifiPointArray, kTRUE);
     ioman->Register("MuFilterPoint", "MuFilterPoints", fMuFilterPointArray, kTRUE);
-    ioman->Register("MCEventHeader.", "MCEventHeader", fMCEventHeader, kTRUE);
  
     // Event header
-    fEventHeader = new FairEventHeader();
-    ioman->Register("EventHeader", "sndEventHeader", fEventHeader, kTRUE);
+    fEventHeader = new SNDLHCEventHeader();
+    ioman->Register("EventHeader.", "sndEventHeader", fEventHeader, kTRUE);
 
     // Create and register output array - for SciFi and MuFilter
     fScifiDigiHitArray = new TClonesArray("sndScifiHit");
@@ -116,9 +119,10 @@ void DigiTaskSND::Exec(Option_t* /*opt*/)
     fMuFilterDigiHitArray->Delete();
     fMuFilterHit2MCPointsArray->Delete();
 
-    // Get event header
+    // Set event header
     fEventHeader->SetRunId(fMCEventHeader->GetRunID());
-    fEventHeader->SetMCEntryNumber(fMCEventHeader->GetEventID());
+    fEventHeader->SetEventNumber(fMCEventHeader->GetEventID());
+    fEventHeader->SetBunchType(101);
 
     // Digitize MC points if any
     if (fMuFilterPointArray) digitizeMuFilter();

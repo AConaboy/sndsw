@@ -80,6 +80,8 @@ InitStatus ConvRawData::Init()
     TObjString* saturationLimit_obj = dynamic_cast<TObjString*>(ioman->GetObject("saturationLimit"));
     TObjString* newFormat_obj = dynamic_cast<TObjString*>(ioman->GetObject("newFormat"));
     TObjString* local_obj = dynamic_cast<TObjString*>(ioman->GetObject("local"));
+    // TMap containing the filling scheme per given run
+    FSmap = static_cast<TMap*>(ioman->GetObject("FSmap"));    
     // Input raw data file is read from the FairRootManager
     // This allows to have it in custom format, e.g. have arbitary names of TTrees
     TFile* f0 = dynamic_cast<TFile*>(ioman->GetObject("rawData"));
@@ -121,7 +123,7 @@ InitStatus ConvRawData::Init()
         fEventTree = (TTree*)f0->Get("data");
         // use sndlhc eventHeader class
         fSNDLHCEventHeader = new SNDLHCEventHeader();
-        ioman->Register("EventHeader", "sndEventHeader", fSNDLHCEventHeader, kTRUE);        
+        ioman->Register("EventHeader.", "sndEventHeader", fSNDLHCEventHeader, kTRUE);        
     }
      
     fDigiSciFi    = new TClonesArray("sndScifiHit");
@@ -268,12 +270,9 @@ void ConvRawData::Process0()
          {
            TDC = bt->GetLeaf("timestamp")->GetValue(n);
            QDC = bt->GetLeaf("value")->GetValue(n);
-           Chi2ndof = 1;
-           satur = 0.;
-           //Chi2ndof = max(bt->GetLeaf("timestampCalChi2")->GetValue(n)/bt->GetLeaf("timestampCalDof")->GetValue(n),
-           //               bt->GetLeaf("valueCalChi2")->GetValue(n)/bt->GetLeaf("valueCalDof")->GetValue(n));
-           // FIXME, valueCalDof is a boolean that is true if v_fine/par[d] is above saturationLimit              
-           //satur = (bt->GetLeaf("valueCalDof")->GetValue(n) == 1) ? 1.1*saturationLimit : 0.9*saturationLimit;    
+           Chi2ndof = max(bt->GetLeaf("timestampCalChi2")->GetValue(n)/bt->GetLeaf("timestampCalDof")->GetValue(n),
+                          	bt->GetLeaf("valueCalChi2")->GetValue(n)/bt->GetLeaf("valueCalDof")->GetValue(n));
+           satur = bt->GetLeaf("valueSaturation")->GetValue(n);
          }
          
          // Print a warning if TDC or QDC is nan.        
@@ -467,7 +466,8 @@ void ConvRawData::Process1()
   int nSiPMs{}, nSides{}, direction{}, detID{}, sipm_number{}, chan{}, orientation{}, sipmLocal{};
   int sipmID{};
   double test{};
-  //TStopwatch timer;     
+  int64_t eventTime{};
+  //TStopwatch timer;
   
   tE = high_resolution_clock::now();
   //timer.Start();
@@ -482,14 +482,20 @@ void ConvRawData::Process1()
   
   fSNDLHCEventHeader->SetFlags(fEventTree->GetLeaf("evtFlags")->GetValue());
   fSNDLHCEventHeader->SetRunId(frunNumber);
-  fSNDLHCEventHeader->SetEventTime(fEventTree->GetLeaf("evtTimestamp")->GetValue());
-  fSNDLHCEventHeader->SetUTCtimestamp(fEventTree->GetLeaf("evtTimestamp")->GetValue()*6.23768*1e-9 + runStartUTC);
+  eventTime = fEventTree->GetLeaf("evtTimestamp")->GetValue();
+  fSNDLHCEventHeader->SetEventTime(eventTime);
+  fSNDLHCEventHeader->SetUTCtimestamp(eventTime*6.23768*1e-9 + runStartUTC);
   fSNDLHCEventHeader->SetEventNumber(fEventTree->GetLeaf("evtNumber")->GetValue());
-
+  // Fill filling scheme data into the event header
+  if (FSmap->GetEntries()>1)
+      fSNDLHCEventHeader->SetBunchType(stoi(((TObjString*)FSmap->GetValue(Form("%d", int((eventTime%(4*3564))/4))))->GetString().Data()));
+  else
+      fSNDLHCEventHeader->SetBunchType(stoi(((TObjString*)FSmap->GetValue("0"))->GetString().Data())); 
+  
   LOG (info) << "evtNumber per run "
              << fEventTree->GetLeaf("evtNumber")->GetValue()
              << " evtNumber per partition: " << eventNumber
-             << " timestamp: " << fEventTree->GetLeaf("evtTimestamp")->GetValue();
+             << " timestamp: " << eventTime;
   // Delete pointer map elements
   for (auto it : digiSciFiStore)
   {
@@ -548,12 +554,9 @@ void ConvRawData::Process1()
        {
          TDC = fEventTree->GetLeaf("timestamp")->GetValue(n);
          QDC = fEventTree->GetLeaf("value")->GetValue(n);
-         Chi2ndof = 1;
-         satur = 0.;
-         //Chi2ndof = max(fEventTree->GetLeaf("timestampCalChi2")->GetValue(n)/fEventTree->GetLeaf("timestampCalDof")->GetValue(n),
-         //               fEventTree->GetLeaf("valueCalChi2")->GetValue(n)/fEventTree->GetLeaf("valueCalDof")->GetValue(n));
-         // FIXME, valueCalDof is a boolean that is true if v_fine/par[d] is above saturationLimit              
-         //satur = (fEventTree->GetLeaf("valueCalDof")->GetValue(n) == 1) ? 1.1*saturationLimit : 0.9*saturationLimit;    
+         Chi2ndof = max(fEventTree->GetLeaf("timestampCalChi2")->GetValue(n)/fEventTree->GetLeaf("timestampCalDof")->GetValue(n),
+                        fEventTree->GetLeaf("valueCalChi2")->GetValue(n)/fEventTree->GetLeaf("valueCalDof")->GetValue(n));
+         satur = fEventTree->GetLeaf("valueSaturation")->GetValue(n);
        }
   
        // Print a warning if TDC or QDC is nan.        

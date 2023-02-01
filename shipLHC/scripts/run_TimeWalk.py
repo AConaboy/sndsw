@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import ROOT,os,sys,subprocess,atexit,time
-from XRootD import client
-from XRootD.client.flags import DirListFlags, OpenFlags, MkDirFlags, QueryCode
+# from XRootD import client
+# from XRootD.client.flags import DirListFlags, OpenFlags, MkDirFlags, QueryCode
 import Monitor
 import Scifi_monitoring
 import Mufi_monitoring
