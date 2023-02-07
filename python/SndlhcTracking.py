@@ -94,7 +94,7 @@ class Tracking(ROOT.FairTask):
     if not option.find('DS')<0:
            self.clusMufi.Delete()
            self.dsCluster()
-           self.trackCandidates['DS'] = self.DStrack(nPlanes=nPlanes)
+           self.trackCandidates['DS'] = self.DStrack()
     if not option.find('Scifi')<0:
            self.clusScifi.Delete()
            self.scifiCluster()
