@@ -42,10 +42,17 @@ parser.add_argument("-c", "--command", dest="command", help="command", default="
 parser.add_argument("-n", "--nEvents", dest="nEvents", help="number of events", default=-1,type=int)
 parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default=0,type=int)
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
-parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function of log function", default=4, type=int, required=False)
+parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function or log function", default=4, type=int, required=False)
 parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
 parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=3)
 parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int, default=5097)
+parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, default='physics')
+parser.add_argument('--state', dest='state', type=str, default='uncorrected')
+
+# Cuts
+parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', type=int, default=0)
+parser.add_argument('--SlopesCut', dest='SlopesCut', type=int, default=1)
+parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', type=int, default=1)
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
@@ -59,6 +66,9 @@ parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
 parser.add_argument("--ScifialignPar", dest="ScifialignPar", default=False)
 parser.add_argument("--ScifiResUnbiased", dest="ScifiResUnbiased", default=False)
 parser.add_argument("--Mufixmin", dest="Mufixmin", default=-10.)
+parser.add_argument("--chi2xpred_zpos", dest="chi2xpred_zpos", help="z-position for plotting DS track red-chi2 values", type=int, default=0)
+parser.add_argument("--WriteOutTrackInfo", dest="WriteOutTrackInfo", type=int, default=0)
+parser.add_argument('--numbering', dest='numbering', type=str, default='systemPCB')
 
 parser.add_argument("--goodEvents", dest="goodEvents", action='store_true',default=False)
 parser.add_argument("--withTrack", dest="withTrack", action='store_true',default=False)
@@ -82,10 +92,14 @@ if options.runNumber < 0  and not options.geoFile:
     print('No run number given and no geoFile. Do not know what to do. Exit.')
     exit()
 if not options.geoFile:
-    if options.runNumber < 4620:
-        geoFile =  "../geofile_sndlhc_TI18_V3_08August2022.root"
-    if options.runNumber > 4619:
-            geoFile =  "../geofile_sndlhc_TI18_V5_14August2022.root"
+    if options.runNumber < 4575:
+        options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
+    elif options.runNumber < 4855:
+        options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
+    elif options.runNumber < 5172:
+        options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
+    else:
+        options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
 # to be extended for future new alignments.
 
 def currentRun():
@@ -180,5 +194,7 @@ if not options.auto:   # default online/offline mode
     if 'TimeWalk' in monitorTasks:
         if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()
     if 'SelectionCriteria' in monitorTasks:
-        if not options.debug: monitorTasks['SelectionCriteria'].WriteOutHistograms()
+        if not options.debug: 
+            monitorTasks['SelectionCriteria'].WriteOutHistograms()
+            if options.WriteOutTrackInfo: monitorTasks['SelectionCriteria'].SaveTrackInfos()
     
