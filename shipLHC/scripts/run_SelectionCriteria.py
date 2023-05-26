@@ -42,6 +42,7 @@ parser.add_argument("-n", "--nEvents", dest="nEvents", help="number of events", 
 parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default=0,type=int)
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
 parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function of log function", required=False)
+parser.add_argument("--chi2xpred_zpos", dest="chi2xpred_zpos", help="z-position for plotting DS track red-chi2 values", default="0")
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')

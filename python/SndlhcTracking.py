@@ -140,8 +140,8 @@ class Tracking(ROOT.FairTask):
     for aCl in clusters:
          k+=1
          detID = aCl.GetFirst()
-         if detID//10000 < 3: continue
-         p = (detID//1000)%10
+         if detID//10000 < 3: continue # only work with DS hits
+         p = (detID//1000)%10 
          bar = detID%1000
          plane = s*10+p
          if bar<60: 
@@ -152,7 +152,7 @@ class Tracking(ROOT.FairTask):
          clusPerStation[plane] +=1
     for p in clusPerStation:
        if clusPerStation[p]>0:
-          planesPerProjection[p%2]+=1
+          planesPerProjection[p%2]+=1 # Count number of horizontal (p%2==0) and vertical (p%2==1) hits
 
     failed = False
     if planesPerProjection[1]<self.DSnPlanes or planesPerProjection[0]<self.DSnPlanes: return trackCandidates
@@ -183,7 +183,7 @@ class Tracking(ROOT.FairTask):
       for plane in range(self.systemAndPlanes[s]+1):
           if not plane%2==proj: continue
           if clusPerStation[s*10+plane]==1:
-             seed = s*10+plane
+             seed = s*10+plane # seed defined as the lowest z-position plane to have 1 cluster! 
              break
       if seed < 0: return trackCandidates
       combinations[proj] = {}
@@ -377,21 +377,21 @@ class Tracking(ROOT.FairTask):
             hitDict[d.GetDetectorID()] = k
        hitList = list(hitDict.keys())
        if len(hitList)>0:
-              hitList.sort()
-              tmp = [ hitList[0] ]
+              hitList.sort() # Smallest detID first: sorted low z to high z.
+              tmp = [ hitList[0] ] 
               cprev = hitList[0]
               ncl = 0
               last = len(hitList)-1
               hitvector = ROOT.std.vector("MuFilterHit*")()
               for i in range(len(hitList)):
-                   if i==0 and len(hitList)>1: continue
-                   c=hitList[i]
+                   if i==0 and len(hitList)>1: continue # tmp is the 1st hit, so start from the 2nd
+                   c=hitList[i] # position of hit in the Digi_MuFilterHits array (k in 1st loop)
                    neighbour = False
-                   if (c-cprev)==1 or (c-cprev)==2:    # allow for one missing channel
-                        neighbour = True
-                        tmp.append(c)
-                   if not neighbour  or c==hitList[last] or c%1000==59:
-                        first = tmp[0]
+                   if (c-cprev)==1 or (c-cprev)==2:    
+                        neighbour = True    # allow for one missing channel to be classed as neighbour
+                        tmp.append(c) 
+                   if not neighbour  or c==hitList[last] or c%1000==59: # if not neighbour, if last horizontal scintillator in plane
+                        first = tmp[0] 
                         N = len(tmp)
                         hitvector.clear()
                         for aHit in tmp: hitvector.push_back( self.event.Digi_MuFilterHits[hitDict[aHit]])
