@@ -57,7 +57,7 @@ class TimeWalk(ROOT.FairTask):
         self.cutdists=self.muAna.GetCutDistributions(self.runNr, ('dy', 'timingdiscriminant'))
         statedict={'zeroth':'uncorrected', 'ToF':'uncorrected', 'TW':'corrected'}
         self.state=statedict[options.mode]
-        self.timingalignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)
+        self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)
 
         self.freq=160.316E6
         self.TDC2ns=1E9/self.freq
@@ -87,25 +87,37 @@ class TimeWalk(ROOT.FairTask):
                     else: 
                         
                         title='#splitline{'+self.subsystemdict[s]+' channel hit rate}{with '+systemhistcriteria[criterion]+'};Channel;Counts'
-                        self.hists[f'channelhitrate-{self.subsystemdict[s]}-{criterion}']=ROOT.TH1F(f'channelhitrate-{self.subsystemdict[s]}-{criterion}', title, self.nchs[s]+1, 0, self.nchs[s])            
+                        self.hists[f'channelhitrate-{self.subsystemdict[s]}-{criterion}']=ROOT.TH1F(f'channelhitrate-{self.subsystemdict[s]}-{criterion}', title, self.nchs[s]+1, 0, self.nchs[s])
         
         if options.mode=='TW':
             if not options.CorrectionType: self.CorrectionType=4
+            else: self.CorrectionType=options.CorrectionType
 
             self.correctionparams=lambda ps : [y for x,y in enumerate(ps) if x%2==0]
-            self.CorrectionType=options.CorrectionType
+            
             if options.CorrectionType==1: self.correctionfunction = lambda ps, qdc : 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
-            elif options.CorrectionType==5: self.correctionfunction = lambda ps, qdc : ps[0]*ROOT.Log(ps[1]*qdc)+ps[2]
-            elif options.CorrectionType==4: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) 
+            
+            elif options.CorrectionType==4: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) )
+            
+            elif options.CorrectionType==5: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
 
+            ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
             if options.TWCorrectionRun==None:
-                if self.timingalignment=='old': self.TWCorrectionRun=str(5097).zfill(6)
-                elif self.timingalignment=='new': self.TWCorrectionRun=str(5408).zfill(6)
+                if self.timealignment=='old': self.TWCorrectionRun=str(5097).zfill(6)
+                elif self.timealignment=='new': self.TWCorrectionRun=str(5408).zfill(6)
+            ### Check that the time-walk correction run selected has the same time alignment has the data set
             else:
-                if self.muAna.GetTimeAlignmentType(runNr=options.TWCorrectionRun) != self.timingalignment:
-                    if self.timingalignment=='old': self.TWCorrectionRun=str(5097).zfill(6)
-                    elif self.timingalignment=='new': self.TWCorrectionRun=str(5408).zfill(6)
+                if self.muAna.GetTimeAlignmentType(runNr=options.TWCorrectionRun) != self.timealignment:
+                    if self.timealignment=='old': self.TWCorrectionRun=str(5097).zfill(6)
+                    elif self.timealignment=='new': self.TWCorrectionRun=str(5408).zfill(6)
                 else: self.TWCorrectionRun=str(options.TWCorrectionRun).zfill(6)
+            
+            ### Dictionary of tw correction parameters taken from the time-walk correction run
+            self.twparameters=self.muAna.MakeTWCorrectionDict(self.TWCorrectionRun)
+        
+        ### Dictionary of cscint values using time-walk correction run
+        if options.mode in ('ToF', 'TW'):
+            self.cscintvalues=self.muAna.Makecscintdict(self.runNr, state=self.state)
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -124,6 +136,7 @@ class TimeWalk(ROOT.FairTask):
                 tracks[3].append(Reco_MuonTracks[i])
         if not inDS: return
         
+        ### If there are more than 1 DS track, take the track with the lowest chi2/Ndf
         if len(tracks[3])==1: dstrack= tracks[3][0]
         else: 
             tmp={i:i.getFitStatus().getChi2()/i.getFitStatus().getNdf() for i in tracks[3]}
@@ -146,17 +159,13 @@ class TimeWalk(ROOT.FairTask):
            self.hists['TDS0']=ROOT.TH1F('TDS0','Average time of DS horizontal bars;DS horizontal average time [ns];Counts', 200, 0, 50)
         self.hists['TDS0'].Fill(TDS0)
 
-        # if self.options.timingdiscriminantcut:
+        ### Timing discriminant cut
         td = self.GetTimingDiscriminant() # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
         if not self.TimingDiscriminantCut(td): return
-        ### Slope cut
-        # slopes=[i:(momvectors[i].x()/momvectors[i].z(), momvectors[i].y()/momvectors[i].z()) for i in momvectors]
-        # if not TimeWalk.slopecut(momvectors[3]): return
-        if not TimeWalk.slopecut(self.mom): return
         
-        #### Testing clusters
-        if self.options.debug:
-            print(self.M.EventNumber)
+        ### Slope cut
+        if not TimeWalk.slopecut(self.mom): return
+    
         
         for hit in event.Digi_MuFilterHits:
             nLeft, nRight=self.muAna.GetnFiredSiPMs(hit)
@@ -228,25 +237,26 @@ class TimeWalk(ROOT.FairTask):
     
         if not dtvpred in hists:
             coord='x' if not self.muAna.DSVcheck(detID) else 'y'
-            title='Uncorrected t_{0}^{DS}-t_{SiPM} v '+coord+'-position'
-            splittitle='#splitline{'+ReadableDetID+'}{'+title+'}'
-            axestitles=coord+'_{predicted} [cm];t_{0}^{DS}-t_{SiPM} [ns]'
+            title='{No time-walk correction t_{0}^{DS}-t^{uncorr}_{SiPM} v '+coord+'-position}'
+            splittitle='#splitline{'+ReadableDetID+'}'+title
+            axestitles=coord+'_{predicted} [cm];t_{0}^{DS}-t^{uncorr}_{SiPM} [ns]'
             fulltitle=splittitle+';'+axestitles
             hists[dtvpred]=ROOT.TH2F(dtvpred,fulltitle,110,-10,100, 800, -20, 20.)
 
         SiPMtime=f'tSiPM_{fixed_ch}_{self.state}'
         if not SiPMtime in hists:
-            title='Uncorrected t_{SiPM}'
-            splittitle='#splitline{'+ReadableDetID+'}{'+title+'}'
+            title='{No time-walk correction t_{SiPM}}'
+            splittitle='#splitline{'+ReadableDetID+'}'+title
             axestitles='t_{SiPM} [ns];Counts'
-            fulltitle=splittitle+';'+axestitles            
-            hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, -10, 10)
+            fulltitle=splittitle+';'+axestitles
+            if self.timealignment=='old': hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, 0, 20)
+            elif self.timealignment=='new': hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, -10, 10)
         
         attlen=f'attlen_{fixed_ch}_{self.state}'
         if not attlen in hists:
             coord='x' if not self.muAna.DSVcheck(detID) else 'y'
-            title='Predicted position against QDC_{SiPM}'
-            splittitle='#splitline{'+ReadableDetID+'}{'+title+'}'
+            title='{Predicted position against QDC_{SiPM}}'
+            splittitle='#splitline{'+ReadableDetID+'}'+title
             axestitles=coord+'_{predicted} [cm];QDC_{SiPM} [a.u]'
             fulltitle=splittitle+';'+axestitles 
             hists[attlen]=ROOT.TH2F(attlen,fulltitle, 110, -10, 110, 200, 0., 200)
@@ -266,14 +276,15 @@ class TimeWalk(ROOT.FairTask):
         hists=self.hists
         ReadableDetID=self.muAna.MakeHumanReadableDetID(fixed_ch)
 
-        cdata=self.muAna.Getcscint(self.runNr, fixed_ch, self.state)
-        if cdata==-999.: return 0
+        # cdata=self.muAna.Getcscint(self.runNr, fixed_ch, self.state)
+        if not fixed_ch in self.cscintvalues:return 
+    
         SiPM=int(fixed_ch.split('_')[-1])
         correctedtime=self.muAna.correct_ToF(SiPM, clock, pred, cdata, self.xref)[1]
         dtvqdc=f'dtvqdc_{fixed_ch}_{self.state}'
         if not dtvqdc in hists:
-            subtitle='Uncorrected t_{0}^{DS}-t_{SiPM} v QDC_{SiPM};QDC_{SiPM} [a.u];t_{0}^{DS}-t_{SiPM} [ns]'
-            title='#splitline{'+ReadableDetID+'}{'+subtitle+'}'
+            subtitle='{No time-walk correction t_{0}^{DS}-t^{uncorr}_{SiPM} v QDC_{SiPM}};QDC_{SiPM} [a.u];t_{0}^{DS}-t^{uncorr}_{SiPM} [ns]'
+            title='#splitline{'+ReadableDetID+'}'+subtitle
             hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 800, -20, 20)
         t_rel=TDS0-correctedtime
         self.hists[dtvqdc].Fill(qdc,t_rel)
@@ -286,27 +297,18 @@ class TimeWalk(ROOT.FairTask):
         SiPM=int(fixed_ch.split('_')[-1])
         time=clock*self.TDC2ns
         
-        tmp = self.muAna.GetPolyParams(self.TWCorrectionRun, fixed_ch, 'uncorrected', self.CorrectionType)
-        if tmp==-999.:
-            return
-        paramsAndErrors, correctionlimit, correctedmeantime=tmp
-        if not correctedmeantime:
-            # print(f'No corrected mean time for {fixed_ch}')
-            meantimecorrection=False
-        if meantimecorrection: correctedmeantime=float(correctedmeantime)
+        ### Check if fixed_ch has tw corr params and a cscint value
+        if any([fixed_ch not in self.twparameters, fixed_ch not in self.cscintvalues]): return 
 
-        chi2pNDF = self.muAna.Getchi2pNDF(self.TWCorrectionRun, fixed_ch, self.CorrectionType, 'uncorrected')
-        cdata = self.muAna.Getcscint(self.TWCorrectionRun, fixed_ch, 'uncorrected')
-        
-        if paramsAndErrors==-999. or cdata==-999.: return 0
-        polyparams = self.correctionparams(paramsAndErrors)
-       
+        cdata=self.cscintvalues[fixed_ch]
+        twparams=self.twparameters[fixed_ch]
+
         ToFcorrectedtime=self.muAna.correct_ToF(SiPM, clock, pred, cdata, self.xref)[1]
-        polycorrection = self.correctionfunction(polyparams, qdc)
+        twcorrection = self.correctionfunction(twparams, qdc)
 
         ### TW corrected time then ToF & TW corrected time        
-        TWcorrectedtime=time+polycorrection
-        ToFTWcorrectedtime=ToFcorrectedtime+polycorrection
+        TWcorrectedtime=time+twcorrection
+        ToFTWcorrectedtime=ToFcorrectedtime+twcorrection
 
         ### Times wrt to DS horizontal average
         ToFTWt_rel=TDS0-ToFTWcorrectedtime
@@ -317,51 +319,38 @@ class TimeWalk(ROOT.FairTask):
         else: dtvxpred=f'dtvypred_{fixed_ch}_{self.state}'
         if not dtvxpred in hists:
             coord='x' if not self.muAna.DSVcheck(detID) else 'y'
-            subtitle='Corrected t_{0}^{DS}-t_{SiPM} v '+coord+'-position w/ run'+str(self.TWCorrectionRun)+';'+coord+'_{predicted} [cm];t_{0}^{DS}-t_{SiPM} [ns]'
-            title='#splitline{'+ReadableDetID+'}{'+subtitle+'}'
+            subtitle='{Time-walk corrected t_{0}^{DS}-t^{tw corr}_{SiPM} v '+coord+'-position w/ run'+str(self.TWCorrectionRun)+'};'+coord+'_{predicted} [cm];t_{0}^{DS}-t^{tw corr}_{SiPM} [ns]'
+            title='#splitline{'+ReadableDetID+'}'+subtitle
             hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,110,-10,100, 800, -20, 20.)
         
         # dtvqdc=f'dtvqdc_{fixed_ch}_{self.state}'
         dtvqdc=f'dtvqdc_{fixed_ch}_corrected'
         if not dtvqdc in hists:
-            subtitle='Corrected t_{0}^{DS}-t_{SiPM} v QDC_{SiPM} w/ run'+str(self.TWCorrectionRun)+';QDC_{SiPM} [a.u];t_{0}^{DS}-t_{SiPM} [ns]'
-            title='#splitline{'+ReadableDetID+'}{'+subtitle+'}'
+            subtitle='{Time-walk corrected t_{0}^{DS}-t^{tw corr}_{SiPM} v QDC_{SiPM} w/ run'+str(self.TWCorrectionRun)+'};QDC_{SiPM} [a.u];t_{0}^{DS}-t^{tw corr}_{SiPM} [ns]'
+            title='#splitline{'+ReadableDetID+'}'+subtitle
             hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 800, -20, 20)                               
 
         SiPMtime=f'tSiPM_{fixed_ch}_corrected'
         if not SiPMtime in hists:
-            subtitle=f'Corrected SiPM time w/ run'+str(self.TWCorrectionRun)+';SiPM time [ns];Counts'
-            title='#splitline{'+ReadableDetID+'}{'+subtitle+'}'
-            hists[SiPMtime]=ROOT.TH1F(SiPMtime,title, 400, -10, 10)
+            subtitle='{Time-walk corrected SiPM time w/ run'+str(self.TWCorrectionRun)+'};t^{tw corr}_{SiPM '+str(SiPM)+'} [ns];Counts'
+            title='#splitline{'+ReadableDetID+'}'+subtitle
+            # hists[SiPMtime]=ROOT.TH1F(SiPMtime,title, 400, -10, 10)
+            if self.timealignment=='old': hists[SiPMtime]=ROOT.TH1F(SiPMtime,title, 400, 0, 20)
+            elif self.timealignment=='new': hists[SiPMtime]=ROOT.TH1F(SiPMtime,title, 400, -10, 10) 
+            
+        SiPMtimeToFcorrected=f'tSiPMToFcorrected_{fixed_ch}_corrected'
+        if not SiPMtimeToFcorrected in hists:
+            subtitle='{Time-walk and signal time-of-flight corrected SiPM time w/ run'+str(self.TWCorrectionRun)+'};t^{tw corr}_{SiPM '+str(SiPM)+'} [ns];Counts'
+            title='#splitline{'+ReadableDetID+'}'+subtitle
+            # hists[SiPMtimeToFTWcorrected]=ROOT.TH1F(SiPMtimeToFTWcorrected,title, 400, -10, 10)    
+            if self.timealignment=='old': hists[SiPMtimeToFcorrected]=ROOT.TH1F(SiPMtimeToFcorrected, title, 400, 0, 20)
+            elif self.timealignment=='new': hists[SiPMtimeToFcorrected]=ROOT.TH1F(SiPMtimeToFcorrected, title, 400, -10, 10)
         
         ### Fill histograms 
         hists[dtvxpred].Fill(pred, TWt_rel)
         hists[dtvqdc].Fill(qdc, ToFTWt_rel)
-        hists[SiPMtime].Fill(TWt_rel)
-        
-        if meantimecorrection:
-
-            tds0correctedtwcorrectedtime=TWcorrectedtime-correctedmeantime
-
-            dtvqdc_meantimecorrected=f'dtvqdc_{fixed_ch}_corrected_tds0corrected'
-            if not dtvqdc_meantimecorrected in hists:
-                subtitle='TW and t_{0}^{DS}-mean corrected t_{0}^{DS}-t_{SiPM} v QDC_{SiPM} w/ run'+str(self.TWCorrectionRun)+';QDC_{SiPM} [a.u];t_{0}^{DS}-t_{SiPM} [ns]'
-                title='#splitline{'+ReadableDetID+'}{'+subtitle+'}'
-                hists[dtvqdc_meantimecorrected]=ROOT.TH2F(dtvqdc_meantimecorrected, title, 200, 0, 200, 800, -20, 20)   
-
-            SiPMtime_meantimecorrected=f'tSiPM_{fixed_ch}_corrected_meantimecorrected'
-            if not SiPMtime_meantimecorrected in hists:
-                subtitle='TW and t_{0}^{DS}-mean corrected SiPM time w/ run'+str(self.TWCorrectionRun)+';SiPM time [ns];Counts'
-                title='#splitline{'+ReadableDetID+'}{'+subtitle+'}'
-                hists[SiPMtime_meantimecorrected]=ROOT.TH1F(SiPMtime_meantimecorrected,title, 500, 0, 25)
-            
-            hists[dtvqdc_meantimecorrected].Fill(qdc, tds0correctedtwcorrectedtime)
-            hists[SiPMtime_meantimecorrected].Fill(tds0correctedtwcorrectedtime)
-
-    def AllCorrection(self, fixed_ch, pred, clock, qdc, TDS0, hit):
-        pass
-
-        # if self.options.debug==1: hists[digimethod].Fill(qdc, DigiTWToFt_rel)
+        hists[SiPMtime].Fill(TWcorrectedtime)
+        hists[SiPMtimeToFTWcorrected].Fill(ToFTWcorrectedtime)
 
     def WriteOutHistograms(self):
         testing_outfile=f'testing_{self.options.runNumber}_{self.options.nStart}_{self.options.nEvents}.root'
@@ -394,7 +383,6 @@ class TimeWalk(ROOT.FairTask):
             print(f'Channel hit rate hists written to {testing_outfile}')
             testing_f.Close()
 
-    # def yresidual3(self, detID, pos, mom):
     def yresidual3(self, detID):
         self.MuFilter.GetPosition(detID,A,B)
         doca=self.Getyresidual(detID)
@@ -460,7 +448,7 @@ class TimeWalk(ROOT.FairTask):
         return DS3Haverage-averageUS1time    
 
     def TimingDiscriminantCut(self, td):
-        if self.timingalignment=='old':
+        if self.timealignment=='old':
             if td<0: return False 
             else: return True
         else: 
@@ -469,7 +457,6 @@ class TimeWalk(ROOT.FairTask):
                 return 
             hist=self.cutdists['timingdiscriminant']
             mean, stddev=hist.GetMean(), hist.GetStdDev()
-            # print(f'td: {td}, mean +/- 2*std. dev.: {mean-2*stddev}, {mean+2*stddev}')
             if td < mean-3*stddev or td > mean+3*stddev: return False
             else: return True
 
