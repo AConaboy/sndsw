@@ -8,8 +8,7 @@ import Mufi_monitoring
 import DAQ_monitoring
 import EventDisplay_Task
 import SndlhcMuonReco
-import TimeWalk
-import SelectionCriteria
+import TimeWalk, SelectionCriteria, SystemAlignment
 
 def pyExit():
     print("Make suicide until solution found for freezing")
@@ -42,7 +41,7 @@ parser.add_argument("-c", "--command", dest="command", help="command", default="
 parser.add_argument("-n", "--nEvents", dest="nEvents", help="number of events", default=-1,type=int)
 parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default=0,type=int)
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
-parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function or log function", default=4, type=int, required=False)
+parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function or log function", default=5, type=int, required=False)
 parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
 parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=3)
 parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int, default=5097)
@@ -58,7 +57,7 @@ parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--eosH8', dest='eosH8', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TB_H8_october/')
 parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TI18/')
-parser.add_argument('--mode', dest='mode', type=str, required=True)
+parser.add_argument('--mode', dest='mode', type=str, default='zeroth')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', help='int (0/1), is on HTCondor?', default=0, type=int, required=False)
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
@@ -171,6 +170,10 @@ elif options.Task=='SelectionCriteria':
     monitorTasks['SelectionCriteria'] = SelectionCriteria.MuonSelectionCriteria()
     for m in monitorTasks:
         monitorTasks[m].Init(options, M)
+elif options.Task=='SystemAlignment':
+    monitorTasks['SystemAlignment'] = SystemAlignment.SystemAlignment()
+    for m in monitorTasks:
+        monitorTasks[m].Init(options, M)
 c=0
 if not options.auto:   # default online/offline mode
     trackIDdict={'DS':3, 'Scifi':1}
@@ -197,4 +200,6 @@ if not options.auto:   # default online/offline mode
         if not options.debug: 
             monitorTasks['SelectionCriteria'].WriteOutHistograms()
             if options.WriteOutTrackInfo: monitorTasks['SelectionCriteria'].SaveTrackInfos()
+    if 'SystemAlignment' in monitorTasks:
+        if not options.debug: monitorTasks['SystemAlignment'].WriteOutHistograms()
     
