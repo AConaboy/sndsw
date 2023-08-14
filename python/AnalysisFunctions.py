@@ -7,6 +7,7 @@ import math as m
 class Analysis(object):
 
 	def __init__(self, options):
+		# self.task=task
 		self.options=options
 		if not hasattr(options, 'runNumber'): options.runNumber=options.runs[0]
 		self.runNr = str(options.runNumber).zfill(6)
@@ -27,22 +28,9 @@ class Analysis(object):
 		elif options.datalocation=='H8':
 			self.path=afswork+'-H8/'
 
-		### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
-		if options.TWCorrectionRun==None:
-			if self.timealignment=='old': self.TWCorrectionRun=str(5097).zfill(6)
-			elif self.timealignment=='new': self.TWCorrectionRun=str(5408).zfill(6)
-		### Check that the time-walk correction run selected has the same time alignment has the data set
-		else:
-			if self.GetTimeAlignmentType(runNr=options.TWCorrectionRun) != self.timealignment:
-				if self.timealignment=='old': self.TWCorrectionRun=str(5097).zfill(6)
-				elif self.timealignment=='new': self.TWCorrectionRun=str(5408).zfill(6)
-			else: self.TWCorrectionRun=str(options.TWCorrectionRun).zfill(6) 
-
-		# mapping SiPM channels to the whole system
-
 		self.CorrectionType=options.CorrectionType
 		self.correctionparams=lambda ps : [y for x,y in enumerate(ps) if x%2==0]
-		self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) )
+		self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
 		self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
 		self.systemAndPlanes = {1:2,2:5,3:7}
 		self.systemAndBars = {1:7,2:10,3:60}
@@ -52,15 +40,16 @@ class Analysis(object):
 		self.gelsides={0:'right', 1:'left', 2:'right', 3:'left', 4:'left'}
 		self.subsystemNames={1:'veto', 2:'upstream', 3:'downstream'}
 		self.verbose=False
-		self.cscintvalues=self.Makecscintdict(self.TWCorrectionRun, state=self.state)
-		self.twparameters=self.MakeTWCorrectionDict(self.TWCorrectionRun)
-		self.alignmentparameters=self.MakeAlignmentParameterDict(self.TWCorrectionRun)
+
+		self.sigmatds0=0.263, 9.5E-5
+
+	def SetTask(self, task):
+		self.task=task
 
 	def DSHcheck(self, detID): # True if detID is a horizontal bar
 		s,p,b=self.parseDetID(detID)
 		if s!=3: return False 
 		if p<3 and b<60:  return True
-		# elif p==3 and b<60: return True
 		else: return False
 
 	def DSVcheck(self, detID): # True if detID is a vertical 
@@ -171,14 +160,20 @@ class Analysis(object):
 		elif any( [b<60, b>59 and p==3] ): plane=p*2 
 		return plane
 
-	def MakeHumanReadableDetID(self, fixed_ch):
+	def MakeHumanReadableFixedCh(self, fixed_ch):
 		s,p,b=self.parseDetID(int(fixed_ch.split('_')[0])) 
 		SiPM=int(fixed_ch.split('_')[1])
   		# Not using f-string because ROOT can't cope with combining them and TLatex
-		res=str(self.subsystemNames[s])+', plane '+str(p+1)+', bar '+str(b+1)+', SiPM '+str(SiPM+1) # +1 to make things more readable. I hope this doesn't complicate things
+		res=str(self.subsystemNames[s])+', plane '+str(p+1)+', bar '+str(b+1)+', SiPM '+str(SiPM+1)+', '+self.GetSide(fixed_ch)+' side' # +1 to make things more readable. I hope this doesn't complicate things
 		return res
 
-	def GetDSHaverage(self, MuFilter, hits, mode='tds0'):
+	def MakeHumanReadableDetID(self, detID):
+		s,p,b=self.parseDetID(detID) 
+  		# Not using f-string because ROOT can't cope with combining them and TLatex
+		res=str(self.subsystemNames[s])+', plane '+str(p+1)+', bar '+str(b+1)
+		return res
+
+	def GetDSHaverage(self, hits, mode='tds0'):
 		stations={k:{} for k in range(4)} # only k=0,1,2 are used
 		for i,hit in enumerate(hits):
 			detID=hit.GetDetectorID()
@@ -198,21 +193,19 @@ class Analysis(object):
 					if not hit.isValid():continue
 					detID=hit.GetDetectorID()
 					tdcs=hit.GetAllTimes()
-					# if len(tdcs) != 2: return -999. # Event selection: only accept events with BOTH SiPMs firing on 1 scintillator
 					if len(tdcs) != 2: continue # pass
 					# for all 3 horizontal DS planes.
 					for item in tdcs: 
 						SiPM, clock = item
-						dscorrectedtime=MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
+						dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
 						total+=dscorrectedtime
 						counter+=1
 			if counter==0: 
-				# print(f'No DS hits with fired SiPMs on both sides')
 				return -999
 
 			dsh_average=total/counter
 			
-			return dsh_average
+			return dsh_average, counter
 
 		elif mode=='timingdiscriminant': # Take k=2 for the 3rd horizontal plane
 			DS3H_hits=list(stations[2].values())
@@ -226,7 +219,7 @@ class Analysis(object):
 				
 				for idx in times: 
 					SiPM,clock=idx
-					dscorrectedtime=MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
+					dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
 					total.append(dscorrectedtime)
 			if len(total)==0:
 				return -420					
@@ -244,7 +237,7 @@ class Analysis(object):
 
 					for idx in times:
 						SiPM, clock=idx
-						dscorrectedtime=MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
+						dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
 						ts[i].append(dscorrectedtime)
 			if any([len(ts[i])==0 for i in ts]): return False
 			res['delta32']=sum(ts[2])/len(ts[2]) - sum(ts[1])/len(ts[1])
@@ -353,9 +346,13 @@ class Analysis(object):
 			elif side == 'L': return value[0]/count[0]
 			elif side == 'R': return value[1]/count[1]
    
+	# def GetMedianTime(self, hit, mode=None, particleToF=None):
 	def GetMedianTime(self, hit, mode=None):
 		
 		if not mode: mode=self.state
+		# if self.timealignment=='old' and particleToF==None: 
+		# 	print(f'A particle ToF must be provided for old time alignment data')
+		# 	return -999
 
 		values={'left':[], 'right':[]}
 		nSiPMs=hit.GetnSiPMs()
@@ -375,7 +372,7 @@ class Analysis(object):
 						3: all(( b<60, any( [nLeft!=1, nRight!=1]) ))
       					}
 		if nSiPMconditions[s]: 
-			print(f'nSiPM conditions not met for {detID}')
+			# print(f'nSiPM conditions not met for {detID}')
 			return
 			
 		for element in clocks:
@@ -394,11 +391,12 @@ class Analysis(object):
 				if not correctedtime: continue
 				values[side].append(correctedtime)
 			
-			elif mode == 'globalcorrection':
+			elif mode == 'alignment':
 				qdc=self.GetChannelVal(SiPM, qdcs)
 				if not qdc: continue
 				correctedtime=self.MuFilterCorrectedTime(fixed_ch, qdc, clock)
 				if not correctedtime: continue
+				
 				values[side].append(correctedtime)
 	
 		if not all( (len(values[i])>0 for i in values) ): 
@@ -409,7 +407,7 @@ class Analysis(object):
 		if s==3 and b<60 and all( [nLeft==1, nRight==1] ): 
 			for x in values: medians[x]=values[x][0]
 			return medians
-  
+
 		for x in values:
 			if len(values[x])%2==0:
 				if len(values[x])==2: print(detID, values)
@@ -482,11 +480,11 @@ class Analysis(object):
 		if subsystem==0:
 			pass
 		elif subsystem==1:
-			zmin, zmax=zPos['MuFilter'][10], zPos['MuFilter'][11]
+			zmin, zmax=self.zPos['MuFilter'][10], self.zPos['MuFilter'][11]
 		elif subsystem==2:
-			zmin, zmax=zPos['MuFilter'][20], zPos['MuFilter'][24]
+			zmin, zmax=self.zPos['MuFilter'][20], self.zPos['MuFilter'][24]
 		elif subsystem==3:
-			zmin, zmax=zPos['MuFilter'][30], zPos['MuFilter'][36]
+			zmin, zmax=self.zPos['MuFilter'][30], self.zPos['MuFilter'][36]
 		else: return 0
 		return zmin, zmax
 
@@ -667,10 +665,10 @@ class Analysis(object):
 	def Getyresidual(self, detID):
 		s,p,b=self.parseDetID(detID)
 		key=10*s+p
-		z=zPos['MuFilter'][key]
-		lam=(z-self.pos.z())/self.mom.z()
-		pq = A-self.pos
-		uCrossv= (B-A).Cross(self.mom)
+		z=self.zPos['MuFilter'][key]
+		lam=(z-self.task.pos.z())/self.task.mom.z()
+		pq = self.task.A-self.task.pos
+		uCrossv= (self.task.B-self.task.A).Cross(self.task.mom)
 		doca = pq.Dot(uCrossv)/uCrossv.Mag()
 		return doca 		
 
@@ -690,13 +688,11 @@ class Analysis(object):
 		with open(f'{self.path}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
 			reader=csv.reader(handle)
 			alldata=[row for row in reader]
-			if len(alldata)<iteration+1 or len(alldata) == 0: 
-				# print(f'{fixed_ch} Len issue')
-				return 
-			try:
-				data=alldata[iteration]
-			except IndexError:
-				print(f'{fixed_ch} IndexError')
+			
+			if len(alldata)<iteration+1 or len(alldata) == 0: return 
+			try: data=alldata[iteration]
+			except IndexError: print(f'{fixed_ch} IndexError')
+
 		return (float(data[1]), float(data[2]))
 
 	def GetBarAveragecscint(self, runNr, detID, state):
@@ -705,7 +701,7 @@ class Analysis(object):
 		cscintvalues={}
 		for SiPM in self.systemAndSiPMs[subsystem]:
 			fixed_ch=self.MakeFixedCh((subsystem, plane, bar, SiPM))
-			# cscint=self.Getcscint(runNr, fixed_ch, state)
+			if fixed_ch not in self.cscintvalues:continue
 			cscint=self.cscintvalues[fixed_ch]
 			if not cscint: continue
 			cscintvalues[fixed_ch]=cscint
@@ -715,6 +711,24 @@ class Analysis(object):
 		uncertainty=ROOT.TMath.Sqrt(uncertainty_sq)
 	
 		return average_cscint, uncertainty
+
+	def GetBarAveragesigmat(self, runNr, detID, state):
+
+		subsystem, plane, bar = self.parseDetID(detID)
+		bartimeresolutionvalues={}
+		for SiPM in self.systemAndSiPMs[subsystem]:
+			fixed_ch=self.MakeFixedCh((subsystem, plane, bar, SiPM))
+			if fixed_ch not in self.timeresolutionvalues:continue
+			timeresolutionvalue=self.timeresolutionvalues[fixed_ch]
+			if m.isnan(timeresolutionvalue[0]): continue
+
+			bartimeresolutionvalues[fixed_ch]=timeresolutionvalue
+
+		average_timeresolution = sum( [bartimeresolutionvalues[ch][0] for ch in bartimeresolutionvalues] ) / len(bartimeresolutionvalues.items())
+		uncertainty_sq = sum( [bartimeresolutionvalues[ch][1]**2 for ch in bartimeresolutionvalues] ) 
+		uncertainty=ROOT.TMath.Sqrt(uncertainty_sq)
+	
+		return average_timeresolution, uncertainty	
 
 	def Getcscint_chi2pNDF_info(self, runNr,fixed_ch,state):
 		iteration=0 if state=='uncorrected' else 1
@@ -751,26 +765,31 @@ class Analysis(object):
 						cscint=self.Getcscint(runNr, fixed_ch=fixed_ch, state=state)
 						if not cscint: continue
 						else: d[fixed_ch]=cscint
-		return d  
+		if len(d)==0: self.cscintvalues=None
+		self.cscintvalues=d
 
-	def Maketimeresolutiondict(self, runNr, subsystem, state):
+	def Maketimeresolutiondict(self, runNr, state):
+		sigmadelta=2/ROOT.TMath.Sqrt(6)*self.sigmatds0[0]
 		iteration=0 if state=='uncorrected' else 1
 		path=f'{self.path}TimeResolution/run{runNr}/'
 		res={}
 		for filename in os.listdir(path):
 			fixed_ch=f'{filename.split("_")[1]}_{filename.split("_")[2].split(".")[0]}'
-			if fixed_ch[0]!=str(subsystem): continue
+			if fixed_ch[0]==str(3): continue
 			with open(path+filename, 'r') as handle:
 				reader=csv.reader(handle)
 				alldata=[row for row in reader]
 				if len(alldata)<iteration or alldata==[]:
-					print(filename)
 					continue
 				data=alldata[iteration]
+				# data -> (state, time resolution, uncertainty on time resolution) #
+				tsipm = ROOT.TMath.Sqrt(float(data[1])**2 - self.sigmatds0[0]**2)
+				
+				#### Uncertainty contribution from sigma tds0 is negligible. ~ 9.5E-5 ns
 				res[fixed_ch]=(float(data[1]), float(data[2]))
 		sorted_tuples=sorted(res.items(), key=lambda x:x[1][0])
 		sorted_d={k:v for k,v in sorted_tuples}
-		return sorted_d   
+		self.timeresolutionvalues=sorted_d
 
 	def GetPolyParams(self, runNr, fixed_ch, state='uncorrected', n=5):
 		iteration=0 if state=='uncorrected' else 1
@@ -967,59 +986,106 @@ class Analysis(object):
 			res=data[iteration-1]
 		return float(res[0])
 
-	def GetToFcorrection(self, SiPM, xpred, cs, xref):
+	def GetToFcorrection(self, SiPM, pred, cs, xref):
 		c_SiPM=float(cs[0])
-		ToFcorrection=abs((xpred-xref)/c_SiPM)
+		ToFcorrection=abs((pred-xref)/c_SiPM)
 		return ToFcorrection
 
-	def correct_ToF(self, SiPM, clock, xpred, cs, xref):
+	def correct_ToF(self, fixed_ch, clock, pred):
+		detID=int(fixed_ch.split('_')[0])
+		s,p,b=self.parseDetID(detID)
+		SiPM=int(fixed_ch.split('_')[-1])		
+		xref=self.xrefs[s]
+		cs=self.cscintvalues[fixed_ch]
 
 		# fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
 		time=clock*self.TDC2ns
 		c_SiPM=float(cs[0])
-		ToFcorrection=abs((xpred-xref)/c_SiPM)
+		ToFcorrection=abs((pred-xref)/c_SiPM)
 		# Does not work for DS! 
 		if SiPM<8:
-			if xpred >= xref: corrected_t = time - ToFcorrection
+			if pred >= xref: corrected_t = time - ToFcorrection
 			else: corrected_t = time + ToFcorrection
 		else: 
-			if xpred >= xref: corrected_t = time + ToFcorrection
+			if pred >= xref: corrected_t = time + ToFcorrection
 			else: corrected_t = time - ToFcorrection
 		return (SiPM, corrected_t)
 
-	def correct_TW(self, fixed_ch, qdc, clock):
-		time=clock*self.TDC2ns
-		# tmp=self.GetPolyParams(self.TWCorrectionRun, fixed_ch)
-		tmp=self.twparameters[fixed_ch]
-		if not tmp:
-			print(f'no params for {fixed_ch}')
-			return
-		paramAndErrors, correctionlimit, subsystemcorrection = tmp
-		params=self.correctionparams(paramAndErrors)
-		correction=self.correctionfunction(params, qdc)
-		TWcorrectedtime=time+correction
-		return TWcorrectedtime
+	def GetCorrectedTimes(self, hit,x=0, mode='unaligned'):
+		detID=hit.GetDetectorID()
 
-	def MuFilterCorrectedTime(self, fixed_ch, qdc, clock):
-		time=clock*self.TDC2ns
-		# tmp=self.GetPolyParams(self.TWCorrectionRun, fixed_ch)
-		tmp=self.twparameters[fixed_ch]  
-		if not tmp:
-			print(f'no params for {fixed_ch}')
-			return
-		# Read everything from file, a tuple of 3 lists 
-		paramAndErrors, correctionlimit = tmp
-  
-		# The list of paramsAndErrors are formatted: (param, error, param, error,...) 
-		# self.correctionparams(X) gets the parameters from the list
-		params=self.correctionparams(paramAndErrors)
-		subsystemcorrection=self.alignmentparameters[fixed_ch]
-		# Pass the parameters and qdc value to evaluate the necessary correction
-		correction=self.correctionfunction(params, qdc)
+		alignedtimes=[]
+		clocks, qdcs=hit.GetAllTimes(), hit.GetAllSignals()
+		for i in clocks:
+			SiPM, clock=i 
+			fixed_ch=f'{detID}_{SiPM}'
+			qdc=self.GetChannelVal(SiPM, qdcs)
+			correctedtime=self.MuFilterCorrectedTime(fixed_ch, qdc, clock, x, mode)
+			if not correctedtime: continue
+			alignedtimes.append((SiPM, correctedtime))
+		return alignedtimes
 
-		# subsystemcorrection is (correction, error)
-		correctedtime=time+correction-subsystemcorrection[0]
-		return correctedtime
+	def MuFilterCorrectedTime(self, fixed_ch, qdc, clock, x=0, mode='unaligned'):
+		time=clock*self.TDC2ns
+
+		if not fixed_ch in self.twparameters:
+			return
+
+		if not fixed_ch in self.alignmentparameters and mode=='unaligned':
+			return
+		
+		if fixed_ch not in self.cscintvalues and x!=0:
+				return
+		elif fixed_ch in self.cscintvalues and x!=0: 
+			cdata=self.cscintvalues[fixed_ch] 
+
+		twparams=self.twparameters[fixed_ch]
+		
+		#### Correct ToF if needed.
+		if x==0:
+			ToFcorrectedtime=time
+		else: 
+			SiPM=int(fixed_ch.split('_')[-1])
+			cscint=self.cscintvalues[fixed_ch]
+			xref=self.xrefs[int(fixed_ch[0])]
+			ToFcorrectedtime=self.correct_ToF(fixed_ch, clock, x)[1]
+
+		#### TW corrected time then ToF & TW corrected time
+		twcorrection=self.correctionfunction(twparams, qdc)
+		ToFTWcorrectedtime=ToFcorrectedtime+twcorrection
+		
+		return ToFTWcorrectedtime
+
+	def GetTimingDiscriminant(self):
+
+		hits=self.task.M.eventTree.Digi_MuFilterHits
+		US1hits=[h.GetDetectorID() for h in hits if all([h.GetDetectorID()//10000==2, self.parseDetID(h.GetDetectorID())[1]==0])]
+
+		if len(US1hits)==0: return -999
+
+		elif len(US1hits)==1:
+			x=US1hits[0]
+			tmp={h.GetDetectorID():h for h in hits}
+			us1hit=tmp[x]
+
+		elif len(US1hits)>1:
+			docas={}
+			for US1detID in US1hits:
+				self.task.MuFilter.GetPosition(US1detID, self.task.A, self.task.B)
+				docas[self.Getyresidual(US1detID)]=US1detID
+			x=docas.pop(min(docas))
+			tmp={h.GetDetectorID():h for h in hits}
+			us1hit=tmp[x]  
+		else:
+			print('shite')
+			return -999
+
+		averageUS1time=self.GetAverageTime(us1hit)
+		if not averageUS1time: return -998
+
+		DS3Haverage=self.GetDSHaverage(hits, mode='timingdiscriminant')
+
+		return DS3Haverage-averageUS1time
 
 	def GetCutDistributions(self, runNr, distmodes=('dy', 'slopes', 'nSiPMs', 'timingdiscriminant'), task='TimeWalk'):
 		Allmodes=('dy', 'nSiPMs', 'slopes', 'timingdiscriminant')
@@ -1080,8 +1146,14 @@ class Analysis(object):
 	
 	def GetTimeAlignmentType(self, runNr):
 		if not isinstance(runNr, int): runNr=int(runNr)
+		
 		if any( [int(runNr) < 5116, int(runNr) > 5174 and int(runNr) < 5193] ): return 'old'
-		else: return 'new'
+		elif int(runNr) < 5413: return 'new'
+		else: return 'new+LHCsynch'
+
+	def isLHCsynch(self, runNr):
+		if int(runNr)<5431: return False
+		else: return True
 
 	def GetSiPMtime(self, runNr, fixed_ch, state, mode='mean'):
 		
@@ -1102,20 +1174,39 @@ class Analysis(object):
 		f.Close()
 		return tSiPM, uncertainty
 
-	def Gettds0mean(self, runNr, fixed_ch, mode='mean', state='corrected'):
+	def GetAlignmentParameters(self, runNr, fixed_ch):
+		fname=f'{self.path}Alignmentparams/run{runNr}/alignmentparams{self.CorrectionType}_{fixed_ch}.csv'
+		if not os.path.exists(fname): 
+			return
+		with open(fname, 'r') as handle:
+			reader=csv.reader(handle)
+			alldata=[row for row in reader]
+			if len(alldata) == 0: return 
+			try:
+				data=alldata[0]
+			except IndexError:
+				print(f'{fixed_ch} IndexError')
+		return (float(data[0]), float(data[1]))		
+
+	def Gettds0mean(self, runNr, fixed_ch, mode='truncated', state='corrected'):
 		filename=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
-		if not os.path.exists(filename): return
+		if not os.path.exists(filename): 
+			print(f'No timewalk file for {fixed_ch}')
+			return
 
 		f=ROOT.TFile.Open(filename, 'READ')
 		if state=='uncorrected': histname=f'dtvqdc_{fixed_ch}_uncorrected'
 		elif state=='corrected': histname=f'dtvqdc_{fixed_ch}_corrected'
+		# elif state=='aligned' and self.timealignment=='new': histname=f'dtvqdc_{fixed_ch}_corrected_tDS0-tSiPMcorrected'
 		elif state=='aligned': histname=f'dtvqdc_{fixed_ch}_corrected_tDS0-tSiPMcorrected'
+		else: print(f'No conditions met for finding histname:\n')
+
 		if not hasattr(f, histname): 
 			f.Close()
+			print(f'No hist {histname} for {fixed_ch}')
 			return 
 		hist=f.Get(histname)
 		if mode=='mean':
-		# if state in ('corrected', 'aligned'):
 			yproj=hist.ProjectionY('full')
 			mean=yproj.GetMean()
 			uncertainty = mean/ROOT.TMath.Sqrt(yproj.GetEntries())
@@ -1140,56 +1231,27 @@ class Analysis(object):
 		filename=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
 		if not os.path.exists(filename): return
 		f=ROOT.TFile.Open(filename, 'READ')
-		histname=f'tSiPM_{fixed_ch}_corrected_tDS0-tSiPMcorrected'
+		# if self.timealignment=='new': histname=f'tSiPMToFcorrected_{fixed_ch}_corrected_tDS0-tSiPMcorrected'
+		histname=f'tSiPMToFcorrected_{fixed_ch}_corrected_tDS0-tSiPMcorrected'
+		# elif self.timealignment=='old': histname=f'ScifiAlignedToFcorrectedtSiPM_{fixed_ch}_corrected'
 		if not hasattr(f, histname): 
 			f.Close()
 			return 
 		hist=f.Get(histname)
 		if mode=='mean':
-			correction=hist.GetMean()
-			uncertainty=hist.GetStdDev()
+			correction=hist.GetBinCenter(hist.GetMaximumBin())
+			error=hist.GetStdDev()/2
+			# for 
+			# correction=hist.GetMean()
+
+			# uncertainty=hist.GetStdDev()
 
 		elif mode=='median':
-			correction, uncertainty=0,0
+			correction, error =0, 0
 		else: 
-			correction, uncertainty=0,0
+			correction, error =0, 0
 		f.Close()
-		return correction, uncertainty
-
-	def OldTimeAlignmentCorrections(self, runNr, key):
-  
-		corrections={}
-		s,p=key//10, key%10
-		# key=10*s+p 
-		
-		for b in range(self.systemAndBars[s]):
-			for SiPM in self.systemAndSiPMs[s]:
-				
-				fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-				filename=f'{self.path}/rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
-				if not os.path.exists(filename): continue
-				f=ROOT.TFile.Open(filename, 'read')
-				if not hasattr(f, f'dtvqdc_{fixed_ch}_corrected'):
-					f.Close()
-					continue
-				hist=f.Get(f'dtvqdc_{fixed_ch}_corrected')
-				yproj=hist.ProjectionY('full-y')
-				modaltime=yproj.GetBinCenter(yproj.GetMaximumBin())
-
-				low, high=yproj.FindBin(modaltime-2*yproj.GetStdDev()), yproj.FindBin(modaltime+2*yproj.GetStdDev()) # mode(yproj) + 2*stddev, mode(yproj) - 2*std dev
-				tmp=[[yproj.GetBinLowEdge(i),yproj.GetBinContent(i)] for i in range(low, high+1)]
-				truncatedmean=sum([x[0]*x[1] for x in tmp]) / sum([x[1] for x in tmp])
-				truncateduncertainty=truncatedmean / ROOT.TMath.Sqrt(sum( [x[1] for x in tmp] ))
-				corrections[fixed_ch]=truncatedmean
-
-				f.Close()
-    
-		left, right=[],[]
-		for ch in corrections:
-			if self.GetSide(ch)=='left': left.append(corrections[ch])
-			elif self.GetSide(ch)=='right': right.append(corrections[ch])
-		avg_left, avg_right = sum(left)/len(left), sum(right)/len(right)
-		return avg_left, avg_right
+		return correction, error
 
 	def GetEntriesInHist(self, runNr, fixed_ch, mode, state):
 
@@ -1244,9 +1306,8 @@ class Analysis(object):
 
 	# 	return params
 
-	def MakeTWCorrectionDict(self, runNr):
+	def MakeTWCorrectionDict(self, runNr, withErrors=False):
   
-		# params={i:[] for i in ('A', 'B', 'C', 'D', 'E', 'F')}
 		d={}
 		for s in (1,2):
 			for p in range(self.systemAndPlanes[s]):
@@ -1256,9 +1317,11 @@ class Analysis(object):
 						tmp=self.GetPolyParams(runNr, fixed_ch, state='uncorrected', n=self.CorrectionType)
 						if not tmp: continue
 						else: paramsAndErrors=tmp[0]
-						params=self.correctionparams(paramsAndErrors)
+						if not withErrors: params=self.correctionparams(paramsAndErrors)
+						else: params=paramsAndErrors
 						d[fixed_ch]=params
-		return d
+		if len(d)==0: self.twparameters=None
+		self.twparameters=d
 
 	### Make dictionary of the alignment parameter determined as the truncated y-mean of tw-corr (tds0 - tSiPM)
 	def MakeAlignmentParameterDict(self, runNr):
@@ -1268,10 +1331,12 @@ class Analysis(object):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-						correction=self.Gettds0mean(runNr, fixed_ch)
+						# correction=self.Gettds0mean(runNr, fixed_ch)
+						correction=self.GetAlignmentParameters(runNr, fixed_ch)
 						if not correction: continue
 						d[fixed_ch]=correction
-		return d     
+		if len(d)==0: self.alignmentparameters=None
+		self.alignmentparameters=d
 
 	def GetCanvas(self, runNr, fixed_ch, mode, iteration):
 		filename=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
