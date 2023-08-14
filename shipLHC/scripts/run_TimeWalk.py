@@ -44,7 +44,7 @@ parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", d
 parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function or log function", default=5, type=int, required=False)
 parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
 parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=3)
-parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int, default=5097)
+parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int)
 parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, default='physics')
 parser.add_argument('--state', dest='state', type=str, default='uncorrected')
 
@@ -52,6 +52,7 @@ parser.add_argument('--state', dest='state', type=str, default='uncorrected')
 parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', type=int, default=0)
 parser.add_argument('--SlopesCut', dest='SlopesCut', type=int, default=1)
 parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', type=int, default=1)
+parser.add_argument('--CrossTalk', dest='CrossTalk', type=int, default=1)
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
@@ -97,8 +98,10 @@ if not options.geoFile:
         options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
     elif options.runNumber < 5172:
         options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
-    else:
+    elif options.runNumber < 5485:
         options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
+    else:
+        options.geoFile =  "geofile_sndlhc_TI18_V1_2023.root"
 # to be extended for future new alignments.
 
 def currentRun():
@@ -128,7 +131,15 @@ if options.runNumber < 0:
     os._exit(1)
 # works only for runs on EOS
 if not options.server.find('eos')<0:
-    runDir = "/eos/experiment/sndlhc/raw_data/commissioning/TI18/data/run_"+str(options.runNumber).zfill(6)
+    if options.path.find('2023')!=-1:
+        rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2023_tmp/'
+    elif options.path.find('2022')!=-1:
+        rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2022/'
+    else:
+        rawDataPath='/eos/experiment/sndlhc/raw_data/commissioning/TI18/data/'
+    options.rawDataPath=rawDataPath
+    print(f'rawDataPath: {rawDataPath}')
+    runDir=rawDataPath+'run_'+str(options.runNumber).zfill(6)
     jname = "run_timestamps.json"
     dirlist  = str( subprocess.check_output("xrdfs "+os.environ['EOSSHIP']+" ls "+runDir,shell=True) ) 
     if jname in dirlist:
@@ -139,6 +150,7 @@ if not options.server.find('eos')<0:
        options.startTime = date['start_time'].replace('Z','')
        if 'stop_time' in date:
            options.startTime += " - "+ date['stop_time'].replace('Z','')
+
 # prepare tasks:
 FairTasks = []
 houghTransform = False # under construction, not yet tested
@@ -164,16 +176,9 @@ if options.Task=='TimeWalk':
         print('=='*20+f'\nNo mode given for time walk task. Give mode as zeroth, tof or tw.\n'+'=='*20)
         pyExit()
     monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
-    for m in monitorTasks:
-        monitorTasks[m].Init(options,M)
-elif options.Task=='SelectionCriteria':
-    monitorTasks['SelectionCriteria'] = SelectionCriteria.MuonSelectionCriteria()
-    for m in monitorTasks:
-        monitorTasks[m].Init(options, M)
-elif options.Task=='SystemAlignment':
-    monitorTasks['SystemAlignment'] = SystemAlignment.SystemAlignment()
-    for m in monitorTasks:
-        monitorTasks[m].Init(options, M)
+for m in monitorTasks:
+    monitorTasks[m].Init(options, M)
+    monitorTasks[m]
 c=0
 if not options.auto:   # default online/offline mode
     trackIDdict={'DS':3, 'Scifi':1}
@@ -194,12 +199,12 @@ if not options.auto:   # default online/offline mode
         for m in monitorTasks:
             monitorTasks[m].ExecuteEvent(M.eventTree)
     print(f'{c}/{options.nEvents} with no tracks')
-    if 'TimeWalk' in monitorTasks:
-        if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()
     if 'SelectionCriteria' in monitorTasks:
         if not options.debug: 
             monitorTasks['SelectionCriteria'].WriteOutHistograms()
             if options.WriteOutTrackInfo: monitorTasks['SelectionCriteria'].SaveTrackInfos()
+    if 'TimeWalk' in monitorTasks:
+        if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()
     if 'SystemAlignment' in monitorTasks:
         if not options.debug: monitorTasks['SystemAlignment'].WriteOutHistograms()
     
