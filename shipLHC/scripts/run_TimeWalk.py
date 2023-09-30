@@ -45,6 +45,7 @@ parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of pol
 parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
 parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=3)
 parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int)
+parser.add_argument("--AlignmentRun", dest="AlignmentRun", help="AlignmentRun", type=int)
 parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, default='physics')
 parser.add_argument('--state', dest='state', type=str, default='uncorrected')
 
@@ -60,6 +61,7 @@ parser.add_argument('--eosH8', dest='eosH8', type=str, default='/eos/experiment/
 parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TI18/')
 parser.add_argument('--mode', dest='mode', type=str, default='zeroth')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', help='int (0/1), is on HTCondor?', default=0, type=int, required=False)
+parser.add_argument('--numusignalevents', dest='numusignalevents', type=int, default=0)
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -130,6 +132,7 @@ if options.runNumber < 0:
     print("run number required for non-auto mode")
     os._exit(1)
 # works only for runs on EOS
+# if not options.numusignalevents:
 if not options.server.find('eos')<0:
     if options.path.find('2023')!=-1:
         rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2023_tmp/'
@@ -149,7 +152,7 @@ if not options.server.find('eos')<0:
        exec("date = "+jsonStr.decode())
        options.startTime = date['start_time'].replace('Z','')
        if 'stop_time' in date:
-           options.startTime += " - "+ date['stop_time'].replace('Z','')
+           options.startTime += " - "+ date['stop_time'].replace('Z','')      
 
 # prepare tasks:
 FairTasks = []
@@ -168,6 +171,11 @@ if options.nEvents < 0 :   options.nEvents = M.GetEntries()
 if options.postScale==0 and options.nEvents>5E7: options.postScale = 100
 if options.postScale==0 and options.nEvents>5E6: options.postScale = 10
 
+if options.numusignalevents:
+    import numusignals 
+    numu = numusignals(options)
+    numu.InvestigateSignalEvents()
+
 M = Monitor.Monitoring(options,FairTasks)
 monitorTasks = {}
 
@@ -175,13 +183,16 @@ if options.Task=='TimeWalk':
     if not options.mode:
         print('=='*20+f'\nNo mode given for time walk task. Give mode as zeroth, tof or tw.\n'+'=='*20)
         pyExit()
+    if options.numusignalevents: options.mode='numusignalevents'
     monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
 for m in monitorTasks:
     monitorTasks[m].Init(options, M)
-    monitorTasks[m]
+    # monitorTasks[m]
 c=0
+
+# else:
 if not options.auto:   # default online/offline mode
-    trackIDdict={'DS':3, 'Scifi':1}
+    # trackIDdict={'DS':3, 'Scifi':1}
     start, nEvents=options.nStart, options.nEvents
     deciles=[i/10 for i in range(11)]
     for n in range(start,start+nEvents):
@@ -205,6 +216,3 @@ if not options.auto:   # default online/offline mode
             if options.WriteOutTrackInfo: monitorTasks['SelectionCriteria'].SaveTrackInfos()
     if 'TimeWalk' in monitorTasks:
         if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()
-    if 'SystemAlignment' in monitorTasks:
-        if not options.debug: monitorTasks['SystemAlignment'].WriteOutHistograms()
-    

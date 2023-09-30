@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ROOT,os,csv
+import ROOT,os,csv,json
 import math as m 
 
 # class mufi_analysis: # I could make several classes for generic functions like parseDetID and more specific ones for 
@@ -40,6 +40,9 @@ class Analysis(object):
 		self.gelsides={0:'right', 1:'left', 2:'right', 3:'left', 4:'left'}
 		self.subsystemNames={1:'veto', 2:'upstream', 3:'downstream'}
 		self.verbose=False
+		
+		if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype
+		else: self.fileext='csv'
 
 		self.sigmatds0=0.263, 9.5E-5
 
@@ -64,14 +67,24 @@ class Analysis(object):
 		return channels
 
 	def GetGeoFile(self,runNumber):
+		if type(runNumber)==str: runNumber=int(runNumber)
+		
 		if runNumber < 4575: geofile='V3_08August2022'
 		elif runNumber < 4856: geofile='V5_14August2022'
 		elif runNumber < 4992: geofile='V6_08October2022'
 		elif runNumber > 4991: geofile='V7_22November2022'
 
-		return geofile	
+		return f"geofile_sndlhc_TI18_{geofile}.root"	
 
-	def BuildBarLengths(MuFilter):
+	def GetRunYear(self, runNr):
+		if isinstance(runNr, str): runNr=int(runNr)
+
+		if runNr < 5485: year='2022'
+		else: year='2023'
+
+		return year
+
+	def BuildBarLengths(self, MuFilter):
 		Vetobarlength = MuFilter.GetConfParF('MuFilter/VetoBarX')
 		USbarlength = MuFilter.GetConfParF('MuFilter/UpstreamBarX')
 		DSbarlength_hor = MuFilter.GetConfParF('MuFilter/DownstreamBarX')
@@ -172,6 +185,9 @@ class Analysis(object):
   		# Not using f-string because ROOT can't cope with combining them and TLatex
 		res=str(self.subsystemNames[s])+', plane '+str(p+1)+', bar '+str(b+1)
 		return res
+
+	def GetScifiAverageTime(self, hits):
+		pass
 
 	def GetDSHaverage(self, hits, mode='tds0'):
 		stations={k:{} for k in range(4)} # only k=0,1,2 are used
@@ -682,18 +698,47 @@ class Analysis(object):
 
 	def Getcscint(self, runNr, fixed_ch, state):
 
-		iteration=0 if state=='uncorrected' else 1
-		if not os.path.exists(f'{self.path}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'): 
-			return
-		with open(f'{self.path}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
-			reader=csv.reader(handle)
-			alldata=[row for row in reader]
-			
-			if len(alldata)<iteration+1 or len(alldata) == 0: return 
-			try: data=alldata[iteration]
-			except IndexError: print(f'{fixed_ch} IndexError')
+		mode=self.fileext
 
-		return (float(data[1]), float(data[2]))
+		if mode=='csv':
+			iteration=0 if state=='uncorrected' else 1
+			if not os.path.exists(f'{self.path}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv'): 
+				return
+			with open(f'{self.path}cscintvalues/run{runNr}/cscint_{fixed_ch}.csv', 'r') as handle:
+				reader=csv.reader(handle)
+				alldata=[row for row in reader]
+				
+				if len(alldata)<iteration+1 or len(alldata) == 0: return 
+				try: data=alldata[iteration]
+				except IndexError: print(f'{fixed_ch} IndexError')
+
+			return (float(data[1]), float(data[2]))
+
+		elif mode=='json':
+			filename=f'{self.path}cscintvalues/run{runNr}/cscint_{fixed_ch}.json'
+
+			if not os.path.exists(filename): return 
+
+			with open(filename, 'r') as x:
+				d=json.load(x)
+
+			if state not in d: return 
+
+			return d[state][0], d[state][1]
+
+	def Getcscint_offset(self, runNr, fixed_ch, state):
+
+		filename=f'{self.path}cscintvalues/run{runNr}/cscint_{fixed_ch}.json'
+
+		if not os.path.exists(filename): return 
+
+		with open(filename, 'r') as x:
+			d=json.load(x)
+
+		if state not in d: return 
+
+		return d[state][2], d[state][3]		
+
 
 	def GetBarAveragecscint(self, runNr, detID, state):
 
@@ -705,7 +750,7 @@ class Analysis(object):
 			cscint=self.cscintvalues[fixed_ch]
 			if not cscint: continue
 			cscintvalues[fixed_ch]=cscint
-      
+
 		average_cscint = sum( [cscintvalues[ch][0] for ch in cscintvalues] ) / len(cscintvalues.items())
 		uncertainty_sq = sum( [cscintvalues[ch][1]**2 for ch in cscintvalues] ) 
 		uncertainty=ROOT.TMath.Sqrt(uncertainty_sq)
@@ -833,21 +878,33 @@ class Analysis(object):
 		else: print(f'No tw correction parameters stored for n={n}')
 		return tds0tSiPMmean
 
-	def Gettimeresolution(self, runNr, fixed_ch, state):
-		iteration=0 if state=='uncorrected' else 1
-		fname=f'{self.path}TimeResolution/run{runNr}/timeresolution_{fixed_ch}.csv'
-		if not os.path.exists(fname): return 
-		with open(fname, 'r') as f:
-			reader=csv.reader(f)
-			alldata=[row for row in reader]
-			if len(alldata)<iteration+1: return 
-			data=alldata[iteration]
-			# if math.isnan(float(data[0])): return -999.
-		timeresolution=float(data[1]), float(data[2])
-		return timeresolution
+	def Gettimeresolution(self, runNr, fixed_ch, state, mode='json'):
+		
+		if mode=='csv':
+			fname=f'{self.path}TimeResolution/run{runNr}/timeresolution_{fixed_ch}.csv'
+			if not os.path.exists(fname): return 
+			with open(fname, 'r') as f:
+				reader=csv.reader(f)
+				alldata=[row for row in reader]
+				if len(alldata)<iteration+1: return 
+				data=alldata[iteration]
+				# if math.isnan(float(data[0])): return -999.
+			timeresolution=float(data[1]), float(data[2])
+			return timeresolution
+
+		elif mode=='json':
+			filename=f'{self.path}TimeResolution/run{runNr}/timeresolution_{fixed_ch}.json'
+
+			if not os.path.exists(filename): return 
+
+			with open(filename, 'r') as x:
+				d=json.load(x)
+
+			if state not in d: return 
+
+			return d[state][0], d[state][1]			
 
 	def FitForMPV(self, runNr, fixed_ch, state):
-		iteration=0 if state=='uncorrected' else 1
 		fname=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
 		if not os.path.exists(fname): return -999.
 		f=ROOT.TFile.Open(fname, 'READ')
@@ -858,15 +915,16 @@ class Analysis(object):
 		hist.SetDirectory(ROOT.gROOT)
 		f.Close()
 		xproj=hist.ProjectionX()
-		xmin,xmax=xproj.GetXaxis().GetXmin(), xproj.GetXaxis().GetXmax()
-		res=self.fit_langau(xproj, 'S Q', xmin, xmax)
+		# xmin,xmax=xproj.GetXaxis().GetXmin(), xproj.GetXaxis().GetXmax()
+		mode=xproj.GetBinCenter(xproj.GetMaximumBin())
+		res=self.fit_langau(xproj, 'LQ',max(mode-2, 0))
+		# 'LQ',0.8*tmp.GetBinCenter(bmin),1.5*tmp.GetBinCenter(bmax)
 		MPV=res.Parameter(1)
 		MPV_err=res.ParError(1)
 		chi2, NDF= res.Chi2(), res.Ndf()
 		return (MPV, MPV_err, chi2, NDF)
 
 	def Getchi2_info(self, runNr, fixed_ch, state, n=5):
-		iteration=0 if state=='uncorrected' else 1
 
 		fname=f'{self.path}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
 		if not os.path.exists(fname): return 
@@ -991,6 +1049,11 @@ class Analysis(object):
 		ToFcorrection=abs((pred-xref)/c_SiPM)
 		return ToFcorrection
 
+	"""
+	Important note: the Analysis.correct_ToF function corrects 
+	the SiPM time to the centre of the bar! 
+	"""
+
 	def correct_ToF(self, fixed_ch, clock, pred):
 		detID=int(fixed_ch.split('_')[0])
 		s,p,b=self.parseDetID(detID)
@@ -1086,6 +1149,23 @@ class Analysis(object):
 		DS3Haverage=self.GetDSHaverage(hits, mode='timingdiscriminant')
 
 		return DS3Haverage-averageUS1time
+
+	def GetQDCpeak(self, runNr, fixed_ch):
+		
+		filename=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
+		if not os.path.exists(filename):return 
+
+		f=ROOT.TFile.Open(filename, 'READ')
+		histname=f'dtvqdc_{fixed_ch}_corrected'
+		if not hasattr(f, histname): 
+			f.Close()
+			return 
+		hist=f.Get(histname)
+		xproj=hist.ProjectionX()
+		qdcpeak=xproj.GetBinLowEdge(xproj.GetMaximumBin())
+		error=xproj.GetStdDev()/ROOT.TMath.Sqrt(xproj.GetEntries())
+		f.Close()
+		return qdcpeak, error
 
 	def GetCutDistributions(self, runNr, distmodes=('dy', 'slopes', 'nSiPMs', 'timingdiscriminant'), task='TimeWalk'):
 		Allmodes=('dy', 'nSiPMs', 'slopes', 'timingdiscriminant')
@@ -1188,17 +1268,16 @@ class Analysis(object):
 				print(f'{fixed_ch} IndexError')
 		return (float(data[0]), float(data[1]))		
 
-	def Gettds0mean(self, runNr, fixed_ch, mode='truncated', state='corrected'):
+	def Gettds0mean(self, runNr, fixed_ch, mode='mean', state='corrected'):
 		filename=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
 		if not os.path.exists(filename): 
 			print(f'No timewalk file for {fixed_ch}')
 			return
 
 		f=ROOT.TFile.Open(filename, 'READ')
-		if state=='uncorrected': histname=f'dtvqdc_{fixed_ch}_uncorrected'
-		elif state=='corrected': histname=f'dtvqdc_{fixed_ch}_corrected'
-		# elif state=='aligned' and self.timealignment=='new': histname=f'dtvqdc_{fixed_ch}_corrected_tDS0-tSiPMcorrected'
-		elif state=='aligned': histname=f'dtvqdc_{fixed_ch}_corrected_tDS0-tSiPMcorrected'
+		# if state=='uncorrected': histname=f'dtvqdc_{fixed_ch}_uncorrected'
+		# elif state=='corrected': histname=f'dtvqdc_{fixed_ch}_corrected'
+		if state=='aligned': histname=f'AlignedSiPMtime_{fixed_ch}'
 		else: print(f'No conditions met for finding histname:\n')
 
 		if not hasattr(f, histname): 
@@ -1206,25 +1285,27 @@ class Analysis(object):
 			print(f'No hist {histname} for {fixed_ch}')
 			return 
 		hist=f.Get(histname)
+
 		if mode=='mean':
-			yproj=hist.ProjectionY('full')
-			mean=yproj.GetMean()
-			uncertainty = mean/ROOT.TMath.Sqrt(yproj.GetEntries())
+			mean=hist.GetMean()
+			uncertainty = mean/ROOT.TMath.Sqrt(hist.GetEntries())
 			f.Close()
 			return mean, uncertainty
 
 		elif mode=='truncated':
-			yproj=hist.ProjectionY('full')
-			modaltime=yproj.GetBinCenter(yproj.GetMaximumBin())
-			low, high=yproj.FindBin(modaltime-2*yproj.GetStdDev()), yproj.FindBin(modaltime+2*yproj.GetStdDev()) # mode(yproj) + 2*stddev, mode(yproj) - 2*std dev
-			tmp=[[yproj.GetBinLowEdge(i),yproj.GetBinContent(i)] for i in range(low, high+1)] # Data within 2 standard deviations of the 
+			modaltime=hist.GetBinCenter(hist.GetMaximumBin())
+			low, high=hist.FindBin(modaltime-hist.GetStdDev()), hist.FindBin(modaltime+hist.GetStdDev()) # mode(hist) + 2*stddev, mode(hist) - 2*std dev
+			tmp=[[hist.GetBinLowEdge(i),hist.GetBinContent(i)] for i in range(low, high+1)] # Data within 2 standard deviations of the 
 			mean=sum([x[0]*x[1] for x in tmp]) / sum([x[1] for x in tmp])
-			uncertainty = mean / ROOT.TMath.Sqrt(sum( [x[1] for x in tmp] ))
+			# uncertainty = mean / ROOT.TMath.Sqrt(sum( [x[1] for x in tmp] ))
+			uncertainty = ROOT.TMath.Sqrt(1/len(tmp) * sum([(x[0]-mean)**2 for x in tmp]))
 			f.Close()
 			return mean, uncertainty      
-			correction, uncertainty=0,0
-		else: 
-			correction, uncertainty=0,0
+
+		elif mode=='mode':
+			correction=hist.GetBinCenter(hist.GetMaximumBin())
+			uncertainty=hist.GetStdDev()/hist.GetEntries()
+			return correction, uncertainty
 		f.Close()
 
 	def GettSiPMcorrectedmean(self, runNr, fixed_ch, mode='mean'):
@@ -1338,6 +1419,73 @@ class Analysis(object):
 		if len(d)==0: self.alignmentparameters=None
 		self.alignmentparameters=d
 
+	def MakeTimingCovarianceDict(self, runNr):
+		filename=f'{self.path}TimingCovariance/run{self.runNr}/timingcovariance.json'
+		with open(filename) as jsonfile:
+			self.timingcovariance=json.load(jsonfile)
+
+	def MakeTimingCorrelationDict(self, runNr):
+		filename=f'{self.path}TimingCovariance/run{self.runNr}/timingcorrelation.json'
+		with open(filename) as jsonfile:
+			self.timingcorrelation=json.load(jsonfile)
+
+	def MakeQDCMIPJson(self, runNr):
+		### Currently 
+		self.langaufun()
+		d={}
+		for s in (1,2):
+			for p in range(self.systemAndPlanes[s]):
+				for b in range(self.systemAndBars[s]):
+					print(f'{s}, {p}, {b}')
+					for SiPM in self.systemAndSiPMs[s]:
+						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
+						MPV, MPV_err, chi2, NDF = self.FitForMPV(runNr, fixed_ch, 'corrected')
+
+						d[fixed_ch] = MPV, MPV_err
+
+		mpvpath=f'{self.afswork}MPVs/run{self.runNr}/'
+		mpvfilename=covariancepath+f'MPVs.json'
+		if not os.path.exists(mpvfilename): 
+			os.makedirs(mpvpath, exist_ok=True)
+		with open(mpvfilename, 'w') as outfile:
+			json.dump(d, outfile, indent=4)
+		print(f'mpv dictionary written to {mpvfilename}')
+
+	def GetAverageSiPMTimingCovariance(self, runNr):
+		r={}
+		
+		if not hasattr(self, 'timingcovariance'): self.MakeTimingCovarianceDict(runNr)
+
+		for key in self.timingcovariance:
+			if key=='timingxt_tds0_Veto' or key =='timingxt_tds0_US': continue
+			x, detID, tmp=key.split('_')
+			
+			SiPMs=tmp[len('SiPMs'):].split('-')
+
+			#### Special case for last SiPM on bar end due to how combinations algorithm works
+			if SiPMs[1] in ('7', '15'):
+				fixed_ch=f'{detID}_{SiPMs[1]}'
+				if not fixed_ch in r: r[fixed_ch]=[]
+				r[fixed_ch].append(self.timingcovariance[key])
+
+			fixed_ch = f'{detID}_{SiPMs[0]}'
+			if not fixed_ch in r: r[fixed_ch]=[]
+			r[fixed_ch].append(self.timingcovariance[key])
+
+		for fixed_ch in r: 
+			avg=1/len(r[fixed_ch]) * sum(r[fixed_ch]) 
+			r[fixed_ch]=avg 
+		
+		self.SiPMaveragetimingcovariance=r
+	
+	def GetCovariance(self, runNr, detID, SiPMs):
+		if not hasattr(self, 'timingcovariance'):
+			self.MakeTimingCovarianceDict(runNr)
+
+		key=f'timingxt_{detID}_SiPMs{SiPMs[0]}-{SiPMs[1]}'
+		if not key in self.timingcovariance: return
+		else: return self.timingcovariance[key]
+
 	def GetCanvas(self, runNr, fixed_ch, mode, iteration):
 		filename=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
 		f=ROOT.TFile.Open(filename, 'read')
@@ -1368,5 +1516,3 @@ class Analysis(object):
 			outfile.WriteObject(canv, canv.GetName(), 'kOverwrite')
 		print(f'{i+1} canvases written to outfilename')
 		outfile.Close()
-
-
