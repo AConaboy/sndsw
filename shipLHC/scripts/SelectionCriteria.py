@@ -35,7 +35,7 @@ class MuonSelectionCriteria(ROOT.FairTask):
         self.TWCorrectionRun=str(options.TWCorrectionRun).zfill(6)
         self.afswork=options.afswork
         self.afsuser=options.afsuser
-        self.state=options.state
+        self.state='uncorrected'
 
         # self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) 
         
@@ -70,6 +70,10 @@ class MuonSelectionCriteria(ROOT.FairTask):
         slopetitle = f'Track slopes;slope x [rad];slope y [rad]'
         self.hists[f'slopes'] = ROOT.TH2F(f'slopes',slopetitle, 300, -1.5, 1.5, 300, -1.5, 1.5)        
         
+        slopetitle = f'Number of fired DS horizontal bars;Fired DS horizontal bars;Counts'
+        self.hists[f'firedDSHbars'] = ROOT.TH1I(f'firedDSHbars',slopetitle,10, 0, 9)
+
+
         systemhistcriteria={None:None, '1DSb':'1 DS bar per plane', '1USb':'1 US bar per plane'}
         for s in (1, 2):
             for criterion in systemhistcriteria.keys():
@@ -213,10 +217,10 @@ class MuonSelectionCriteria(ROOT.FairTask):
             dstrack=tmp[ min(tmp) ]
         
         fitStatus=dstrack.getFitStatus()
-        fstate=dstrack.getFittedState()
+        self.fstate=dstrack.getFittedState()
         
-        self.pos=fstate.getPos()
-        self.mom=fstate.getMom()
+        self.pos=self.fstate.getPos()
+        self.mom=self.fstate.getMom()
         self.trackchi2NDF=fitStatus.getChi2()/fitStatus.getNdf()+1E-10
 
         self.OneHitPerUS=self.muAna.OneHitPerSystem(hits, (2,))
@@ -229,9 +233,10 @@ class MuonSelectionCriteria(ROOT.FairTask):
         # If fitted DS track passes slope criteria. Then fill correlate red-chi2 with xy-position
         if self.cuts['SlopesCut'] and not self.slopecut(): return
         
-        TDS0=self.muAna.GetDSHaverage(self.MuFilter, hits) # Now returns in ns
+        TDS0, firedDSHbars=self.muAna.GetDSHaverage(self.MuFilter, hits) # Now returns in ns
         if TDS0==-999: print(f'Event {self.M.EventNumber} has a fitted DS track but no DS horizontal bars with both SiPMs firing.')
         self.hists['TDS0'].Fill(TDS0)
+        self.hists['firedDSHbars'].Fill(firedDSHbars)
 
         # Use the correct subsystems for 1 bar / plane cut
         if inVeto: tmp=(1,2,3)
@@ -399,7 +404,7 @@ class MuonSelectionCriteria(ROOT.FairTask):
             detID=hit.GetDetectorID()
             s,p,b=self.muAna.parseDetID(detID)
             if s==3: continue
-            medians=self.muAna.GetMedianTime(hit, state=state)
+            medians=self.muAna.GetMedianTime(hit, mode=state)
             if not medians: continue
             if len(medians)!=2: continue
             
@@ -625,8 +630,8 @@ class MuonSelectionCriteria(ROOT.FairTask):
                 if tr.GetUniqueID()==3:
                     DStrack=self.M.Reco_MuonTracks[idx]
         
-        fstate=DStrack.getFittedState()
-        mom, pos=fstate.getMom(), fstate.getPos()
+        self.fstate=DStrack.getFittedState()
+        mom, pos=self.fstate.getMom(), self.fstate.getPos()
         detIDs=[hit.GetDetectorID() for hit in self.M.eventTree.Digi_MuFilterHits]
         
         trackinfo={'mom':[mom.x(), mom.y(), mom.z()], 'pos':[pos.x(),pos.y(),pos.z(),], 'detIDs':detIDs}

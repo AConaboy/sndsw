@@ -143,6 +143,11 @@ class Monitoring():
                     eventChain = f.cbmsim
                     if eventChain.GetBranch('MCTrack'): self.MonteCarlo = True
                 partitions = []
+            
+            elif options.customEventChain:
+                eventChain=options.customEventChain
+                partitions=[]
+
             else:
               partitions = 0
               if options.partition < 0:
@@ -296,13 +301,15 @@ class Monitoring():
             if self.options.FairTask_convRaw:
                 self.options.online.sTree.GetEvent(self.options.online.sTree.GetEntries()-1)
             for t in self.FairTasks: 
-                if not t.GetName()=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=options.nDSPlanes)
+                if not t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=options.nDSPlanes)
                 else: self.FairTasks[t].ExecuteTask(options.trackType)
             self.eventTree = self.options.online.sTree
       else: 
             self.eventTree.GetEvent(n)
             if self.MonteCarlo: self.Weight = self.eventTree.MCTrack[0].GetWeight()
-            for t in self.FairTasks: self.FairTasks[t].ExecuteTask()
+            for t in self.FairTasks: 
+                if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
+                else: self.FairTasks[t].ExecuteTask()
       self.EventNumber = n
 
 # check for bunch xing type

@@ -1,13 +1,6 @@
-import ROOT, os, csv, subprocess, cProfile, io, pstats
-from argparse import ArgumentParser
+#!/usr/bin/env python
+import ROOT
 
-from AnalysisFunctions import Analysis
-from pathlib import Path
-from array import array
-
-A, B, locA, locB = ROOT.TVector3(), ROOT.TVector3(), ROOT.TVector3(), ROOT.TVector3()
-
-# class SystemAlignment(ROOT.FairTask):
 class SystemAlignment(object):
 
     def __init__(self, options, tw):
@@ -44,20 +37,24 @@ class SystemAlignment(object):
 
         self.hists=tw.hists
 
-        # self.gauss=ROOT.TF1('mygauss', 'abs([0])*abs([4])/(abs([2])*sqrt(2*pi))*exp(-0.5*((x-[1])/[2])**2)+abs([3])', 4)
-        # for idx,param in enumerate(('Constant', 'Mean', 'Sigma', 'y-offset', 'bin-width')): self.gauss.SetParName(idx, param)
+        if options.CrossTalk:
+            from itertools import combinations
+            self.vetocombinations={'left':list(combinations(range(8), 2)), 'right':list(combinations(range(8, 16), 2))}
+            self.UScombinations={'left':list(combinations([0,1,3,4,6,7], 2)), 'right':list(combinations([8,9,11,12,14,15], 2))}
 
+            self.SiPMcombinations = {1:{'left':list(combinations(range(8), 2)), 'right':list(combinations(range(8, 16), 2))}, 
+            2:{'left':list(combinations([0,1,3,4,6,7], 2)), 'right':list(combinations([8,9,11,12,14,15], 2))}
+            }
+        
         self.sigmatds0=0.263 # ns 
 
     def FillSiPMHists(self, hit):
 
         detID=hit.GetDetectorID()
 
-        # qdcs, clocks = hit.GetAllSignals(), hit.GetAllTimes()
+        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned')
 
-        alignedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned')
-
-        for ch in alignedtimes:
+        for ch in correctedtimes:
             SiPM, time=ch
             fixed_ch=f'{detID}_{SiPM}'
 
@@ -66,90 +63,103 @@ class SystemAlignment(object):
             if not SiPMtime in self.hists:
                 title=f'DS horizontal average relative, TW + ToF corrected + DS aligned SiPM time'
                 splittitle='#splitline{'+ReadableDetID+'}{'+title+'}'
-                axestitles='t^{0}_{DS} - t_{SiPM '+str(SiPM)+'}^{tw corr + aligned} [ns];Counts'
+                axestitles='t^{0}_{DS} - t_{SiPM '+str(SiPM)+'}^{tw corr} - d_{SiPM '+str(SiPM)+'} [ns];Counts'
                 fulltitle=splittitle+';'+axestitles
                 if self.timealignment=='old': self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, 0, 20)
-                else: self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, -10, 10)
+                else: self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 2000, -5, 5)
 
-            alignmentparameter=self.muAna.alignmentparameters[fixed_ch]
-            if self.options.debug: print(f'{fixed_ch}, {self.tw.TDS0 - time - alignmentparameter[0] }')
+            d=self.muAna.alignmentparameters[fixed_ch]
 
-            self.hists[SiPMtime].Fill(self.tw.TDS0 - time - alignmentparameter[0])
+            self.hists[SiPMtime].Fill(self.tw.TDS0 - time - d[0])
 
-    def FillBarTimeHists(self, hit):
+    def FillBarHists(self, hit):
 
-        """
-        I will keep the Analysis class methods to return the 
-        SiPM times relative to the event-t0. In the methods in this SystemAlignment class
-        I will shift them to be relative to tds0.
-        """
-        
-        ### medians returns a dictionary: {'left': float, 'right':float}
-        # medians=self.muAna.GetMedianTime(hit, mode='alignment')
-        alignedtimes=self.muAna.GetAlignedTimes(hit, self.tw.pred)
-        
-        if medians==-999: return
-        if not medians: 
-            return 
-
-        averagetime=1/2 * sum([self.tw.TDS0-i for i in medians.values()])
-
-        deltatime=self.tw.TDS0-medians['left'] - self.tw.TDS0-medians['right']
-        
         detID=hit.GetDetectorID()
-        subsystem, plane, bar= self.muAna.parseDetID(detID)
+        s, p, b= self.muAna.parseDetID(detID)
+
+        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned')
+        qdcs = hit.GetAllSignals()
+        times={'left':{}, 'right':{}}
+
+        for i in correctedtimes: 
+            SiPM, correctedtime = i
+            fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
+
+            if not fixed_ch in self.muAna.alignmentparameters: continue
+            d=self.muAna.alignmentparameters[fixed_ch]
+
+            qdc=self.muAna.GetChannelVal(SiPM, qdcs)
+            side=self.muAna.GetSide(f'{detID}_{SiPM}')
+            times[side][SiPM]=self.tw.TDS0 - correctedtime - d[0]
+
+        if any([len(times[i])==0 for i in ('left', 'right')]): return
+        averages={side:sum(times[side].values()) / len(times[side]) for side in times}
+        averagetime = 1/2 * sum(averages.values())
+
+        deltatime = averages['left'] - averages['right']
         
-        averagebartimehistname=f'{10*subsystem+plane}_bar{bar}_averagetime'
+        averagebartimehistname=f'averagetime_{detID}_aligned'
         if not averagebartimehistname in self.hists:
-            title=self.subsystemdict[subsystem]+' plane '+str(plane+1)+' bar '+str(bar+1)+' average of median '+self.state+' times from each side as a function of x_{predicted};x_{predicted} [cm];'+'#frac{1}{2}#times(t^{tw corr}_{left}+t^{tw corr}_{right}) [ns];Counts'
-            self.hists[averagebartimehistname]=ROOT.TH2F(averagebartimehistname, title, 100, 0, 100, 200, -10, 10)
-        self.hists[averagebartimehistname].Fill(self.pred, self.tw.TDS0-averagetime)
+            title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average of aligned times from each side as a function of x_{predicted};x_{predicted} [cm];'+'#frac{1}{2}#times(t^{tw corr}_{left}+t^{tw corr}_{right}) [ns];Counts'
+            self.hists[averagebartimehistname]=ROOT.TH2F(averagebartimehistname, title, 100, 0, 100, 2000, -5, 5)
+        self.hists[averagebartimehistname].Fill(self.tw.pred, averagetime)
         
-        deltabartimehistname=f'{10*subsystem+plane}_bar{bar}_deltatime'
+        deltabartimehistname=f'deltatime_{detID}_aligned'
         if not deltabartimehistname in self.hists:
-            title=self.subsystemdict[subsystem]+' plane '+str(plane+1)+' bar '+str(bar+1)+' difference of median '+self.state+' times from each side as a function of x_{predicted};x_{predicted} [cm];'+'t^{tw corr}_{left} - t^{tw corr}_{right} [ns];Counts'
-            self.hists[deltabartimehistname]=ROOT.TH2F(deltabartimehistname, title, 100, 0, 100, 200, -10, 10)
+            title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' difference of average aligned time from each side as a function of x_{predicted};x_{predicted} [cm];'+'t^{tw corr}_{left} - t^{tw corr}_{right} [ns];Counts'
+            self.hists[deltabartimehistname]=ROOT.TH2F(deltabartimehistname, title, 100, 0, 100, 2000, -5, 5)
         self.hists[deltabartimehistname].Fill(self.tw.pred, deltatime)
 
         for side in ('left', 'right'):
-            averagebarsidetimehistname=f'{10*subsystem+plane}_bar{bar}_{side}sidetime'
+            averagebarsidetimehistname=f'sidetime_{detID}-{side}_aligned'
             if not averagebarsidetimehistname in self.hists:
-                title=self.subsystemdict[subsystem]+' plane '+str(plane+1)+' bar '+str(bar+1)+' median '+self.state+' times from '+side+' side as a function of x_{predicted};x_{predicted} [cm];'+'Median of t^{tw corr}_{'+side+'} [ns];Counts'
-                self.hists[averagebarsidetimehistname]=ROOT.TH2F(averagebarsidetimehistname, title, 100, 0, 100, 200, -10, 10)
-            self.hists[averagebarsidetimehistname].Fill(self.tw.pred, self.tw.TDS0- medians[side])
+                title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average aligned time from '+side+' side as a function of x_{predicted};x_{predicted} [cm];'+ side+' side average of t^{tw corr}_{'+side+'} [ns];Counts'
+                self.hists[averagebarsidetimehistname]=ROOT.TH2F(averagebarsidetimehistname, title, 100, 0, 100, 2000, -5, 5)
+            self.hists[averagebarsidetimehistname].Fill(self.tw.pred, averages[side])
 
     def XTHists(self, hit):
 
-        clocks, qdcs =hit.GetAllTimes(), hit.GetAllSignals()
+        correctedtimes, qdcs = self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned'), hit.GetAllSignals()
         times={'left':{}, 'right':{}}
         detID=hit.GetDetectorID()
         s,p,b = self.muAna.parseDetID(detID)
 
-        for i in clocks: 
-            SiPM, clock=i
+        for i in correctedtimes: 
+            SiPM, correctedtime = i
             fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
-            qdc=self.muAna.GetChannelVal(SiPM, qdcs)
-            correctedtime=self.muAna.MuFilterCorrectedTime(fixed_ch, qdc, clock, self.tw.pred)
-            if not correctedtime: continue
+
+            if not fixed_ch in self.muAna.alignmentparameters: continue
+            d=self.muAna.alignmentparameters[fixed_ch]
+
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            times[side][SiPM]=correctedtime
+            times[side][SiPM]=self.tw.TDS0 - correctedtime - d[0]
+
+        xtds0histname=f'timingxt_tds0_{self.subsystemdict[s]}'
+        if not xtds0histname in self.hists:
+            title='Timing correlation between all '+self.subsystemdict[s]+' SiPMs and t_{0}^{DS}'
+            axestitles='t_{0}^{DS} - t_{SiPM}^{tw corr} [ns];t_{0}^{DS} [ns];Counts'
+            fulltitle=title+';'+axestitles
+            if self.timealignment=='old': self.hists[xtds0histname]=ROOT.TH1F(xtds0histname,fulltitle, 150, -5, 20, 125, 0, 25)
+            else: self.hists[xtds0histname]=ROOT.TH2F(xtds0histname,fulltitle, 150, -5, 20, 125, 0, 25)
 
         for side in times:
-            for i in times[side]:
-                for j in times[side]:
-                    if i==j: continue
-                    permutation_id = f'{i}{j}'
-                    xthistname=f'timingxt_{detID}_SiPMs{i}-{j}'
-                    if not xthistname in self.hists:
-                        title=f'Timing correlation, {self.subsystemdict[s]} plane {p+1} bar {b+1}'
-                        subtitle=f'{side} SiPMs {i+1} and {j+1}'
-                        splittitle='#splitline{'+title+'}{'+subtitle+'}'
-                        axestitles='t_{0}^{DS} - t_{SiPM '+str(i)+'}^{tw corr + aligned} [ns];t_{0}^{DS} - t_{SiPM '+str(j)+'}^{tw corr + aligned} [ns]'
-                        fulltitle=splittitle+';'+axestitles
-                        if self.timealignment=='old': self.hists[xthistname]=ROOT.TH1F(xthistname,fulltitle, 100, 0, 20, 100, 0, 20)
-                        else: self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, 100, -5, 15, 100, -5, 15)
-                    ti, tj= self.tw.TDS0-times[side][i],self.tw.TDS0-times[side][j]
-                    self.hists[xthistname].Fill(ti, tj)
+            for combination in self.SiPMcombinations[s][side]:
+                i, j=combination
+                if not (i in times[side] and j in times[side]): continue
+                
+                time_i, time_j = times[side][i], times[side][j]
+                xthistname=f'timingxt_{detID}_SiPMs{i}-{j}'
+                if not xthistname in self.hists:
+                    title=f'Timing correlation, {self.subsystemdict[s]} plane {p+1} bar {b+1}'
+                    subtitle=f'{side} SiPMs {i+1} and {j+1}'
+                    splittitle='#splitline{'+title+'}{'+subtitle+'}'
+                    axestitles='t_{0}^{DS} - t_{SiPM '+str(i)+'}^{tw corr} [ns];t_{0}^{DS} - t_{SiPM '+str(j)+'}^{tw corr} [ns];Counts'
+                    fulltitle=splittitle+';'+axestitles
+                    if self.timealignment=='old': self.hists[xthistname]=ROOT.TH1F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
+                    else: self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
+
+                self.hists[xthistname].Fill(time_i, time_j)
+                self.hists[xtds0histname].Fill(time_i, self.tw.TDS0)
 
     def WriteOutHistograms(self):
 
