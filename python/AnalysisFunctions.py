@@ -7,28 +7,31 @@ import math as m
 class Analysis(object):
 
 	def __init__(self, options):
-		# self.task=task
 		self.options=options
-		if not hasattr(options, 'runNumber'): options.runNumber=options.runs[0]
-		self.runNr = str(options.runNumber).zfill(6)
-		self.TWCorrectionRun = str(options.TWCorrectionRun).zfill(6)
-		self.freq=160.316E6
-		self.TDC2ns=1E9/self.freq
-		self.timealignment=self.GetTimeAlignmentType(self.runNr)
 
-		self.state=options.state
+		# Adding flag for LaserMeasurements/ work to use some functions defined in here
+		if not hasattr(options, "LaserMeasurements"):
+			if not hasattr(options, 'runNumber'): options.runNumber=options.runs[0]
+			self.runNr = str(options.runNumber).zfill(6)
+			self.TWCorrectionRun = str(options.TWCorrectionRun).zfill(6)
+			self.freq=160.316E6
+			self.TDC2ns=1E9/self.freq
+			self.timealignment=self.GetTimeAlignmentType(self.runNr)
+			self.state=options.state
+			if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype
+			else: self.fileext='csv'		
+			self.CorrectionType=options.CorrectionType
 
-		afswork='/afs/cern.ch/work/a/aconsnd/Timing'
-		afsuser='/afs/cern.ch/user/a/aconsnd/twfiles'
-		# if self.options.path.find('commissioning/TI18')>0:
-		if options.datalocation=='commissioning':
-			self.path=afswork+'-commissioning/'
-		elif options.datalocation=='physics':
-			self.path=afswork+'-physics2022/'
-		elif options.datalocation=='H8':
-			self.path=afswork+'-H8/'
+			afswork='/afs/cern.ch/work/a/aconsnd/Timing'
+			afsuser='/afs/cern.ch/user/a/aconsnd/twfiles'
+			# if self.options.path.find('commissioning/TI18')>0:
+			if options.datalocation=='commissioning':
+				self.path=afswork+'-commissioning/'
+			elif options.datalocation=='physics':
+				self.path=afswork+'-physics2022/'
+			elif options.datalocation=='H8':
+				self.path=afswork+'-H8/'
 
-		self.CorrectionType=options.CorrectionType
 		self.correctionparams=lambda ps : [y for x,y in enumerate(ps) if x%2==0]
 		self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
 		self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
@@ -40,9 +43,6 @@ class Analysis(object):
 		self.gelsides={0:'right', 1:'left', 2:'right', 3:'left', 4:'left'}
 		self.subsystemNames={1:'veto', 2:'upstream', 3:'downstream'}
 		self.verbose=False
-		
-		if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype
-		else: self.fileext='csv'
 
 		self.sigmatds0=0.263, 9.5E-5
 
@@ -553,8 +553,7 @@ class Analysis(object):
 		
 		s,p,b=self.parseDetID(hit.GetDetectorID())
 		nSiPMs=hit.GetnSiPMs()
-  
-  
+		
 		nFiredSiPMs_left=0
 		nFiredSiPMs_right=0
 		channels=hit.GetAllSignals()
@@ -656,6 +655,13 @@ class Analysis(object):
 		elif SiPM>=nSiPMs:
 			SiPM_r=400+SiPM%nSiPMs
 			return SiPM_r+nSiPMs*b+p*SiPMs_plane
+
+	def SiPM2BarAndPosition(self, SiPM):
+		# Pass the SiPM number on the PCB 
+		# returns the bar number and SiPM number within the bar
+		barNumber = SiPM//8
+		SiPMNumber = SiPM%8
+		return [barNumber, SiPMNumber]
 
 	def GetDeltaT(self, times, one_channel=None):
 		# nSiPMs=aHit.GetnSiPMs()

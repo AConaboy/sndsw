@@ -89,18 +89,20 @@ class Numusignaleventtiming(object):
 
     def __init__(self, options):
        
+        self.colours={0:ROOT.kRed, 1:ROOT.kBlack, 2:ROOT.kMagenta, 3: ROOT.kGreen}
         self.options=options
         self.afswork=f'{options.afswork}-physics2022/'
         self.hists={}
         self.muAna = Analysis.Analysis(options)
         self.numucandidatescale=5
         self.legend=ROOT.TLegend(0.14, 0.60, 0.40, 0.85)
+        self.planelegends={i:ROOT.TLegend(0.14, 0.60, 0.40, 0.85) for i in range(5)}
         if options.loadhists:
             self.LoadSignalHists()
             self.LoadPassingMuonHists()
             self.FillLegend()
-            self.MakeSignalComparisonCanvases()
-            self.WriteOutSignalComparisonCanvases()
+            # self.MakeSignalComparisonCanvases()
+            # self.WriteOutSignalComparisonCanvases()
 
         else:
             self.MakeSignalPartitions()
@@ -196,6 +198,7 @@ class Numusignaleventtiming(object):
                 self.hists[hist.GetName()]=hist
 
         self.planesignalhists={}
+        self.planesignalstacks={}
         for histname in self.hists:
             tmp, detID, state=histname.split('_')
             key=tmp.split('-')[1]
@@ -204,22 +207,40 @@ class Numusignaleventtiming(object):
                 key = f'sidetime-{side}'
             s,p,b = self.muAna.parseDetID(detID)
 
-            if not p in self.planesignalhists: self.planesignalhists[p]={}
-            if not key in self.planesignalhists[p]: self.planesignalhists[p][key]=[]
+            if not p in self.planesignalhists: 
+                self.planesignalhists[p]={}
+                self.planesignalstacks[p]={}
+            if not key in self.planesignalhists[p]: 
+                self.planesignalhists[p][key]=[]
             self.planesignalhists[p][key].append(self.hists[histname])
 
         for p in self.planesignalhists:
             for key in self.planesignalhists[p]:
-                
-                if key.find('sidetime')==0: side=key.split('-')[1]
+                for idx, hist in enumerate(self.planesignalhists[p][key]): hist.SetLineColor(self.colours[idx]) 
 
-                hists=self.planesignalhists[p][key]
-                mergedhist=hists[0].Clone()
-                mergedhist.SetDirectory(ROOT.gROOT)
-                [mergedhist.Add(i) for i in hists]
-                if key.find('sidetime')==0: mergedhist.SetName(f'sidetime_plane{p}-{side}_aligned')
-                else: mergedhist.SetName(f'{key}_plane{p}_aligned')
-                self.planesignalhists[p][key]=mergedhist            
+        #         if key.find('sidetime')==0: side=key.split('-')[1]
+
+        #         hists=self.planesignalhists[p][key]
+                
+        #         signalstack = ROOT.THStack(f'{key}stack_plane{p}_signal', 'Signal events in plane {p}')
+        #         # mergedhist=hists[0].Clone()
+                
+        #         # mergedhist.SetDirectory(ROOT.gROOT)
+        #         # [mergedhist.Add(i) for i in hists]
+        #         [signalstack.Add(i) for i in hists]
+        #         # [muonstack.Add(i) for i in hists]
+        #         for idx, h in enumerate(signalstack.GetHists()):
+        #             h.SetLineColor(self.colours[idx])
+        #             # h.SetColor(self.colours[idx])
+        #             # signalstack.Add(h)
+        #         if key.find('sidetime')==0: 
+        #             # mergedhist.SetName(f'sidetime_plane{p}-{side}_aligned')
+        #             signalstack.SetName(f'sidetimestack_plane{p}-{side}_aligned')
+        #         else: 
+        #             # mergedhist.SetName(f'{key}_plane{p}_aligned')
+        #             signalstack.SetName(f'{key}stack_plane{p}_aligned')
+        #         # self.planesignalhists[p][key]=mergedhist
+        #         self.planesignalstacks[p][key]=signalstack
 
     def LoadPassingMuonHists(self):
 
@@ -301,6 +322,12 @@ class Numusignaleventtiming(object):
         self.legend.AddEntry(signalhist, '#nu_{#mu} data')
         self.legend.AddEntry(muonhist, '#mu data')
 
+        for p in self.planesignalhists:
+            for hist in self.planesignalhists[p]['averagetime']:
+                detID = hist.GetName().split('_')[1]
+                s,p,b=self.muAna.parseDetID(detID)
+                self.planelegends[p].AddEntry(hist, '#nu_{#mu} data, bar '+str(b+1))
+
     def MakeSignalComparisonCanvases(self):
         
         self.secondaxes={}
@@ -320,7 +347,7 @@ class Numusignaleventtiming(object):
                 self.planecomparisoncanvases[canvasname]=ROOT.TCanvas(canvasname, canvasname, 1000, 500)
                 self.planecomparisoncanvases[canvasname].Divide(2,2)
                 for jdx, histkey in enumerate(('averagetime', 'deltatime', 'left', 'right')):
-                    self.MakeCompositeHist(p, histkey, plane=True)
+                    self.MakeCompositeHist(detID, histkey, plane=True)
             
             for jdx, histkey in enumerate(('averagetime', 'deltatime', 'left', 'right')):
                 self.MakeCompositeHist(detID, histkey)
@@ -330,11 +357,12 @@ class Numusignaleventtiming(object):
     def MakeCompositeHist(self, detID, histkey, plane=None):
 
         padkeys={'averagetime':1, 'deltatime':2, 'left':3, 'right':4}
+        print(f'Making composite hist for {detID}, {histkey}, plane:{plane}')
         if not plane: readabledetID = self.muAna.MakeHumanReadableDetID(detID)
         
         else:
             s,p,b=self.muAna.parseDetID(detID) 
-            readabledetID = 'upstream, plane '+str(detID)
+            readabledetID = 'upstream, plane '+str(p+1)
         
         titlepart1='Comparison of signal times against passing muon times'
         if histkey=='averagetime':  
@@ -374,14 +402,14 @@ class Numusignaleventtiming(object):
             muonhist = self.muonhists[muonhistname]
         else:
             if histkey in ('left', 'right'):
-                signalhist = self.planesignalhists[p][f'sidetime-{histkey}']
+                signalhists = self.planesignalhists[p][f'sidetime-{histkey}']
                 muonhist = self.planemuonhists[p][f'sidetime-{histkey}']
             else: 
-                signalhist = self.planesignalhists[p][f'{histkey}']
+                signalhists = self.planesignalhists[p][f'{histkey}']
                 muonhist = self.planemuonhists[p][f'{histkey}']                
 
         if not plane: pad=self.comparisoncanvases[f'signalvmuon_comparison_{detID}'].cd(padkeys[histkey])
-        else: pad=self.planecomparisoncanvases[f'signalvmuon_comparison_plane{detID}'].cd(padkeys[histkey])
+        else: pad=self.planecomparisoncanvases[f'signalvmuon_comparison_plane{p}'].cd(padkeys[histkey])
         muonhist.SetTitle(title)
         muonhist.SetTitleSize(0.06, 'xyzt')
         muonhist.SetStats(0)
@@ -389,12 +417,18 @@ class Numusignaleventtiming(object):
 
         pad.Update()
 
-        rightmax=1.1*signalhist.GetMaximum()
+        rightmax=1.1*muonhist.GetMaximum()
         scale=ROOT.gPad.GetUymax()/rightmax
-        signalhist.Scale(scale/self.numucandidatescale)
-        signalhist.Draw('same')
+        
+        if plane: 
+            for idx,h in enumerate(signalhists):
+                h.Scale(scale/rightmax)
+                h.Draw('same')
 
-        self.legend.Draw()
+        else: signalhist.Scale(scale/rightmax)
+        
+        if not plane: self.legend.Draw()
+        else: self.planelegends[p].Draw()
 
     def WriteOutSignalHists(self):
 
