@@ -33,6 +33,7 @@ parser.add_argument("-P", "--partition", dest="partition", help="partition of da
 parser.add_argument("-d", "--debug", dest="debug", help="debug", type=int, default=False)
 parser.add_argument("-cpp", "--convRawCPP", action='store_true', dest="FairTask_convRaw", help="convert raw data using ConvRawData FairTask", default=False)
 parser.add_argument( "--withCalibration", action='store_true', dest="makeCalibration", help="make QDC and TDC calibration, not taking from raw data", default=False)
+parser.add_argument("--customEventChain", dest="customEventChain", action="store_true")
 
 parser.add_argument("-f", "--inputFile", dest="fname", help="file name for MC", type=str,default=None,required=False)
 parser.add_argument("-g", "--geoFile", dest="geoFile", help="geofile", required=False,default=False)
