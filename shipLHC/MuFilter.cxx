@@ -60,6 +60,7 @@ fMom(),
 fTime(-1.),
 fLength(-1.),
 fELoss(-1),
+eventHeader(0),
 fMuFilterPointCollection(new TClonesArray("MuFilterPoint"))
 {
 }
@@ -73,6 +74,7 @@ fMom(),
 fTime(-1.),
 fLength(-1.),
 fELoss(-1),
+eventHeader(0),
 fMuFilterPointCollection(new TClonesArray("MuFilterPoint"))
 {
 }
@@ -506,8 +508,40 @@ Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t ra
 /* calibration implemented only for DS! */
 /* channel 0 left or top, channel 1 right */
 	if (fDetectorID<30000){
- 		LOG(ERROR) << "not yet implemented for Veto and DS, no correction applied" ;
+		LOG(ERROR) << "MuFilter::GetCorrectedTime: not yet implemented for Veto and DS, no correction applied" ;
 		return rawTime;
+	}
+	TString tag = "";
+	vector<int> coveredRuns{};
+	if (eventHeader){
+		Int_t fRunNumber = eventHeader->GetRunId();
+		if (fRunNumber<1){
+			LOG(ERROR) << "MuFilter::GetCorrectedTime: non valid run number "<<fRunNumber;
+			return rawTime;
+		}
+		// Get available tags from the geometry file
+		std::string tag_string;
+		for (auto key : conf_floats){
+		     tag_string = key.first.Data();
+		     if (tag_string.find("MuFilter/DSTcorslopet_") != string::npos){
+		         coveredRuns.push_back(stoi(tag_string.substr(tag_string.find("t_")+2)));
+		     }
+		}
+		if (coveredRuns.size()!=0){
+		    tag = "t_"+to_string(coveredRuns[coveredRuns.size()-1]);
+		    for (int i=1; i<coveredRuns.size(); i++){
+		          if (fRunNumber>=coveredRuns[i-1] && fRunNumber<coveredRuns[i]){
+		              tag = "t_"+to_string(coveredRuns[i-1]);
+		          }
+		    }
+		    //special case
+		    if (fRunNumber<5193 && fRunNumber>5174) tag = "t_"+to_string(coveredRuns[0]);
+		}
+		else{
+		     // allow reading older geo files with letter tags i.e. A, B, C
+		     tag = "A";
+		     if (fRunNumber>5116 && !(fRunNumber<5193 && fRunNumber>5174) ) {tag = "B";}		 
+		}
 	}
 	Float_t cor = rawTime;
 	int l = (fDetectorID-30000)/1000;
@@ -522,10 +556,10 @@ Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t ra
 	if (l==3){p-=4;}
 	if (ichannel60>59) {ichannel60-=60;}
 	// DS time alignment first order
-	if (ichannel60<30){cor += conf_floats["MuFilter/DSTcorslope"]*(ichannel60-15);}
-	else{              cor -= conf_floats["MuFilter/DSTcorslope"]*(ichannel60-45);}
+	if (ichannel60<30){cor += conf_floats["MuFilter/DSTcorslope"+tag]*(ichannel60-15);}
+	else{              cor -= conf_floats["MuFilter/DSTcorslope"+tag]*(ichannel60-45);}
 	string si = to_string(p);
-	cor -= conf_floats["MuFilter/DSTcorC"+si];
+	cor -= conf_floats["MuFilter/DSTcorC"+si+tag];
 	cor -= L/conf_floats["MuFilter/DsPropSpeed"];
 	return cor;
 }
@@ -541,7 +575,8 @@ void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
   TString barName;
   Float_t shift;
   switch(subsystem) {
-  
+  // VETO/US/DS alignment relativ to Scifi only done once. 
+  // should be done after each emulsion exchange.
   case 1: 
       path+="volVeto_1/volVetoPlane_"+std::to_string(plane)+"_"+std::to_string(plane);
       barName = "/volVetoBar_";

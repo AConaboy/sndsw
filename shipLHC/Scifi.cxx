@@ -52,6 +52,7 @@ fMom(),
 fTime(-1.),
 fLength(-1.),
 fELoss(-1),
+eventHeader(0),
 fScifiPointCollection(new TClonesArray("ScifiPoint"))
 {
 }
@@ -65,6 +66,7 @@ fMom(),
 fTime(-1.),
 fLength(-1.),
 fELoss(-1),
+eventHeader(0),
 fScifiPointCollection(new TClonesArray("ScifiPoint"))
 {
 
@@ -445,15 +447,45 @@ Last three digits F: fiber number
 
 Double_t Scifi::GetCorrectedTime(Int_t fDetectorID, Double_t rawTime, Double_t L){
 /* expect time in u.ns  and  path length to sipm u.cm */
-
+	TString tag = "t";
 	TString sID;
+	vector<int> coveredRuns{};
+	if (eventHeader){
+		Int_t fRunNumber = eventHeader->GetRunId();
+		if (fRunNumber<1) {
+			LOG(ERROR) << "Scifi::GetCorrectedTime: non valid run number "<<fRunNumber;
+			return rawTime;
+		}
+		// Get available tags from the geometry file
+		std::string tag_string;
+		for (auto key : conf_floats){
+		     tag_string = key.first.Data();
+		     if (tag_string.find("Scifi/station1t_") != string::npos){
+		         coveredRuns.push_back(stoi(tag_string.substr(tag_string.find("t_")+2)));
+		     }
+		}
+		if (coveredRuns.size()!=0){
+		    tag = "t_"+to_string(coveredRuns[coveredRuns.size()-1]);
+		    for (int i=1; i<coveredRuns.size(); i++){
+		         if (fRunNumber>=coveredRuns[i-1] && fRunNumber<coveredRuns[i]){
+		             tag = "t_"+to_string(coveredRuns[i-1]);
+		         }
+		    }
+		    // special case
+		    if (fRunNumber<5193 && fRunNumber>5174) tag = "t_"+to_string(coveredRuns[0]);
+		}
+		else{		
+		     // allow reading older geo files with letter tags i.e. A, B, C
+		    tag = "tA";
+		    if (fRunNumber>5116 && !(fRunNumber<5193 && fRunNumber>5174) ) {tag = "tB";}		
+		}		
+	}
 	sID.Form("%i",fDetectorID);
-	Double_t cor = conf_floats["Scifi/station"+TString(sID(0,1))+"t"];
-
+	Double_t cor = conf_floats["Scifi/station"+TString(sID(0,1))+tag];
 	if (sID(1,1)=="0"){
-		cor+=conf_floats["Scifi/station"+TString(sID(0,1))+"H"+TString(sID(2,1))+"t"];
+		cor+=conf_floats["Scifi/station"+TString(sID(0,1))+"H"+TString(sID(2,1))+tag];
 	}else{
-		cor+=conf_floats["Scifi/station"+TString(sID(0,1))+"V"+TString(sID(2,1))+"t"];
+		cor+=conf_floats["Scifi/station"+TString(sID(0,1))+"V"+TString(sID(2,1))+tag];
 	}
 	cor += L/conf_floats["Scifi/signalSpeed"];
 	return rawTime-cor;
@@ -535,13 +567,48 @@ void Scifi::GetSiPMPosition(Int_t SiPMChan, TVector3& A, TVector3& B)
 	Int_t globNumber         = int(SiPMChan/100000)*100000;
 	Float_t locPosition        = SiPMPos[locNumber]; // local position in plane of reference plane.
 	Double_t fFiberLength  = conf_floats["Scifi/fiber_length"];
-
+	
+	TString tag = "";
+	vector<int> coveredRuns{};
+	// in case of old data with FairEventHeader, user will be responsible to use the correct geofile.
+	if (eventHeader){
+		Int_t fRunNumber = eventHeader->GetRunId();
+		if (fRunNumber<1) {
+		LOG(ERROR) << "Scifi::GetSiPMPosition: non valid run number "<<fRunNumber;
+		return;
+		}
+		// Get available tags from the geometry file
+		std::string tag_string;
+		for (auto key : conf_floats){
+		     tag_string = key.first.Data();
+		     if (tag_string.find("Scifi/LocM100t_") != string::npos){
+		         coveredRuns.push_back(stoi(tag_string.substr(tag_string.find("t_")+2)));
+		     }
+		}
+		if (coveredRuns.size()!=0){
+		    tag = "t_"+to_string(coveredRuns[coveredRuns.size()-1]);
+		    for (int i=1; i<coveredRuns.size(); i++){
+		         if (fRunNumber>=coveredRuns[i-1] && fRunNumber<coveredRuns[i]){
+		             tag = "t_"+to_string(coveredRuns[i-1]);
+		         }
+		    }
+		}
+		else{
+		    // allow reading older geo files with letter tags i.e. A, B, C
+		    tag = "E";
+		    if (fRunNumber<4575) {tag = "A";}
+		    else if (fRunNumber<4855) {tag = "B";}
+		    else if (fRunNumber<5172) {tag = "C";}
+		    else if (fRunNumber<5431) {tag = "D";}
+		}
+	}
 	TString sID;
 	sID.Form("%i",SiPMChan);
-	locPosition += conf_floats["Scifi/LocM"+TString(sID(0,3))];
-	Float_t rotPhi = conf_floats["Scifi/RotPhiS"+TString(sID(0,1))];
-	Float_t rotPsi = conf_floats["Scifi/RotPsiS"+TString(sID(0,1))];
-	Float_t rotTheta = conf_floats["Scifi/RotThetaS"+TString(sID(0,1))];
+	
+	locPosition += conf_floats["Scifi/LocM"+TString(sID(0,3))+tag];
+	Float_t rotPhi = conf_floats["Scifi/RotPhiS"+TString(sID(0,1))+tag];
+	Float_t rotPsi = conf_floats["Scifi/RotPsiS"+TString(sID(0,1))+tag];
+	Float_t rotTheta = conf_floats["Scifi/RotThetaS"+TString(sID(0,1))+tag];
 
 	Double_t loc[3] = {0,0,0};
 	TString path = "/cave_1/Detector_0/volTarget_1/ScifiVolume"+TString(sID(0,1))+"_"+TString(sID(0,1))+"000000/";

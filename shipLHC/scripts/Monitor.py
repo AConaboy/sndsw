@@ -120,6 +120,8 @@ class Monitoring():
             self.converter = ConvRawData.ConvRawDataPY()
             self.converter.Init(options)
             self.options.online = self.converter
+            self.fsdict = False
+            self.hasBunchInfo = False
             self.eventTree = options.online.fSink.GetOutTree()
             self.Nkeys = 38   # need to find a way to get this number automatically
             if self.converter.newFormat: self.Nkeys = 1
@@ -211,7 +213,13 @@ class Monitoring():
                self.clusMufi        = self.trackTask.clusMufi
                self.clusScifi       = self.trackTask.clusScifi
                self.trackTask.DSnPlanes = 3
-            
+
+# initialize detector class for access to eventheader
+        rc = eventChain.GetEvent(0)
+        if not self.MonteCarlo:
+           self.snd_geo.modules['Scifi'].InitEvent(eventChain.EventHeader)
+           self.snd_geo.modules['MuFilter'].InitEvent(eventChain.EventHeader)
+
         # get filling scheme, only necessary if not encoded in EventHeader, before 2022 reprocessing
         self.hasBunchInfo = False
         self.fsdict = False
@@ -306,6 +314,10 @@ class Monitoring():
             self.eventTree = self.options.online.sTree
       else: 
             self.eventTree.GetEvent(n)
+            if not self.MonteCarlo:
+              # initialize detector class for access to eventheader
+              self.snd_geo.modules['Scifi'].InitEvent(self.eventTree.EventHeader)
+              self.snd_geo.modules['MuFilter'].InitEvent(self.eventTree.EventHeader)
             if self.MonteCarlo: self.Weight = self.eventTree.MCTrack[0].GetWeight()
             for t in self.FairTasks: 
                 if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
@@ -353,7 +365,7 @@ class Monitoring():
        self.presenterFile.Close()
        if self.options.online:
            wwwPath = "/eos/experiment/sndlhc/www/online"
-       elif self.options.path.find('2022') :
+       elif self.options.path.find('2022')>0 :
            wwwPath = "/eos/experiment/sndlhc/www/reprocessing"
        else:    
            wwwPath = "/eos/experiment/sndlhc/www/offline"
