@@ -49,8 +49,15 @@ class ShowerProfiles(object):
         For this code I do NOT want hits associated with the track. 
         I will then check if they have atleast 4 (6) US (veto) SiPMs firing
         before agreeing to analyse the SiPM data
+        
+        For non-track correlated hits I will:
+            1. Plot the fraction of fired SiPMs in the hit
+            2. Find the next event where the each of the 4 small SiPMs fire. 
+            3. Correlate the clock cycles with that delay with the number of fired channels on the PCB
         """
         nontrackhits=[]
+        self.nSiPMsPCB = self.muAna.GetFiredSiPMsOnPCBs(hits)
+        
         for hit in hits:
 
             detID = hit.GetDetectorID()
@@ -77,9 +84,44 @@ class ShowerProfiles(object):
             detID=nt_hit.GetDetectorID()
             s, p, b= self.muAna.parseDetID(detID)
 
-            ### Apply time-walk correction to all times in the hit.
-            ### GetCorrectedTimes(muAna, hit, x=0, mode='unaligned')
+            # Fill histogram with the fraction of the SiPMs that fire in this hit.
+            fractionSiPMs_histname=f'frac_SiPMs'
+            if not fractionSiPMs_histname in self.hists:
+                title = 'Fraction of expected SiPMs that fire;N_{fired} / N_{expected};Counts'
+                self.hists[fractionSiPMs_histname] = ROOT.TH1F(fractionSiPMs_histname, title, 16, 0, 1)
+            
+            large_SiPMs = [i[0] for i in nt_hit.GetAllSignals() if i[0] not in (2,5,10,13)]
+            small_SiPMs = [i[0] for i in nt_hit.GetAllSignals() if i[0] in (2,5,10,13)]
+            
+            frac_n = ( len(large_SiPMs) + len(small_SiPMs) ) / 16
+            self.hists[fractionSiPMs_histname].Fill(frac_n) 
 
+            """
+            Soooo now I make the delta evt_timestamp histogram.
+            Fill it with 0 for each small SiPM that fires in the hit.
+            Call method to search next 100 events for the small SiPMs
+            """
+            
+            next_smallSiPM_timestamp_histname=f'next_smallSiPM_timestamp'
+            if not next_smallSiPM_timestamp_histname in self.hists:
+                title = 'Clock cycles until expected small SiPM next fires;Clock cycles [n];Counts'
+                self.hists[next_smallSiPM_timestamp_histname] = ROOT.TH1I(next_smallSiPM_timestamp_histname, title, 50, 0, 50)
+            
+            # For the small SiPMs in this event, fill dt hist with 0 and remove it from the list of small SiPMs
+            for smallSiPM in small_SiPMs: 
+                self.hists[next_smallSiPM_timestamp_histname].Fill(0)
+                small_SiPMs.remove(smallSiPM)
+            """
+            Look for the other small SiPMs over the next 100 events 
+            Fill histograms of:
+                
+                1. Correlating the delay with nSiPMs/PCB 
+                2. QDC
+                
+            """
+            self.FindExpectedSmallSiPMs(detID, small_SiPMs)
+            
+            ### Apply time-walk correction to all times in the hit.
             correctedtimes=self.muAna.GetCorrectedTimes(nt_hit)
             qdcs = nt_hit.GetAllSignals()
             # print(f'detID: {detID}, len corrected times: {len(correctedtimes)}')
@@ -180,6 +222,71 @@ class ShowerProfiles(object):
             if td < mean-2*stddev or td > mean+2*stddev: return False
             else: return True
 
+    def FindExpectedSmallSiPMs(self, fDetID, smallSiPMs):
+        
+        # Time of event in clock cycles since run began
+        sndeventheader = self.tw.M.eventTree.EventHeader
+        signal_event = sndeventheader.GetEventNumber()
+        large_eventtime = sndeventheader.GetEventTime()
+        
+        # Loop over subsequent 100 events
+        for evt in range(signal_event+1, signal_event+101):
+            
+            d_event = evt - signal_event
+            print(f'{d_event} events ahead...')
+            # self.tw.M.eventTree.GetEvent(evt)
+            self.tw.M.GetEvent(evt)
+            hits=self.tw.M.eventTree.Digi_MuFilterHits
+            
+            # Check that the detID I need is in the 
+            for h in hits: 
+                detID = h.GetDetectorID() 
+                
+                # Check if required detID is in this event
+                if detID != fDetID: continue 
+                
+                # Check if any required small SiPM is in this event
+                SiPMs = [i[0] for i in h.GetAllSignals()]
+                if not any([i in smallSiPMs for i in SiPMs]): continue 
+                
+                # Fill delta event time hist
+                sndeventheader = self.tw.M.eventTree.EventHeader
+                small_eventtime = sndeventheader.GetEventTime()                
+
+                signals=h.GetAllSignals()
+                for x in signals:
+                    
+                    SiPM, QDC = x 
+                    if SiPM not in smallSiPMs: continue 
+                    print(f'Found a small SiPM {d_event} events ahead')
+                    
+                    fixed_ch = f'{detID}_{SiPM}'
+                    side = self.muAna.GetSide(fixed_ch)
+                    d_clockcycles = small_eventtime - large_eventtime
+                    
+                    # Fill delta t hist for each small SiPM hit found in the delayed event
+                    self.hists[next_smallSiPM_timestamp_histname].Fill(d_clockcycles)
+                    
+                    delayedSmallSiPM_dtvQDC = f'delayedSmallSiPM_{SiPM}_dtvQDC'
+                    if not delayedSmallSiPM_dtvQDC in self.hists:
+                        title=f'QDC v delta clock cycles for small SiPM {SiPM} in {detID}'
+                        self.hists[delayedSmallSiPM_dtvQDC] = ROOT.TH2F(delayedSmallSiPM_dtvQDC, title, 50, 0, 50, 100, 0, 100)
+                    self.hists[delayedSmallSiPM_dtvQDC].Fill(d_clockcycles, QDC) 
+                    
+                    s,p,b = self.muAna.parseDetID(detID)
+                    SiPMsOnPCBkey = f'{p}_{side}'
+                    SiPMsOnPCB = self.nSiPMsPCB[SiPMsOnPCBkey]
+                    
+                    delayedSmallSiPM_dtvnSiPMs = f'delayedSmallSiPM_{SiPM}_dtvnSiPMs'
+                    if not delayedSmallSiPM_dtvnSiPMs in self.hists:
+                        title = f'Fired SiPMs on PCB v small SiPM delay in clock cycles'
+                        self.hists[delayedSmallSiPM_dtvnSiPMs] = ROOT.TH2F(delayedSmallSiPM_dtvnSiPMs, title, 50, 0, 50, 80, 0, 80)
+                    self.hists[delayedSmallSiPM_dtvnSiPMs].Fill(d_clockcycles, SiPMsOnPCB)
+
+                
+    def FillSmallSiPMHists(self, hit, smallSiPMs):
+        pass
+        
     @staticmethod
     def dycut(hist, nsig=1):    
         dymin=hist.GetMean()-nsig*hist.GetStdDev()

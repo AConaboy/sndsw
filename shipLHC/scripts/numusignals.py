@@ -52,18 +52,18 @@ parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, defau
 parser.add_argument('--state', dest='state', type=str, default='uncorrected')
 
 # Cuts
-parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', type=int, default=0)
-parser.add_argument('--SlopesCut', dest='SlopesCut', type=int, default=1)
-parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', type=int, default=1)
-parser.add_argument('--CrossTalk', dest='CrossTalk', type=int, default=1)
+parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', action='store_true',default=False)
+parser.add_argument('--SlopesCut', dest='SlopesCut', action='store_true',default=False)
+parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', action='store_true',default=False)
+parser.add_argument('--CrossTalk', dest='CrossTalk', action='store_true',default=False)
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--eosH8', dest='eosH8', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TB_H8_october/')
 parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TI18/')
 parser.add_argument('--mode', dest='mode', type=str, default='showerprofiles')
-parser.add_argument('-C', '--HTCondor', dest='HTCondor', help='int (0/1), is on HTCondor?', default=0, type=int, required=False)
-parser.add_argument('--numusignalevents', dest='numusignalevents', type=int, default=0)
+parser.add_argument('-C', '--HTCondor', dest='HTCondor', action='store_true')
+parser.add_argument('--numusignalevents', dest='numusignalevents', type=int, default=1)
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -80,12 +80,11 @@ parser.add_argument("--nTracks", dest="nTracks",default=0,type=int)
 parser.add_argument("--save", dest="save", action='store_true',default=False)
 parser.add_argument("--interactive", dest="interactive", action='store_true',default=False)
 parser.add_argument("--postScale", dest="postScale",help="post scale events, 1..10..100", default=-1,type=int)
+parser.add_argument("--load-hists", dest="load_hists", action='store_true')
 
-parser.add_argument("--Load", dest="loadhists",default=True)
 options = parser.parse_args()
 
 class Numusignaleventtiming(object):
-# class TimeWalk(ROOT.FairTask):
 
     def __init__(self, options):
        
@@ -97,7 +96,7 @@ class Numusignaleventtiming(object):
         self.numucandidatescale=5
         self.legend=ROOT.TLegend(0.14, 0.60, 0.40, 0.85)
         self.planelegends={i:ROOT.TLegend(0.14, 0.60, 0.40, 0.85) for i in range(5)}
-        if options.loadhists:
+        if options.load_hists:
             self.LoadSignalHists()
             self.LoadPassingMuonHists()
             self.FillLegend()
@@ -114,7 +113,7 @@ class Numusignaleventtiming(object):
             nu_mu_data=[r for r in reader]
         self.nu_mu_events={int(x[0]):int(x[1]) for x in nu_mu_data}
 
-        self.signalpartitions={} 
+        self.signalpartitions={}
         self.eventChain=ROOT.TChain("rawConv")
         
         for runNr in self.nu_mu_events:
@@ -124,27 +123,28 @@ class Numusignaleventtiming(object):
             partition = int(eventNumber) // int(1E6)
             dirlist  = os.listdir(self.options.path+"run_"+runNumber)
             partitionfile=f'{self.options.path}run_{runNumber}/sndsw_raw-{str(partition).zfill(4)}.root'        
-            self.signalpartitions[runNr]=partitionfile
+            self.signalpartitions[runNumber]=str(partition).zfill(4)
             self.eventChain.Add(partitionfile)
 
+        options.signalpartitions = self.signalpartitions
         self.options.customEventChain=self.eventChain
+
+        # Set initial geofile to instance Monitor
+        options.runNumber = list(self.nu_mu_events.keys())[0]
 
         FairTasks=[]
         trackTask = SndlhcTracking.Tracking()
         trackTask.SetName('simpleTracking')
-        FairTasks.append(trackTask)
-
-        # Set initial geofile to instance Monitor
-        run0 = list(self.nu_mu_events.keys())[0]
+        FairTasks.append(trackTask)  
 
         self.M = Monitor.Monitoring(options, FairTasks)
-        
+
         self.monitorTasks = {}
 
         if options.Task=='TimeWalk':
             if options.numusignalevents: options.mode='showerprofiles'
             self.monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
-        
+              
         for m in self.monitorTasks:
             self.monitorTasks[m].Init(self.options, self.M)
 
@@ -217,30 +217,6 @@ class Numusignaleventtiming(object):
         for p in self.planesignalhists:
             for key in self.planesignalhists[p]:
                 for idx, hist in enumerate(self.planesignalhists[p][key]): hist.SetLineColor(self.colours[idx]) 
-
-        #         if key.find('sidetime')==0: side=key.split('-')[1]
-
-        #         hists=self.planesignalhists[p][key]
-                
-        #         signalstack = ROOT.THStack(f'{key}stack_plane{p}_signal', 'Signal events in plane {p}')
-        #         # mergedhist=hists[0].Clone()
-                
-        #         # mergedhist.SetDirectory(ROOT.gROOT)
-        #         # [mergedhist.Add(i) for i in hists]
-        #         [signalstack.Add(i) for i in hists]
-        #         # [muonstack.Add(i) for i in hists]
-        #         for idx, h in enumerate(signalstack.GetHists()):
-        #             h.SetLineColor(self.colours[idx])
-        #             # h.SetColor(self.colours[idx])
-        #             # signalstack.Add(h)
-        #         if key.find('sidetime')==0: 
-        #             # mergedhist.SetName(f'sidetime_plane{p}-{side}_aligned')
-        #             signalstack.SetName(f'sidetimestack_plane{p}-{side}_aligned')
-        #         else: 
-        #             # mergedhist.SetName(f'{key}_plane{p}_aligned')
-        #             signalstack.SetName(f'{key}stack_plane{p}_aligned')
-        #         # self.planesignalhists[p][key]=mergedhist
-        #         self.planesignalstacks[p][key]=signalstack
 
     def LoadPassingMuonHists(self):
 
