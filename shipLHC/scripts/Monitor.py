@@ -156,7 +156,11 @@ class Monitoring():
             
             elif options.customEventChain:
                 eventChain=options.customEventChain
-                partitions=[]
+                
+               # Code added to analyse a collection of partitions from different runs e.g. for looking at mu_nu candidates 
+               # Passing a dictionary of {runNr : partition}
+                if options.signalpartitions:
+                  partitions=[f'sndsw_raw-{p}.root' for p in list(options.signalpartitions.values())]
 
             else:
               partitions = 0
@@ -196,9 +200,13 @@ class Monitoring():
             ioman.SetTreeName(eventChain.GetName())
             outFile = ROOT.TMemFile('dummy','CREATE')
             source = ROOT.FairFileSource(eventChain.GetCurrentFile())
-            for i in range(1,len(partitions)):
-                  p = partitions[i]
-                  source.AddFile(path+'run_'+self.runNr+'/'+p)
+            if not options.customEventChain:
+               for i in range(1,len(partitions)):
+                     p = partitions[i]
+                     source.AddFile(path+'run_'+self.runNr+'/'+p)
+            else:
+               for idx, runNr in enumerate(options.signalpartitions):
+                  source.AddFile(path+'run_'+runNr+'/'+partitions[idx])
             self.run.SetSource(source)
             self.sink = ROOT.FairRootFileSink(outFile)
             self.run.SetSink(self.sink)
