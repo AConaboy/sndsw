@@ -564,6 +564,21 @@ class Analysis(object):
 			elif SiPM>=nSiPMs: nFiredSiPMs_right+=1
 		return nFiredSiPMs_left, nFiredSiPMs_right 
 
+	def GetFiredSiPMsOnPCBs(self, hits):
+		channels_on_PCB = {}
+		for hit in hits:
+			detID = hit.GetDetectorID()
+			s,p,b = self.parseDetID(detID)
+			Fired_left, Fired_right = self.GetnFiredSiPMs(hit)
+			fired = {'left':Fired_left, 'right':Fired_right}
+
+			for side in fired: 
+				key=f'{p}_{side}'
+				if not key in channels_on_PCB: channels_on_PCB[key]=0 
+				channels_on_PCB[key] += fired[side]
+   
+		return channels_on_PCB
+
 	def GetSiPMNumberInSystem_LandR(self, detID, SiPM): # 20000 SiPM 8 -> 8
 		if not isinstance(SiPM, int): SiPM=int(SiPM)
 		s, p, b = self.parseDetID(int(detID))
@@ -659,9 +674,10 @@ class Analysis(object):
 	def SiPM2BarAndPosition(self, SiPM):
 		# Pass the SiPM number on the PCB 
 		# returns the bar number and SiPM number within the bar
-		barNumber = SiPM//8
-		SiPMNumber = SiPM%8
-		return [barNumber, SiPMNumber]
+		barNumber = (SiPM-1)//8+1
+		SiPMNumber = (SiPM-1)%8+1
+		if SiPMNumber==0: SiPMNumber==8
+		return barNumber, SiPMNumber
 
 	def GetDeltaT(self, times, one_channel=None):
 		# nSiPMs=aHit.GetnSiPMs()

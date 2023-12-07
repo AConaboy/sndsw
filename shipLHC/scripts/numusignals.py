@@ -121,13 +121,13 @@ class Numusignaleventtiming(object):
 
             runNumber = str(runNr).zfill(6)
             partition = int(eventNumber // 1E6)
-            dirlist  = os.listdir(self.options.path+"run_"+runNumber)
-            partitionfile=f'{self.options.path}run_{runNumber}/sndsw_raw-{str(partition).zfill(4)}.root'        
+            dirlist  = os.listdir(options.path+"run_"+runNumber)
+            partitionfile=f'{options.path}run_{runNumber}/sndsw_raw-{str(partition).zfill(4)}.root'        
             self.signalpartitions[runNumber]=str(partition).zfill(4)
             self.eventChain.Add(partitionfile)
 
         options.signalpartitions = self.signalpartitions
-        self.options.customEventChain=self.eventChain
+        options.customEventChain=self.eventChain
 
         # Set initial geofile to instance Monitor
         options.runNumber = list(self.nu_mu_events.keys())[0]
@@ -146,7 +146,7 @@ class Numusignaleventtiming(object):
             self.monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
               
         for m in self.monitorTasks:
-            self.monitorTasks[m].Init(self.options, self.M)
+            self.monitorTasks[m].Init(options, self.M)
 
         self.tw = self.monitorTasks['TimeWalk']
         self.hists=self.tw.hists
@@ -156,42 +156,58 @@ class Numusignaleventtiming(object):
         runs=self.nu_mu_events.keys()
 
         for runNr in runs:
+            self.InvestigateEvent(runNr)
             
-            evt_number=self.GetSignalEventNumber(runNr)
-            self.M.GetEvent(evt_number) # Runs tracking task
-            
-            eventheader = self.M.eventTree.EventHeader
-            runId = eventheader.GetRunId()
-            
-            print(f'RunNr: {runNr}, runId: {runId}')
-            # print(f'signal event in M.eventTree: {evt_number}, M.EventNumber: {self.M.EventNumber}, event number in partition: {eventheader.GetEventNumber()}')
+        
+    def InvestigateEvent(self, runNr):
+        evt_number=self.GetSignalEventNumber(runNr)
+        self.M.GetEvent(evt_number) # Runs tracking task
+        
+        eventheader = self.M.eventTree.EventHeader
+        runId = eventheader.GetRunId()
+        
+        # print(f'RunNr: {runNr}, runId: {runId}')
+        # print(f'signal event in M.eventTree: {evt_number}, M.EventNumber: {self.M.EventNumber}, event number in partition: {eventheader.GetEventNumber()}')
 
-            """
-            # Temporarily commenting this out to minimise std out
-            if runNr < 4575:     options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
-            elif runNr < 4855:   options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
-            elif runNr < 5172:   options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
-            elif runNr < 5485:   options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
-            else:                options.geoFile =  "geofile_sndlhc_TI18_V1_2023.root"            
+        """
+        # Temporarily commenting this out to minimise std out
+        if runNr < 4575:     options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
+        elif runNr < 4855:   options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
+        elif runNr < 5172:   options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
+        elif runNr < 5485:   options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
+        else:                options.geoFile =  "geofile_sndlhc_TI18_V1_2023.root"            
 
-            self.M.snd_geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
-            self.M.MuFilter = self.M.snd_geo.modules['MuFilter']
-            self.M.Scifi       = self.M.snd_geo.modules['Scifi']
-            self.M.zPos = self.M.getAverageZpositions()
-            """
-            
-            print(f'Investigating run {runNr}, run event {evt_number}')
-            firedUSDetIds = [i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==2]
-            print(f'Looking for detIDs: {firedUSDetIds}')
+        self.M.snd_geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
+        self.M.MuFilter = self.M.snd_geo.modules['MuFilter']
+        self.M.Scifi       = self.M.snd_geo.modules['Scifi']
+        self.M.zPos = self.M.getAverageZpositions()
+        """
+        
+        # print(f'Investigating run {runNr}, run event {evt_number}')
+        firedUSDetIds = [i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==2]
+        nVeto = len([i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==1])
+        if nVeto != 0: 
+            print(f'Veto in this event. Cannot be correct event')
+        print(f'Looking for detIDs: {firedUSDetIds}')
 
-            for m in self.monitorTasks:
-                self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
+        for m in self.monitorTasks:
+            self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
             
     def GetSignalEventNumber(self, runNr):
         n_partition = list(self.nu_mu_events.keys()).index(runNr)
         evt_number = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6)            
         return evt_number
-        
+    
+    def testing(self):
+        self.fired_detIDs={}
+        for run in self.nu_mu_events:
+            signalevent = self.GetSignalEventNumber(run)
+            self.M.GetEvent(signalevent)
+
+            hits = self.M.eventTree.Digi_MuFilterHits
+            self.fired_detIDs[run] = [i.GetDetectorID() for i in hits if i.GetDetectorID()//10000!=3]
+            
+
     def LoadSignalHists(self):
 
         fname = f'{self.afswork}Results/SignalComparisonPlots.root'
@@ -421,7 +437,7 @@ class Numusignaleventtiming(object):
     def WriteOutSignalHists(self):
 
         outfilename = f'{self.tw.outpath}Results/SignalComparisonPlots.root'
-        outfile=ROOT.TFile.Open(outfilename, 'update')
+        outfile=ROOT.TFile.Open(outfilename, 'recreate')
 
         for histname in self.tw.hists:
             if histname in ('ExtraHitsMultiplicity', 'DISradius_US', 'US-SiPMQDC', 'frac_SiPMs', 'fractionMissingSmallFound'):
