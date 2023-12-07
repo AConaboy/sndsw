@@ -120,7 +120,7 @@ class Numusignaleventtiming(object):
             eventNumber=self.nu_mu_events[runNr]
 
             runNumber = str(runNr).zfill(6)
-            partition = int(eventNumber) // int(1E6)
+            partition = int(eventNumber // 1E6)
             dirlist  = os.listdir(self.options.path+"run_"+runNumber)
             partitionfile=f'{self.options.path}run_{runNumber}/sndsw_raw-{str(partition).zfill(4)}.root'        
             self.signalpartitions[runNumber]=str(partition).zfill(4)
@@ -153,15 +153,21 @@ class Numusignaleventtiming(object):
 
     def InvestigateSignalEvents(self):
 
-        runs=list(self.nu_mu_events.keys())
+        runs=self.nu_mu_events.keys()
 
-        for i in range(self.eventChain.GetEntries()):
+        for runNr in runs:
+            
+            evt_number=self.GetSignalEventNumber(runNr)
+            self.M.GetEvent(evt_number) # Runs tracking task
+            
+            eventheader = self.M.eventTree.EventHeader
+            runId = eventheader.GetRunId()
+            
+            print(f'RunNr: {runNr}, runId: {runId}')
+            # print(f'signal event in M.eventTree: {evt_number}, M.EventNumber: {self.M.EventNumber}, event number in partition: {eventheader.GetEventNumber()}')
 
-            self.eventChain.GetEvent(i)
-
-            runNr = self.eventChain.EventHeader.GetRunId()
-            if runNr not in runs: continue
-
+            """
+            # Temporarily commenting this out to minimise std out
             if runNr < 4575:     options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
             elif runNr < 4855:   options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
             elif runNr < 5172:   options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
@@ -172,14 +178,20 @@ class Numusignaleventtiming(object):
             self.M.MuFilter = self.M.snd_geo.modules['MuFilter']
             self.M.Scifi       = self.M.snd_geo.modules['Scifi']
             self.M.zPos = self.M.getAverageZpositions()
-
-            self.M.GetEvent(self.nu_mu_events[runNr] % int(10E5)) # 10E5 returns float(1,000,000)! 
+            """
+            
+            print(f'Investigating run {runNr}, run event {evt_number}')
+            firedUSDetIds = [i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==2]
+            print(f'Looking for detIDs: {firedUSDetIds}')
 
             for m in self.monitorTasks:
                 self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
-
-            runs.remove(runNr)
-
+            
+    def GetSignalEventNumber(self, runNr):
+        n_partition = list(self.nu_mu_events.keys()).index(runNr)
+        evt_number = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6)            
+        return evt_number
+        
     def LoadSignalHists(self):
 
         fname = f'{self.afswork}Results/SignalComparisonPlots.root'
@@ -412,20 +424,31 @@ class Numusignaleventtiming(object):
         outfile=ROOT.TFile.Open(outfilename, 'update')
 
         for histname in self.tw.hists:
-            if histname in ('ExtraHitsMultiplicity', 'DISradius_US'):
+            if histname in ('ExtraHitsMultiplicity', 'DISradius_US', 'US-SiPMQDC', 'frac_SiPMs', 'fractionMissingSmallFound'):
                 hist=self.tw.hists[histname]
                 outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')
 
-            if len(histname.split('_'))!=3: continue
+            if len(histname.split('_')) == 3:
 
-            hist=self.tw.hists[histname]
-            key, detID, state=histname.split('_')
-            
-            if not hasattr(outfile, key): outfile.mkdir(key)
-            tdir = outfile.Get(key)
-            tdir.cd()
+                hist=self.tw.hists[histname]
+                key, detID, state=histname.split('_')
+                
+                if not hasattr(outfile, key): outfile.mkdir(key)
+                tdir = outfile.Get(key)
+                tdir.cd()
 
-            hist.Write(hist.GetName(), 2)
+                hist.Write(hist.GetName(), 2)
+
+            elif len(histname.split('_')) == 2:
+
+                hist=self.tw.hists[histname]
+                key, whatever =histname.split('_')
+                
+                if not hasattr(outfile, key): outfile.mkdir(key)
+                tdir = outfile.Get(key)
+                tdir.cd()
+                
+                hist.Write(hist.GetName(), 2)
 
         outfile.Close()
         print(f'Signal hists written to {outfilename}')

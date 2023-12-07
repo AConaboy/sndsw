@@ -151,9 +151,7 @@ class TimeWalk(ROOT.FairTask):
     def ExecuteEvent(self, event):
 
         if not hasattr(self.muAna, 'task'): self.muAna.SetTask(self)
-
         # if self.path == 'H8':
-
 
         tracks={1:[], 3:[]}
         Reco_MuonTracks=self.M.Reco_MuonTracks
@@ -166,7 +164,9 @@ class TimeWalk(ROOT.FairTask):
             if track.GetUniqueID()==3: 
                 inDS=True
                 tracks[3].append(Reco_MuonTracks[i])
-        if not inDS: return
+        if not inDS: 
+            print('No DS track')
+            return
 
         ### If there are more than 1 DS track, take the track with the lowest chi2/Ndf
         if len(tracks[3])==1: dstrack= tracks[3][0]
@@ -191,12 +191,13 @@ class TimeWalk(ROOT.FairTask):
            self.hists['TDS0']=ROOT.TH1F('TDS0','Average time of DS horizontal bars;DS horizontal average time [ns];Counts', 200, 0, 50)
         self.hists['TDS0'].Fill(self.TDS0)
 
-        ### Timing discriminant cut
-        td = self.muAna.GetTimingDiscriminant() # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
-        if not self.TimingDiscriminantCut(td): return
-
         if self.options.mode=='showerprofiles':
             self.sp.FillHists(event.Digi_MuFilterHits)
+            return
+
+        # ### Timing discriminant cut
+        # td = self.muAna.GetTimingDiscriminant() # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
+        # if not self.TimingDiscriminantCut(td): return
 
         ### Slope cut
         if not self.slopecut(): return
