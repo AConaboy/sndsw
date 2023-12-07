@@ -62,7 +62,7 @@ parser.add_argument('--eosH8', dest='eosH8', type=str, default='/eos/experiment/
 parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TI18/')
 parser.add_argument('--mode', dest='mode', type=str, default='zeroth')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', help='int (0/1), is on HTCondor?', default=0, type=int, required=False)
-parser.add_argument('--numusignalevents', dest='numusignalevents', type=int, default=0)
+parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -91,7 +91,7 @@ if (options.auto and not options.interactive) or options.batch: ROOT.gROOT.SetBa
 
 # if no geofile given, use defaults according to run number
 
-if options.runNumber < 0  and not options.geoFile: 
+if options.runNumber < 0  and not options.geoFile and not options.numusignalevents: 
     print('No run number given and no geoFile. Do not know what to do. Exit.')
     exit()
 if not options.geoFile:
@@ -136,7 +136,7 @@ if options.runNumber < 0:
 # if not options.numusignalevents:
 if not options.server.find('eos')<0:
     if options.path.find('2023')!=-1:
-        rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2023_tmp/'
+        rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2023/'
     elif options.path.find('2022')!=-1:
         rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2022/'
     else:
