@@ -206,7 +206,7 @@ class Monitoring():
                      source.AddFile(path+'run_'+self.runNr+'/'+p)
             else:
                for idx, runNr in enumerate(options.signalpartitions):
-                  source.AddFile(path+'run_'+runNr+'/'+partitions[idx])
+                  if idx!=0: source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
             self.run.SetSource(source)
             self.sink = ROOT.FairRootFileSink(outFile)
             self.run.SetSink(self.sink)
