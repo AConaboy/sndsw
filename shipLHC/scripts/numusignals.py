@@ -157,7 +157,6 @@ class Numusignaleventtiming(object):
 
         for runNr in runs:
             self.InvestigateEvent(runNr)
-            
         
     def InvestigateEvent(self, runNr):
         evt_number=self.GetSignalEventNumber(runNr)
@@ -440,7 +439,7 @@ class Numusignaleventtiming(object):
         outfile=ROOT.TFile.Open(outfilename, 'recreate')
 
         for histname in self.tw.hists:
-            if histname in ('ExtraHitsMultiplicity', 'DISradius_US', 'US-SiPMQDC', 'frac_SiPMs', 'fractionMissingSmallFound'):
+            if histname in ('ExtraHitsMultiplicity', 'DISradius_US', 'US-SiPMQDC', 'frac_SiPMs', 'fractionMissingSmallFound', 'fractionMissingSmallFound-highQDC'):
                 hist=self.tw.hists[histname]
                 outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')
 

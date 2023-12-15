@@ -711,8 +711,7 @@ class Analysis(object):
 		pq = self.task.A-self.task.pos
 		uCrossv= (self.task.B-self.task.A).Cross(self.task.mom)
 		doca = pq.Dot(uCrossv)/uCrossv.Mag()
-		return doca 		
-
+		return doca
 
 	def GetdtCalc(self, xpred, L, cs):
 		left, right=list(filter(lambda x : x[0]<8, cs)), list(filter(lambda x : x[0]>7, cs))
@@ -799,6 +798,9 @@ class Analysis(object):
 		uncertainty=ROOT.TMath.Sqrt(uncertainty_sq)
 	
 		return average_timeresolution, uncertainty	
+
+	# def GetBarAverageQDC(self, qdcs):
+		# for 
 
 	def Getcscint_chi2pNDF_info(self, runNr,fixed_ch,state):
 		iteration=0 if state=='uncorrected' else 1

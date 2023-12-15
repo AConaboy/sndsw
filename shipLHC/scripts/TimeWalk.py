@@ -139,8 +139,6 @@ class TimeWalk(ROOT.FairTask):
 
         if options.mode in ('TW', 'res', 'systemalignment', 'showerprofiles', 'numusignalevents'):
             self.muAna.MakeTWCorrectionDict(self.TWCorrectionRun)
-        
-        # self.scifi1z=self.zPos['Scifi'][10]
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -168,7 +166,6 @@ class TimeWalk(ROOT.FairTask):
                 inDS=True
                 tracks[3].append(Reco_MuonTracks[i])
         if not inDS: 
-            print('No DS track')
             return
 
         ### If there are more than 1 DS track, take the track with the lowest chi2/Ndf
@@ -183,9 +180,11 @@ class TimeWalk(ROOT.FairTask):
         self.pos=fstate.getPos()
         self.mom=fstate.getMom()
         self.trackchi2NDF=fitStatus.getChi2()/fitStatus.getNdf()+1E-10
+        
+        hits=event.Digi_MuFilterHits
 
         # Get DS event t0
-        x=self.muAna.GetDSHaverage(event.Digi_MuFilterHits) # Now returns in ns
+        x=self.muAna.GetDSHaverage(hits) # Now returns in ns
         if x==-999.: 
             print(f'Event {self.M.EventNumber} has no DS horizontal hits with 2 fired SiPMs')
             return
@@ -195,7 +194,8 @@ class TimeWalk(ROOT.FairTask):
         self.hists['TDS0'].Fill(self.TDS0)
 
         if self.options.mode=='showerprofiles':
-            self.sp.FillHists(event.Digi_MuFilterHits)
+            # self.sp.FillHists(hits)
+            self.sp.ShowerDirection(hits)
             return
 
         # ### Timing discriminant cut
@@ -350,8 +350,7 @@ class TimeWalk(ROOT.FairTask):
             subtitle='{Time-walk corrected t_{0}^{DS}-t^{tw corr}_{SiPM} v '+coord+'-position w/ run'+str(self.TWCorrectionRun)+'};'+coord+'_{predicted} [cm];t_{0}^{DS}-t^{tw corr}_{SiPM} [ns]'
             title='#splitline{'+ReadableFixedCh+'}'+subtitle
             hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,110,-10,100, 800, -20, 20.)          
-
-        ### Fill histograms 
+    
         hists[dtvxpred].Fill(self.pred, TWt_rel)
         
     def res(self, fixed_ch, clock, qdc):
@@ -406,70 +405,41 @@ class TimeWalk(ROOT.FairTask):
             print(f'{len(self.M.h)} histograms saved to {self.outpath}splitfiles/run{self.runNr}/fixed_ch')
         
         if self.options.mode == 'systemalignment':
+            self.sa.WriteOutHistograms()
             
-            outfilename=f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/SystemAlignment_{self.options.nStart}.root'
-            if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
-            else: outfile=ROOT.TFile.Open(outfilename, 'create')
-
-            additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt']
-            
-            for h in self.hists:
-                
-                if h=='TDS0':
-                    outfile.WriteObject(self.hists[h], self.hists[h].GetName(), 'kOverwrite')
-
-                if h.find('timingxt_tds0')==0:
-                    hist=self.hists[h]
-                    if histkey in additionalkeys:
-                        if not hasattr(outfile, histkey): folder=outfile.mkdir(histkey)
-                        else: folder=outfile.Get(histkey)
-                        folder.cd()
-                        hist.Write(h, 2)                    
-
-                if len(h.split('_'))==3:
-                    histkey, detID, x = h.split('_')
-                    hist=self.hists[h]
-                    if histkey in additionalkeys:
-                        if not hasattr(outfile, histkey): folder=outfile.mkdir(histkey)
-                        else: folder=outfile.Get(histkey)
-                        folder.cd()
-                        hist.Write(h, 2)                
-            outfile.Close()
-            print(f'{len(self.M.h)} histograms saved to {self.outpath}splitfiles/run{self.runNr}/SystemAlignment/SystemAlignment_{self.options.nStart}.root')
-
         if self.options.mode == 'showerprofiles':
+            self.sp.WriteOutHistograms()
+            # outfilename=f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root'
             
-            outfilename=f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root'
+            # if not os.path.exists(f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/'):
+            #     os.makedirs(f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/', exist_ok=True)
+
+            # if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
+            # else: outfile=ROOT.TFile.Open(outfilename, 'create')
+
+            # additionalkeys=['averagetime', 'deltatime', 'sidetime']
             
-            if not os.path.exists(f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/'):
-                os.makedirs(f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/', exist_ok=True)
+            # for h in self.hists:
 
-            if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
-            else: outfile=ROOT.TFile.Open(outfilename, 'create')
+            #     if h == 'ExtraHitsMultiplicity':
+            #         hist=self.hists[h]
+            #         outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')
 
-            additionalkeys=['averagetime', 'deltatime', 'sidetime']
-            
-            for h in self.hists:
+            #     if h.find('DISradius')==0:
+            #         hist=self.hists[h]
+            #         outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')                    
 
-                if h == 'ExtraHitsMultiplicity':
-                    hist=self.hists[h]
-                    outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')
+            #     if len(h.split('_'))==3:
+            #         histkey, detID, x = h.split('_')
+            #         hist=self.hists[h]
+            #         if histkey in additionalkeys:
+            #             if not hasattr(outfile, histkey): folder=outfile.mkdir(histkey)
+            #             else: folder=outfile.Get(histkey)
+            #             folder.cd()
+            #             hist.Write(h, 2)
 
-                if h.find('DISradius')==0:
-                    hist=self.hists[h]
-                    outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')                    
-
-                if len(h.split('_'))==3:
-                    histkey, detID, x = h.split('_')
-                    hist=self.hists[h]
-                    if histkey in additionalkeys:
-                        if not hasattr(outfile, histkey): folder=outfile.mkdir(histkey)
-                        else: folder=outfile.Get(histkey)
-                        folder.cd()
-                        hist.Write(h, 2)
-
-            outfile.Close()
-            print(f'{len(self.M.h)} histograms saved to {self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root')            
+            # outfile.Close()
+            # print(f'{len(self.M.h)} histograms saved to {self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root')            
         
 
     def LoadSystemObservables(self):

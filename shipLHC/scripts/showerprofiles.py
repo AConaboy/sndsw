@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ROOT, csv
+import ROOT, csv, os
 
 class ShowerProfiles(object):
 
@@ -41,6 +41,9 @@ class ShowerProfiles(object):
         self.hists=tw.hists
         
         self.sigmatds0=0.263 # ns 
+        self.highQDCthreshold=60
+
+        self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
         
         if options.signalpartitions: self.Loadnumuevents()
         
@@ -54,7 +57,7 @@ class ShowerProfiles(object):
     def FillHists(self, hits):
         
         """ 
-        Hits passed here will be in events with a DS track
+        Hits passed here will be in events with a DS trackf
         I then check if they are in good agreement with the DS track in y.
         For this code I do NOT want hits associated with the track. 
         I will then check if they have atleast 4 (6) US (veto) SiPMs firing
@@ -69,7 +72,8 @@ class ShowerProfiles(object):
         self.nSiPMsPCB = self.muAna.GetFiredSiPMsOnPCBs(hits)
         
         for hit in hits: # Looking now at all hits, should start here incase d(phi)z between hadronic shower and the muon is sub 1 bar
-
+            if not hit.isValid(): continue
+            
             detID = hit.GetDetectorID()
 
             s, p, b= self.muAna.parseDetID(detID)
@@ -81,12 +85,15 @@ class ShowerProfiles(object):
                 title = 'Fraction of SiPMs that fire for hits in US;N_{fired} / N_{expected};Counts'
                 self.hists[fractionSiPMs_histname] = ROOT.TH1F(fractionSiPMs_histname, title, 16, 0, 1)
             
-            all_signals=hit.GetAllSignals()
+            qdcs=hit.GetAllSignals()
             found_large_SiPMs=[]
             found_small_SiPMs=[]
-            for i in all_signals:
-                if i in (2,5,10,13): found_small_SiPMs.append(i[0])
+            for i in qdcs:
+                if i[0] in (2,5,10,13): found_small_SiPMs.append(i[0])
                 else: found_large_SiPMs.append(i[0])
+                
+            if any([len(qdcs)==0, sum([i[1] for i in qdcs])==0 ]):
+                print([(i[0],i[1]) for i in qdcs])
             
             frac_n = ( len(found_large_SiPMs) + len(found_small_SiPMs) ) / 16
             self.hists[fractionSiPMs_histname].Fill(frac_n) 
@@ -104,7 +111,6 @@ class ShowerProfiles(object):
             
             # For the small SiPMs in this event, fill dt hist with 0 and remove it from the list of small SiPMs
             for smallSiPM in found_small_SiPMs: 
-                print(f'Small SiPM {smallSiPM} in the expected event!!\n') # Never happens
                 self.hists[next_smallSiPM_timestamp_histname].Fill(0)
                 
             """
@@ -117,13 +123,13 @@ class ShowerProfiles(object):
             """
             
             missing_small_SiPMs = [i for i in [2,5,10,13] if not i in found_small_SiPMs]
-            print(f'Looking for small SiPMs in detID: {detID}')
-            self.FindExpectedSmallSiPMs(detID, all_signals, missing_small_SiPMs)
-            continue # Temporary statement to focus on finding small SiPMs
+            
+            if len(missing_small_SiPMs) != 0:
+                x=self.FindExpectedSmallSiPMs(detID, qdcs, missing_small_SiPMs)
+                if x==-999: continue # Skip event if no large SiPMs fire.
             
             ### Apply time-walk correction to all times in the hit.
             correctedtimes=self.muAna.GetCorrectedTimes(hit)
-            qdcs = hit.GetAllSignals()
             times={'left':{}, 'right':{}}
 
             for i in correctedtimes: 
@@ -182,19 +188,18 @@ class ShowerProfiles(object):
 
     def WriteOutHistograms(self):
 
-        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/SystemAlignment_{self.options.nStart}.root'
+        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root'
         if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
         else: outfile=ROOT.TFile.Open(outfilename, 'create')
 
-        additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt']
+        additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt', 'y-barycentre']
         for h in self.hists:
             if h=='TDS0':
                 outfile.WriteObject(self.hists[h], self.hists[h].GetName(),'kOverwrite')
 
-            if len(h.split('_'))==3:
+            elif len(h.split('_'))>1:
                 for additionalkey in additionalkeys:
                     if h.find(additionalkey)==-1: continue
-                    planekey, bar, key = h.split('_')
                     
                     hist=self.hists[h]
                     if not hasattr(outfile, additionalkey): folder=outfile.mkdir(additionalkey)
@@ -230,14 +235,18 @@ class ShowerProfiles(object):
             if td < mean-2*stddev or td > mean+2*stddev: return False
             else: return True
 
-    def FindExpectedSmallSiPMs(self, fDetID, signals, smallSiPMs):
+    def FindExpectedSmallSiPMs(self, fDetID, qdcs, smallSiPMs):
         
         # Time of event in clock cycles since run began 
         
         # Use options.signalpartitions to get the right runNumber
         # Now this function will only work for nu_mu data
         
-        large_SiPMQDCs=[i[1] for i in signals if not i[0] in (2,5,10,13)]
+        large_SiPMQDCs=[i[1] for i in qdcs if not i[0] in (2,5,10,13)]
+        if len(large_SiPMQDCs)==0: 
+            print(f'Que??')
+            return -999 # Weird that this happens?
+        
         avg_large_SiPMQDC = sum(large_SiPMQDCs) / len(large_SiPMQDCs)
 
         n_missing = len(smallSiPMs)
@@ -247,9 +256,10 @@ class ShowerProfiles(object):
         runNr = self.tw.M.eventTree.EventHeader.GetRunId()
         large_eventtime = sndeventheader.GetEventTime() # clock cycles since run started
 
-        n_partition = list(self.options.signalpartitions.keys()).index(f'{str(runNr).zfill(6)}')
-        signal_event = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6)  
-        # print(f'runNr, signal_event: {runNr}, {signal_event}')
+        if self.options.signalpartitions: # If I'm looking at mu_nu candidates
+            n_partition = list(self.options.signalpartitions.keys()).index(f'{str(runNr).zfill(6)}')
+            signal_event = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6) 
+        else: signal_event = self.tw.M.EventNumber
         
         # Loop over subsequent 100 events
         for evt in range(signal_event+1, signal_event+101):
@@ -279,8 +289,8 @@ class ShowerProfiles(object):
                 for x in signals:
                     
                     SiPM, QDC = x 
-                    if SiPM not in smallSiPMs: continue 
-                    # print(f'Found a small SiPM {d_event} events ahead')
+                    if SiPM not in smallSiPMs: continue # If a required small SiPM doesn't fire in this hit then continue
+
                     smallSiPMs.remove(SiPM) # Don't double count small SiPM hits!
                     n_found += 1
                     
@@ -294,7 +304,7 @@ class ShowerProfiles(object):
                     delayedSmallSiPM_dtvQDC = f'delayedSmallSiPM_{SiPM}_dtvQDC'
                     if not delayedSmallSiPM_dtvQDC in self.hists:
                         title='QDC v delta clock cycles for small SiPM '+str(SiPM)+' in '+str(detID)+';#Delta clock cycles (small SiPMs, #nu_{#mu} candidate);QDC [a.u]'
-                        self.hists[delayedSmallSiPM_dtvQDC] = ROOT.TH2F(delayedSmallSiPM_dtvQDC, title, 50, 0, 50, 50, 0, 50)
+                        self.hists[delayedSmallSiPM_dtvQDC] = ROOT.TH2F(delayedSmallSiPM_dtvQDC, title, 50, 0, 50, 60, -10, 50)
                     self.hists[delayedSmallSiPM_dtvQDC].Fill(d_clockcycles, QDC) 
                     
                     s,p,b = self.muAna.parseDetID(detID)
@@ -309,9 +319,9 @@ class ShowerProfiles(object):
                     
                     delayedSmallSiPM_dtvnSiPMs = f'SiPMsOnPCB_dtvnSiPMs-highQDC'
                     if not delayedSmallSiPM_dtvnSiPMs in self.hists:
-                        title = '#splitline{Fired SiPMs on PCB v delay of small SiPM in clock cycles}{average large SiPM QDC > 80};#Delta clock cycles (small SiPMs, #nu_{#mu} candidate);Fired SiPMs on PCB'
+                        title = '#splitline{Fired SiPMs on PCB v delay of small SiPM in clock cycles}{average large SiPM QDC > '+str(self.highQDCthreshold)+'};#Delta clock cycles (small SiPMs, #nu_{#mu} candidate);Fired SiPMs on PCB'
                         self.hists[delayedSmallSiPM_dtvnSiPMs] = ROOT.TH2F(delayedSmallSiPM_dtvnSiPMs, title, 100, 0, 100, 50, 0, 50)
-                    if avg_large_SiPMQDC>=80: self.hists[delayedSmallSiPM_dtvnSiPMs].Fill(d_clockcycles, SiPMsOnPCB)                    
+                    if avg_large_SiPMQDC>=self.highQDCthreshold: self.hists[delayedSmallSiPM_dtvnSiPMs].Fill(d_clockcycles, SiPMsOnPCB)                    
                     
                     largeSiPMQDC_dtvQDC = f'largeSiPMQDC_dtvQDC'
                     if not largeSiPMQDC_dtvQDC in self.hists:
@@ -322,32 +332,120 @@ class ShowerProfiles(object):
                     largevsmall_QDCvQDC = f'largevsmall_QDCvQDC'
                     if not largevsmall_QDCvQDC in self.hists:
                         title = 'Correlation of average large SiPM QDC v small SiPM QDC for US hits in #nu_{#mu} candidates;Average QDC per large SiPM [a.u];Small SiPM QDC [a.u]'
-                        self.hists[largevsmall_QDCvQDC] = ROOT.TH2F(largevsmall_QDCvQDC, title, 200, -20, 180, 50, 0, 50) 
+                        self.hists[largevsmall_QDCvQDC] = ROOT.TH2F(largevsmall_QDCvQDC, title, 200, -20, 180, 60, -10, 50) 
                     self.hists[largevsmall_QDCvQDC].Fill(avg_large_SiPMQDC, QDC)
                     
                     smallQDCvdt = f'smallQDCvdt_dtvQDC'
                     if not smallQDCvdt in self.hists:
                         title = 'Correlation of small SiPM delay in clock cycles v small SiPM QDC for US hits in #nu_{#mu} candidates;#Delta clock cycles (small SiPMs, #nu_{#mu} candidate);Small SiPM QDC [a.u]'
-                        self.hists[smallQDCvdt] = ROOT.TH2F(smallQDCvdt, title, 100, 0, 100, 50, 0, 50) 
+                        self.hists[smallQDCvdt] = ROOT.TH2F(smallQDCvdt, title, 100, 0, 100, 60, -10, 50) 
                     self.hists[smallQDCvdt].Fill(d_clockcycles, QDC) 
                     
-                    smallQDCvdt = f'smallQDCvdt_dtvQDC'
+                    smallQDCvdt = f'smallQDCvdt_dtvQDC-highQDC'
                     if not smallQDCvdt in self.hists:
-                        title = 'Correlation of small SiPM delay in clock cycles v small SiPM QDC for US hits in #nu_{#mu} candidates;#Delta clock cycles (small SiPMs, #nu_{#mu} candidate);Small SiPM QDC [a.u]'
-                        self.hists[smallQDCvdt] = ROOT.TH2F(smallQDCvdt, title, 100, 0, 100, 50, 0, 50) 
-                    self.hists[smallQDCvdt].Fill(d_clockcycles, QDC)                                        
-                    
+                        title = '#splitline{Correlation of small SiPM delay in clock cycles v small SiPM QDC for US hits in #nu_{#mu} candidates}{Average large SiPM QDC>'+str(self.highQDCthreshold)+'};#Delta clock cycles (small SiPMs, #nu_{#mu} candidate);Small SiPM QDC [a.u]'
+                        self.hists[smallQDCvdt] = ROOT.TH2F(smallQDCvdt, title, 100, 0, 100, 60, -10, 50) 
+                    if avg_large_SiPMQDC>=self.highQDCthreshold: self.hists[smallQDCvdt].Fill(d_clockcycles, QDC)                                        
+          
+        fractionMissingSmallFoundHighQDC = f'fractionMissingSmallFound-highQDC'
+        if not fractionMissingSmallFoundHighQDC in self.hists:
+            title = '#splitline{Fraction of small SiPMs missing from signal candidate hit}{which where found in the next 100 events. Average large SiPM QDC>'+str(self.highQDCthreshold)+'};Fraction exp. small SiPM firing within 100 clock cycles;Counts'
+            self.hists[fractionMissingSmallFoundHighQDC] = ROOT.TH1F(fractionMissingSmallFoundHighQDC, title, 6, 0, 1.2)
+        if avg_large_SiPMQDC>self.highQDCthreshold: self.hists[fractionMissingSmallFoundHighQDC].Fill(n_found/n_missing)
+
         fractionMissingSmallFound = f'fractionMissingSmallFound'
         if not fractionMissingSmallFound in self.hists:
-            title = 'Fraction of small SiPMs missing from signal candidate hit which where found in the next 100 events'
-            self.hists[fractionMissingSmallFound] = ROOT.TH1F(fractionMissingSmallFound, title, 5, 0, 1)
-        self.hists[fractionMissingSmallFound].Fill(n_found/n_missing)
+            title = '#splitline{Fraction of small SiPMs missing from signal candidate hit}{which where found in the next 100 events};Fraction exp. small SiPM firing within 100 clock cycles;Counts'
+            self.hists[fractionMissingSmallFound] = ROOT.TH1F(fractionMissingSmallFound, title, 6, 0, 1.2)
+        self.hists[fractionMissingSmallFound].Fill(n_found/n_missing)        
 
         # Very important to load the signal event back!
         self.tw.M.GetEvent(signal_event)
 
-    def FillSmallSiPMHists(self, hit, smallSiPMs):
-        pass
+    def ShowerDirection(self, hits):
+        
+        planedata={i:{} for i in range(5)}
+
+        """
+        1. Plot shower baricentre in y (x) by using a QDC weighting, aligned timing
+        2. First consider all hits 
+        3. For each event, plot the baricentre in x and y at each plane
+        """
+
+        for hit in hits:
+            if not hit.isValid(): continue
+
+            detID = hit.GetDetectorID()
+            s,p,b = self.muAna.parseDetID(detID)
+            
+            if s!=2: continue
+
+            ### Apply time-walk correction to all times in the hit.
+            qdcs = hit.GetAllSignals()
+            qdc_sides = {'left':[], 'right':[]}
+            
+            for idx in qdcs: 
+                SiPM, qdc = idx 
+                if SiPM < 8: qdc_sides['left'].append(qdc)
+                else: qdc_sides['right'].append(qdc)
+            larger_side = 'left' if sum(qdc_sides['left']) > sum(qdc_sides['right']) else 'right'
+            largerQDCs = qdc_sides[larger_side]
+ 
+            correctedtimes=self.muAna.GetCorrectedTimes(hit)
+            alignedtimes=self.GetAlignedTimes(detID, correctedtimes, qdcs)
+
+            # average_qdc=sum([i[1] for i in qdcs]) / len(qdcs)
+            
+            delta_sidetime = sum(alignedtimes['left'].values()) - sum(alignedtimes['right'].values())
+
+            planedata[p][detID] = (delta_sidetime, largerQDCs)
+
+        for plane in range(5):
+            data = planedata[plane]
+            if len(data) == 0: continue
+            # print(f'Data: {data}')
+            # continue
+            y_barycentre = self.GetYBarycentre(data)
+            
+            y_barycentre_hist = f'y-barycentre_plane{plane}'
+            if not y_barycentre_hist in self.hists:
+                title = f'Barycentre in y from QDC weighting;y-barycentre [cm];Counts'
+                self.hists[y_barycentre_hist] = ROOT.TH1F(y_barycentre_hist, title, 150, 0, 150)
+            self.hists[y_barycentre_hist].Fill(y_barycentre)
+            
+    def GetYBarycentre(self, data):
+
+        qdcs = [i[1] for i in data.values()]
+        qdcs = [i for j in qdcs for i in j]
+        
+        maxA,maxB,minA,minB = ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3()
+        self.MuFilter.GetPosition(max(data.keys()), maxA, maxB)
+        self.MuFilter.GetPosition(min(data.keys()), minA, minB) 
+
+        # GetPosition returns the midpoint of the bar. So I add on the y-width of 1 bar to compensate 
+        ymin, ymax = 1/2*(minA.y()+minB.y()), 1/2*(maxA.y()+maxB.y())
+        yrange = ymax - ymin + self.MuFilter.GetConfParF('MuFilter/UpstreamBarY')
+        totalQDC = sum(qdcs)
+        normalised_qdcs = [i/totalQDC for i in qdcs]
+        
+        y_barycentre = max(normalised_qdcs)*yrange + ymin 
+
+        return y_barycentre
+        
+    def GetAlignedTimes(self, detID, correctedtimes, qdcs):
+        times={'left':{}, 'right':{}}
+        for i in correctedtimes: 
+            SiPM, correctedtime = i
+            # fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
+            fixed_ch=f'{detID}_{SiPM}'
+
+            if not fixed_ch in self.muAna.alignmentparameters: continue
+            d=self.muAna.alignmentparameters[fixed_ch]
+
+            qdc=self.muAna.GetChannelVal(SiPM, qdcs)
+            side=self.muAna.GetSide(f'{detID}_{SiPM}')
+            times[side][SiPM]=self.tw.TDS0 - correctedtime - d[0]
+        return times
         
     @staticmethod
     def dycut(hist, nsig=1):    
