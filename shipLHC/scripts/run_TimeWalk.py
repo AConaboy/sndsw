@@ -63,6 +63,7 @@ parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experim
 parser.add_argument('--mode', dest='mode', type=str, default='zeroth')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', help='int (0/1), is on HTCondor?', default=0, type=int, required=False)
 parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
+parser.add_argument('--signalpartitions', dest='signalpartitions', required=False)
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)

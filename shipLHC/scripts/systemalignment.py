@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ROOT
+import ROOT, os
 
 class SystemAlignment(object):
 
@@ -14,7 +14,6 @@ class SystemAlignment(object):
         self.timealignment=tw.timealignment
 
         ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
-
 
         self.afswork=tw.afswork
         self.outpath=tw.outpath
@@ -77,9 +76,11 @@ class SystemAlignment(object):
         detID=hit.GetDetectorID()
         s, p, b= self.muAna.parseDetID(detID)
 
-        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned')
+        # correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned')
+        correctedtimes = self.muAna.GetCorrectedTimes(hit, x=0, mode='unaligned')
         qdcs = hit.GetAllSignals()
-        times={'left':{}, 'right':{}}
+        aligned_times={'left':{}, 'right':{}}
+        times={'left':{}, 'right':{}} # Only apply time walk correction
 
         for i in correctedtimes: 
             SiPM, correctedtime = i
@@ -90,13 +91,45 @@ class SystemAlignment(object):
 
             qdc=self.muAna.GetChannelVal(SiPM, qdcs)
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            times[side][SiPM]=self.tw.TDS0 - correctedtime - d[0]
+            aligned_times[side][SiPM] = self.tw.TDS0 - correctedtime - d[0]
+            times[side][SiPM] = correctedtime - d[0]
 
         if any([len(times[i])==0 for i in ('left', 'right')]): return
         averages={side:sum(times[side].values()) / len(times[side]) for side in times}
         averagetime = 1/2 * sum(averages.values())
 
         deltatime = averages['left'] - averages['right']
+
+        # Using passing muons, bar length = 2*x_L / c dt_{L,R}
+        # where x_L is the distance from the left edge of the bar to the extrapolated track
+        
+        # self.pred is set for each hit in the TimeWalk task
+
+        xL = f'xL_plane{p}'
+        if not xL in self.hists:
+            title='x_{L};x_{L} [cm];Counts'
+            self.hists[xL]=ROOT.TH1F(xL,title,80, 0, 80)
+        
+        dt = f'dt_plane{p}'
+        if not dt in self.hists:
+            title='#Delta t(left, right);#Delta t_{L, R} [ns];Counts'
+            self.hists[dt]=ROOT.TH1F(dt,title,50, -5, 5)
+            
+        tL = f'tL_plane{p}'
+        if not tL in self.hists:
+            title='t_{left};t_{left} [ns];Counts'
+            self.hists[tL]=ROOT.TH1F(tL,title,50, -5, 5)            
+
+        barlength=f'2xL-cdt_plane{p}'
+        if not barlength in self.hists:
+            title='L = 2x_{L} - c#Delta t_{L,R};2x_{L} - c#Delta t_{L,R} [cm];Counts'
+            self.hists[barlength]=ROOT.TH1F(barlength,title, 160, 0, 160)
+        
+        x = 2*self.tw.pred - (18.99*deltatime)
+        self.hists[barlength].Fill(x)
+        self.hists[xL].Fill(self.tw.pred)
+        self.hists[dt].Fill(deltatime)
+        self.hists[tL].Fill(averages['left'])
         
         averagebartimehistname=f'averagetime_{detID}_aligned'
         if not averagebartimehistname in self.hists:
@@ -167,12 +200,13 @@ class SystemAlignment(object):
         if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
         else: outfile=ROOT.TFile.Open(outfilename, 'create')
 
-        additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt']
+        additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt',
+                        'xL/cdt', 'xL', 'dt']
         for h in self.hists:
             if h=='TDS0':
                 outfile.WriteObject(self.hists[h], self.hists[h].GetName(),'kOverwrite')
 
-            if len(h.split('_'))==3:
+            elif len(h.split('_'))==3:
                 for additionalkey in additionalkeys:
                     if h.find(additionalkey)==-1: continue
                     planekey, bar, key = h.split('_')
@@ -181,7 +215,15 @@ class SystemAlignment(object):
                     if not hasattr(outfile, additionalkey): folder=outfile.mkdir(additionalkey)
                     else: folder=outfile.Get(additionalkey)
                     folder.cd()
-                    hist.Write(h, 2) # The 2 means it will overwrite a hist of the same name                
+                    hist.Write(h, 2) # The 2 means it will overwrite a hist of the same name  
+
+            elif len(h.split('_'))==2:
+                key, plane = h.split('_')
+                hist=self.hists[h]
+                if not hasattr(outfile, 'xL/cdt'): folder=outfile.mkdir('xL/cdt')
+                else: folder=outfile.Get('xL/cdt')
+                folder.cd()
+                hist.Write(h, 2) # The 2 means it will overwrite a hist of the same name                  
 
         outfile.Close()
         print(f'{len(self.hists)} histograms saved to {outfilename}')        

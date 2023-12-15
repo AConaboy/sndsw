@@ -65,6 +65,18 @@ class Tracking(ROOT.FairTask):
    # offline read only:   converted data in, no output
    # offline read/write:  converted data in, converted data out
 
+   # for scifi tracking
+   self.nPlanes = 3
+   self.nClusters = 5
+   self.sigma=150*u.um
+   self.maxRes=50
+   self.maskPlane=-1
+   # for DS tracking
+   self.DSnPlanes = 3
+   self.DSnHits = 5
+   self.nDSPlanesVert  = self.mufiDet.GetConfParI("MuFilter/NDownstreamPlanes")
+   self.nDSPlanesHor = self.nDSPlanesVert-1
+
    if online:
       self.event = self.sink.GetOutTree()
    else: 
@@ -477,9 +489,10 @@ class Tracking(ROOT.FairTask):
             if detID>50000: detSys=3 # Never True?
         else:
             detID = aCl.GetDetectorID()
-            if detID//10000 < 2: detSys  = 2 # Not DS track
-            else: detSys  = 3 # DS track
-            self.mufiDet.GetPosition(detID,A,B) 
+            detSys  = 1
+            if detID<40000: detSys=3
+            if detSys==3: self.mufiDet.GetPosition(detID,A,B)
+            if detSys==1: self.scifiDet.GetSiPMPosition(detID,A,B)
         distance = 0
         tmp = array('d',[A[0],A[1],A[2],B[0],B[1],B[2],distance])
         unSortedList[A[2]] = [ROOT.TVectorD(7,tmp),detID,k,detSys]
