@@ -73,6 +73,8 @@ class SystemAlignment(object):
 
     def FillBarHists(self, hit):
 
+        # if not self.tw.passslopecut: return
+        
         detID=hit.GetDetectorID()
         s, p, b= self.muAna.parseDetID(detID)
 
@@ -91,45 +93,59 @@ class SystemAlignment(object):
 
             qdc=self.muAna.GetChannelVal(SiPM, qdcs)
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            aligned_times[side][SiPM] = self.tw.TDS0 - correctedtime - d[0]
+            # aligned_times[side][SiPM] = self.tw.TDS0 - (correctedtime - d[0])
             times[side][SiPM] = correctedtime - d[0]
 
         if any([len(times[i])==0 for i in ('left', 'right')]): return
-        averages={side:sum(times[side].values()) / len(times[side]) for side in times}
+        averages={side:self.tw.TDS0 - (sum(times[side].values()) / len(times[side])) for side in times}
+        fastest = {side:self.tw.TDS0 - min(times[side].values()) for side in times}
         averagetime = 1/2 * sum(averages.values())
 
-        deltatime = averages['left'] - averages['right']
+        baraveragecscint_left, baraveragecscint_right = self.muAna.GetBarAveragecscint(self.runNr, detID, 'corrected')
+        baraveragecscint = 0.5* (baraveragecscint_left[0] + baraveragecscint_right[0])
+
+        delta_averagetime = averages['right'] - averages['left']
+        delta_fastesttime = fastest['right'] - fastest['left']
 
         # Using passing muons, bar length = 2*x_L / c dt_{L,R}
         # where x_L is the distance from the left edge of the bar to the extrapolated track
         
         # self.pred is set for each hit in the TimeWalk task
-
-        xL = f'xL_plane{p}'
+        x='yAgreement' if self.tw.trackrelated else 'notyAgreement'
+        xL = f'xL-{x}_plane{p}'
         if not xL in self.hists:
             title='x_{L};x_{L} [cm];Counts'
             self.hists[xL]=ROOT.TH1F(xL,title,80, 0, 80)
-        
-        dt = f'dt_plane{p}'
+
+        dt = f'dt-{x}_plane{p}'
         if not dt in self.hists:
             title='#Delta t(left, right);#Delta t_{L, R} [ns];Counts'
             self.hists[dt]=ROOT.TH1F(dt,title,50, -5, 5)
             
-        tL = f'tL_plane{p}'
-        if not tL in self.hists:
-            title='t_{left};t_{left} [ns];Counts'
-            self.hists[tL]=ROOT.TH1F(tL,title,50, -5, 5)            
+        sumt = f'sumt-{x}_plane{p}'
+        if not sumt in self.hists:
+            title = 'corrected and aligned t_{right} + t_{left};t_{right} + t_{left} [ns];Counts'
 
-        barlength=f'2xL-cdt_plane{p}'
-        if not barlength in self.hists:
-            title='L = 2x_{L} - c#Delta t_{L,R};2x_{L} - c#Delta t_{L,R} [cm];Counts'
-            self.hists[barlength]=ROOT.TH1F(barlength,title, 160, 0, 160)
-        
-        x = 2*self.tw.pred - (18.99*deltatime)
-        self.hists[barlength].Fill(x)
+        lamx_hist = f'lambda-{x}_plane{p}'
+        if not lamx_hist in self.hists:
+            title='Deposition width c_{scint}(t_{right} + t_{left});c_{scint}(t_{right} + t_{left}) [cm];Counts'
+            self.hists[lamx_hist] = ROOT.TH1F(lamx_hist, title, 160, -90, 60)
+
+        barycentrex_hist = f'xbarycentre-{x}_plane{p}'
+        if not barycentrex_hist in self.hists:
+            title='Barycentre in x, #frac{c_{scint}}{2}(t_{right}+t_{left});#frac{c_{scint}}{2}(t_{right}+t_{left}) [cm];Counts'
+            self.hists[barycentrex_hist] = ROOT.TH1F(barycentrex_hist, title, 160, -90, 60)
+
         self.hists[xL].Fill(self.tw.pred)
-        self.hists[dt].Fill(deltatime)
-        self.hists[tL].Fill(averages['left'])
+        self.hists[dt].Fill(delta_averagetime)
+
+        lamx = baraveragecscint*delta_averagetime
+        barycentrex = 0.5*baraveragecscint*(averages['right'] + averages['left'])
+        self.hists[lamx_hist].Fill(lamx)
+        self.hists[barycentrex_hist].Fill(barycentrex)
+
+        # self.hists[xlvcdt].Fill(self.tw.pred, cdt)
+        # self.hists[lamx].Fill(L-2*self.tw.pred+cdt)
         
         averagebartimehistname=f'averagetime_{detID}_aligned'
         if not averagebartimehistname in self.hists:
@@ -141,7 +157,7 @@ class SystemAlignment(object):
         if not deltabartimehistname in self.hists:
             title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' difference of average aligned time from each side as a function of x_{predicted};x_{predicted} [cm];'+'t^{tw corr}_{left} - t^{tw corr}_{right} [ns];Counts'
             self.hists[deltabartimehistname]=ROOT.TH2F(deltabartimehistname, title, 100, 0, 100, 2000, -5, 5)
-        self.hists[deltabartimehistname].Fill(self.tw.pred, deltatime)
+        self.hists[deltabartimehistname].Fill(self.tw.pred, delta_fastesttime)
 
         for side in ('left', 'right'):
             averagebarsidetimehistname=f'sidetime_{detID}-{side}_aligned'
@@ -201,7 +217,7 @@ class SystemAlignment(object):
         else: outfile=ROOT.TFile.Open(outfilename, 'create')
 
         additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt',
-                        'xL/cdt', 'xL', 'dt']
+                        'xL', 'dt', 'sumt', 'lambda', 'xbarycentre']
         for h in self.hists:
             if h=='TDS0':
                 outfile.WriteObject(self.hists[h], self.hists[h].GetName(),'kOverwrite')
@@ -220,8 +236,8 @@ class SystemAlignment(object):
             elif len(h.split('_'))==2:
                 key, plane = h.split('_')
                 hist=self.hists[h]
-                if not hasattr(outfile, 'xL/cdt'): folder=outfile.mkdir('xL/cdt')
-                else: folder=outfile.Get('xL/cdt')
+                if not hasattr(outfile, 'xL-cdt'): folder=outfile.mkdir('xL-cdt')
+                else: folder=outfile.Get('xL-cdt')
                 folder.cd()
                 hist.Write(h, 2) # The 2 means it will overwrite a hist of the same name                  
 
@@ -230,7 +246,7 @@ class SystemAlignment(object):
 
     # def yresidual3(self, detID, pos, mom):
     def yresidual3(self, detID):
-        self.MuFilter.GetPosition(detID,A,B)
+        self.tw.MuFilter.GetPosition(detID,A,B)
         doca=self.Getyresidual(detID)
         s,p,b=self.muAna.parseDetID(detID)
         if s==3: return True
@@ -260,9 +276,10 @@ class SystemAlignment(object):
                 print(f'No timing discriminant histogram')
                 return 
             hist=self.cutdists['timingdiscriminant']
+            modaltime=hist.GetBinCenter(hist.GetMaximumBin())
             mean, stddev=hist.GetMean(), hist.GetStdDev()
             # print(f'td: {td}, mean +/- 2*std. dev.: {mean-2*stddev}, {mean+2*stddev}')
-            if td < mean-2*stddev or td > mean+2*stddev: return False
+            if td < modaltime-2*stddev or td > modaltime+2*stddev: return False
             else: return True
 
     @staticmethod

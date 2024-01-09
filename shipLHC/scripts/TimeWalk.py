@@ -12,13 +12,16 @@ for i in ('x', 'y', 'z','t'): ROOT.gStyle.SetTitleSize(0.04, i)
 
 class TimeWalk(ROOT.FairTask):
 
-    def Init(self, options, monitor):
+    def __init__(self, options, monitor):
         
         statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
                     'TW':'corrected', 'res':'corrected', 
+                    'selectioncriteria':'corrected',
                     'systemalignment':'corrected',
                     'showerprofiles':'corrected', 
-                    'numusignalevents':'corrected'}
+                    'numusignalevents':'corrected',
+                    '2muon':'corrected'}
+        
         self.state=statedict[options.mode]
 
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
@@ -102,7 +105,7 @@ class TimeWalk(ROOT.FairTask):
         #### Time walk correction run is independent of time alignment settings. 
         self.TWCorrectionRun=str(5408).zfill(6)
 
-        if options.mode in ('systemalignment', 'showerprofiles', 'numusignalevents'):
+        if options.mode in ('selectioncriteria', 'systemalignment', 'showerprofiles', 'numusignalevents'):
 
             ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
             if options.AlignmentRun==None:
@@ -124,7 +127,13 @@ class TimeWalk(ROOT.FairTask):
                 self.sa = SystemAlignment(options, self)
             elif options.mode == 'showerprofiles':
                 from showerprofiles import ShowerProfiles
-                self.sp = ShowerProfiles(options, self)          
+                self.sp = ShowerProfiles(options, self) 
+            elif options.mode == 'selectioncriteria':
+                from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
+                self.sc = SelectionCriteria(options, self)
+            elif options.mode == 'dimuon':
+                from dimuon import Dimuon
+                self.dimuon = Dimuon(options, self)
 
         self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
         ### Incase selection criteria distributions not made for the TWCorrectionRun
@@ -132,12 +141,16 @@ class TimeWalk(ROOT.FairTask):
             self.TWCorrectionRun=str(5408).zfill(6)
             self.muAna.TWCorrectionRun=self.TWCorrectionRun
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
+        if 'timingdiscriminant' in self.cutdists:
+            tdmin = self.cutdists['timingdiscriminant'].GetMean() - 3*self.cutdists['timingdiscriminant'].GetStdDev()
+            tdmax = self.cutdists['timingdiscriminant'].GetMean() + 3*self.cutdists['timingdiscriminant'].GetStdDev()
+            print(f'td-min, td-max: {tdmin}, {tdmax}')
 
         ### Dictionary of cscint values using time-walk correction run
         if options.mode != 'zeroth':
             self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
 
-        if options.mode in ('TW', 'res', 'systemalignment', 'showerprofiles', 'numusignalevents'):
+        if options.mode in ('TW', 'res', 'systemalignment', 'showerprofiles', 'numusignalevents', 'selectioncriteria'):
             self.muAna.MakeTWCorrectionDict(self.TWCorrectionRun)
 
     def GetEntries(self):
@@ -167,7 +180,13 @@ class TimeWalk(ROOT.FairTask):
                 tracks[3].append(Reco_MuonTracks[i])
         if not inDS: 
             return
-
+        
+        hits=event.Digi_MuFilterHits
+        
+        # 1st iteration for dimuon, only accept events with 2 tracks in DS
+        if self.options.mode=='dimuon' and not len(tracks[3])==2: return
+        elif self.options.mode=='dimuon' and len(tracks[3])==2: self.dm.FillHists(hits)
+            
         ### If there are more than 1 DS track, take the track with the lowest chi2/Ndf
         if len(tracks[3])==1: dstrack= tracks[3][0]
         else: 
@@ -180,8 +199,6 @@ class TimeWalk(ROOT.FairTask):
         self.pos=fstate.getPos()
         self.mom=fstate.getMom()
         self.trackchi2NDF=fitStatus.getChi2()/fitStatus.getNdf()+1E-10
-        
-        hits=event.Digi_MuFilterHits
 
         # Get DS event t0
         x=self.muAna.GetDSHaverage(hits) # Now returns in ns
@@ -192,22 +209,28 @@ class TimeWalk(ROOT.FairTask):
         if not 'TDS0' in self.hists:
            self.hists['TDS0']=ROOT.TH1F('TDS0','Average time of DS horizontal bars;DS horizontal average time [ns];Counts', 200, 0, 50)
         self.hists['TDS0'].Fill(self.TDS0)
-
+        
+        ### Timing discriminant cut
+        self.td = self.muAna.GetTimingDiscriminant(hits) # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
+        if self.TimingDiscriminantCut(): self.passtdcut=True 
+        else: self.passtdcut=False
+        
+        ### Slope cut
+        if self.slopecut(): self.passslopecut=True 
+        else: self.passslopecut=False
+        
+        if self.options.mode == 'selectioncriteria':
+            self.sc.FillHists(hits)
+            return
+        
         if self.options.mode=='showerprofiles':
             # self.sp.FillHists(hits)
-            self.sp.ShowerDirection(hits)
+            if self.passslopecut: self.sp.ShowerDirection(hits)
             return
 
-        # ### Timing discriminant cut
-        # td = self.muAna.GetTimingDiscriminant() # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
-        # if not self.TimingDiscriminantCut(td): return
-
-        ### Slope cut
-        if not self.slopecut(): return
-    
         for hit in event.Digi_MuFilterHits:
             nLeft, nRight=self.muAna.GetnFiredSiPMs(hit)
-            
+
             # if not self.nSiPMscut(hit, nLeft, nRight): continue
 
             detID=hit.GetDetectorID()
@@ -216,8 +239,8 @@ class TimeWalk(ROOT.FairTask):
             # Only investigate veto hits if there is a Scifi track!
             if not inVeto and s==1: continue
 
-            if not self.yresidual3(detID): 
-                continue
+            if self.yresidual3(detID): self.trackrelated = True
+            else: self.trackrelated=False
 
             zEx=self.zPos['MuFilter'][s*10+p]
             lam=(zEx-self.pos.z())/self.mom.z()
@@ -236,6 +259,9 @@ class TimeWalk(ROOT.FairTask):
                 self.sa.FillBarHists(hit)
                 continue
 
+            # Only investigate track related hits
+            if not self.trackrelated:continue 
+            
             for channel in channels_t:
                 SiPM,clock=channel
                 qdc=self.muAna.GetChannelVal(SiPM, channels_qdc)
@@ -404,43 +430,14 @@ class TimeWalk(ROOT.FairTask):
                     f.Close()
             print(f'{len(self.M.h)} histograms saved to {self.outpath}splitfiles/run{self.runNr}/fixed_ch')
         
-        if self.options.mode == 'systemalignment':
+        elif self.options.mode == 'systemalignment':
             self.sa.WriteOutHistograms()
             
-        if self.options.mode == 'showerprofiles':
-            self.sp.WriteOutHistograms()
-            # outfilename=f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root'
+        elif self.options.mode == 'showerprofiles':
+            self.sp.WriteOutHistograms()      
             
-            # if not os.path.exists(f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/'):
-            #     os.makedirs(f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/', exist_ok=True)
-
-            # if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
-            # else: outfile=ROOT.TFile.Open(outfilename, 'create')
-
-            # additionalkeys=['averagetime', 'deltatime', 'sidetime']
-            
-            # for h in self.hists:
-
-            #     if h == 'ExtraHitsMultiplicity':
-            #         hist=self.hists[h]
-            #         outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')
-
-            #     if h.find('DISradius')==0:
-            #         hist=self.hists[h]
-            #         outfile.WriteObject(hist, hist.GetName(), 'kOverwrite')                    
-
-            #     if len(h.split('_'))==3:
-            #         histkey, detID, x = h.split('_')
-            #         hist=self.hists[h]
-            #         if histkey in additionalkeys:
-            #             if not hasattr(outfile, histkey): folder=outfile.mkdir(histkey)
-            #             else: folder=outfile.Get(histkey)
-            #             folder.cd()
-            #             hist.Write(h, 2)
-
-            # outfile.Close()
-            # print(f'{len(self.M.h)} histograms saved to {self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root')            
-        
+        elif self.options.mode == 'selectioncriteria':
+            self.sc.WriteOutHistograms()
 
     def LoadSystemObservables(self):
         systemobservablesfilename=f'{self.afswork}SystemObservables/run{self.TWCorrectionRun}/systemparameters.json'
@@ -472,9 +469,9 @@ class TimeWalk(ROOT.FairTask):
             pass 
         return True   
 
-    def TimingDiscriminantCut(self, td):
+    def TimingDiscriminantCut(self):
         if self.timealignment=='old':
-            if td<0: return False 
+            if self.td<0: return False 
             else: return True
         else: 
             if not 'timingdiscriminant' in self.cutdists:
@@ -482,7 +479,7 @@ class TimeWalk(ROOT.FairTask):
                 return 
             hist=self.cutdists['timingdiscriminant']
             mean, stddev=hist.GetMean(), hist.GetStdDev()
-            if td < mean-3*stddev or td > mean+3*stddev: return False
+            if self.td < mean-2*stddev or self.td > mean+2*stddev: return False
             else: return True
 
     def dycut(self, hist, nsig=1):    
@@ -502,4 +499,5 @@ class TimeWalk(ROOT.FairTask):
         return TDS0ns 
     
     def GetDistanceToSiPM(self,Ex):
+        # vector A contains the midpoint of the left pointing (wall-side) face of the scintillator
         return ROOT.TMath.Sqrt((self.A.x()-Ex.x())**2+(self.A.y()-Ex.y())**2+(self.A.z()-Ex.z())**2)
