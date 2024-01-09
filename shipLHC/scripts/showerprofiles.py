@@ -52,7 +52,7 @@ class ShowerProfiles(object):
         with open(numusignalevent_filepath, 'r') as f:
             reader=csv.reader(f)
             nu_mu_data=[r for r in reader]
-        self.nu_mu_events={int(x[0]):int(x[1]) for x in nu_mu_data}        
+        self.nu_mu_events={int(x[0]):(int(x[1]), int(x[2])) for x in nu_mu_data}        
 
     def FillHists(self, hits):
         
@@ -68,7 +68,6 @@ class ShowerProfiles(object):
             2. Find the next event where the each of the 4 small SiPMs fire. 
             3. Correlate the clock cycles with that delay with the number of fired channels on the PCB
         """
-        nontrackhits=[]
         self.nSiPMsPCB = self.muAna.GetFiredSiPMsOnPCBs(hits)
         
         for hit in hits: # Looking now at all hits, should start here incase d(phi)z between hadronic shower and the muon is sub 1 bar
@@ -118,8 +117,7 @@ class ShowerProfiles(object):
             Fill histograms of:
                 
                 1. Correlating the delay with nSiPMs/PCB 
-                2. Correlating the delay with QDC
-                
+                2. Correlating the delay with QDC 
             """
             
             missing_small_SiPMs = [i for i in [2,5,10,13] if not i in found_small_SiPMs]
@@ -158,7 +156,7 @@ class ShowerProfiles(object):
             deltatime = averages['left'] - averages['right']
             
             ### Don't need to worry about nSiPMs because I have already cut on it
-            baraveragecscint = self.muAna.GetBarAveragecscint(self.TWCorrectionRun, detID, 'corrected')
+            baraveragecscint_left, baraveragecscint_right = self.muAna.GetBarAveragecscint(self.TWCorrectionRun, detID, 'corrected')
 
             averagebartimehistname=f'averagetime_{detID}_aligned'
             if not averagebartimehistname in self.hists:
@@ -179,12 +177,12 @@ class ShowerProfiles(object):
                     self.hists[averagebarsidetimehistname]=ROOT.TH1F(averagebarsidetimehistname, title, 2000, -5, 5)
                 self.hists[averagebarsidetimehistname].Fill(averages[side])
 
-            radiusestimate=f'DISradius_{self.subsystemdict[s]}'
-            if not radiusestimate in self.hists:
-                title='Muon DIS shower radius estimate;L - c_{bar}(#frac{1}{t_{L}} - #frac{1}{t_{R}}) [cm];Counts'
-                self.hists[radiusestimate]=ROOT.TH1F(radiusestimate, title, 200, -50, 50)
-            r=0.5*(self.barlengths[s] - baraveragecscint[0]*(1/averages['left'] - 1/averages['left']) )
-            self.hists[radiusestimate].Fill(r)
+            # radiusestimate=f'DISradius_{self.subsystemdict[s]}'
+            # if not radiusestimate in self.hists:
+            #     title='Muon DIS shower radius estimate;L - c_{bar}(#frac{1}{t_{L}} - #frac{1}{t_{R}}) [cm];Counts'
+            #     self.hists[radiusestimate]=ROOT.TH1F(radiusestimate, title, 200, -50, 50)
+            # r=0.5*(self.barlengths[s] - baraveragecscint[0]*(1/averages['left'] - 1/averages['left']) )
+            # self.hists[radiusestimate].Fill(r)
 
     def WriteOutHistograms(self):
 
@@ -393,19 +391,38 @@ class ShowerProfiles(object):
  
             correctedtimes=self.muAna.GetCorrectedTimes(hit)
             alignedtimes=self.GetAlignedTimes(detID, correctedtimes, qdcs)
-
-            # average_qdc=sum([i[1] for i in qdcs]) / len(qdcs)
             
-            delta_sidetime = sum(alignedtimes['left'].values()) - sum(alignedtimes['right'].values())
+            aligned_times={'left':{}, 'right':{}}
+            for i in correctedtimes: 
+                SiPM, correctedtime = i
+                fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
 
-            planedata[p][detID] = (delta_sidetime, largerQDCs)
+                if not fixed_ch in self.muAna.alignmentparameters: continue
+                d=self.muAna.alignmentparameters[fixed_ch]
+
+                qdc=self.muAna.GetChannelVal(SiPM, qdcs)
+                side=self.muAna.GetSide(f'{detID}_{SiPM}')
+                aligned_times[side][SiPM] = self.tw.TDS0 - (correctedtime - d[0])
+                # times[side][SiPM] = correctedtime - d[0]            
+
+            if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
+            averages={side:sum(aligned_times[side].values()) / len(aligned_times[side]) for side in aligned_times}
+            fastest = {side:min(aligned_times[side].values()) for side in aligned_times}
+            averagetime = 1/2 * sum(averages.values())
+
+            delta_averagetime = averages['left'] - averages['right']
+            delta_fastesttime = fastest['left'] - fastest['right']
+            
+            # delta_sidetime = sum(alignedtimes['left'].values()) - sum(alignedtimes['right'].values())
+
+            planedata[p][detID] = (averages, largerQDCs)
 
         for plane in range(5):
             data = planedata[plane]
             if len(data) == 0: continue
-            # print(f'Data: {data}')
-            # continue
             y_barycentre = self.GetYBarycentre(data)
+            x_barycentre = self.GetXBarycentre(data)
+            if not y_barycentre: continue
             
             y_barycentre_hist = f'y-barycentre_plane{plane}'
             if not y_barycentre_hist in self.hists:
@@ -417,6 +434,7 @@ class ShowerProfiles(object):
 
         qdcs = [i[1] for i in data.values()]
         qdcs = [i for j in qdcs for i in j]
+        if len(qdcs)==0: return
         
         maxA,maxB,minA,minB = ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3()
         self.MuFilter.GetPosition(max(data.keys()), maxA, maxB)
@@ -432,6 +450,26 @@ class ShowerProfiles(object):
 
         return y_barycentre
         
+    def GetXBarycentre(self, data):
+        """
+        Determine x-barycentre using bar with largest QDC
+        Already, data contains the qdcs of the larger side max( sum(right_qdcs), sum(left_qdcs) )
+        So I can use detID:[qdcs] to find the bar with the largest QDC deposit
+        """
+        
+
+        averages = [i[0] for i in data.values()] 
+        if len(averages) == 0: return
+        # print(data)
+        largestQDC_bar = max(data, key=lambda k:sum(data[k][1]))
+        # print(largestQDC_bar)
+        
+        average_left_cscint, average_right_cscint = self.muAna.GetBarAveragecscint(self.runNr, largestQDC_bar, 'corrected')
+        x_barycentre = 0.5*(average_left_cscint+average_right_cscint) * 0.5 * (averages['right'] + averages['left'])
+        
+        return x_barycentre
+        
+        
     def GetAlignedTimes(self, detID, correctedtimes, qdcs):
         times={'left':{}, 'right':{}}
         for i in correctedtimes: 
@@ -444,7 +482,7 @@ class ShowerProfiles(object):
 
             qdc=self.muAna.GetChannelVal(SiPM, qdcs)
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            times[side][SiPM]=self.tw.TDS0 - correctedtime - d[0]
+            times[side][SiPM]=self.tw.TDS0 - (correctedtime - d[0])
         return times
         
     @staticmethod

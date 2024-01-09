@@ -7,12 +7,13 @@ from random import randint
 A, B, locA, locB = ROOT.TVector3(), ROOT.TVector3(), ROOT.TVector3(), ROOT.TVector3()
 
 class MuonSelectionCriteria(object):
-    def Init(self, options, tw):
+    def __init__(self, options, tw):
        
         self.tw=tw
+        self.options=options
         self.muAna=tw.muAna
         self.state=tw.state
-        self.runNr=tw.r
+        self.runNr=tw.runNr
         
         self.cuts={'OneHitPerSystem':options.OneHitPerSystem, 'SlopesCut':options.SlopesCut, 'nSiPMsCut':options.nSiPMsCut}
 
@@ -29,12 +30,12 @@ class MuonSelectionCriteria(object):
         self.systemAndBars = {1:7,2:10,3:60}
         self.nchs={1:224, 2:800}
         self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
-        self.zPos=self.M.zPos
+        self.zPos=tw.zPos
 
         self.freq=160.316E6
         self.TDC2ns=1E9/self.freq
 
-        self.hists=self.M.h
+        self.hists=tw.hists
 
         self.histtypes=['slopes', 'dy', 'nSiPMs']
         
@@ -48,8 +49,7 @@ class MuonSelectionCriteria(object):
         slopetitle = f'Number of fired DS horizontal bars;Fired DS horizontal bars;Counts'
         self.hists[f'firedDSHbars'] = ROOT.TH1I(f'firedDSHbars',slopetitle,10, 0, 9)
 
-
-        systemhistcriteria={None:None, '1DSb':'1 DS bar per plane', '1USb':'1 US bar per plane'}
+        systemhistcriteria={None:None, '1DSb':'1 DS bar per plane', '1USb':'1 US bar per plane', 'slopecut':'slope cut'}
         for s in (1, 2):
             for criterion in systemhistcriteria.keys():
                 if not criterion:
@@ -168,10 +168,9 @@ class MuonSelectionCriteria(object):
                     self.hists[f'{10*subsystem+plane}_bar{bar}_averagetime_{self.state}'].GetXaxis().SetTitleSize(0.05)
                     self.hists[f'{10*subsystem+plane}_bar{bar}_averagetime_{self.state}'].GetYaxis().SetTitleSize(0.05)
 
-    def ExecuteEvent(self, event):
+    def ExecuteEvent(self, hits):
         
         hists=self.hists
-        hits=event.Digi_MuFilterHits
 
         tracks={1:[], 3:[]}
         Reco_MuonTracks=self.M.Reco_MuonTracks
@@ -206,11 +205,12 @@ class MuonSelectionCriteria(object):
             hists[f'slopes'].Fill(*self.slopes)
 
         # If fitted DS track passes slope criteria. Then fill correlate red-chi2 with xy-position
-        if self.cuts['SlopesCut'] and not self.slopecut(): return
+        if self.slopecut(): self.slopecut=True
+        else: self.slopecut=False
         
-        TDS0, firedDSHbars=self.muAna.GetDSHaverage(self.MuFilter, hits) # Now returns in ns
-        if TDS0==-999: print(f'Event {self.M.EventNumber} has a fitted DS track but no DS horizontal bars with both SiPMs firing.')
-        self.hists['TDS0'].Fill(TDS0)
+        self.TDS0, firedDSHbars=self.muAna.GetDSHaverage(self.MuFilter, hits) # Now returns in ns
+        if self.TDS0==-999: print(f'Event {self.M.EventNumber} has a fitted DS track but no DS horizontal bars with both SiPMs firing.')
+        self.hists['TDS0'].Fill(self.TDS0)
         self.hists['firedDSHbars'].Fill(firedDSHbars)
 
         # Use the correct subsystems for 1 bar / plane cut
@@ -219,44 +219,44 @@ class MuonSelectionCriteria(object):
         Nfired=self.muAna.OneHitPerSystem(hits, tmp, Nfired=True)
         hists['NPlanes'].Fill(Nfired)        
 
-        self.redchi2hists(fitStatus)        
+    def FillHists(self, hits):
+        
+        # self.redchi2hists(fitStatus)        
 
         if self.options.debug:
             self.FillChannelRateHists()
     
-            self.Fillchi2xy(tmp)
+            # self.Fillchi2xy(tmp)
 
         # if self.cuts['OneHitPerSystem']:
-        self.FillTimingDiscriminantHists(hits, tmp)
+        self.FillTimingDiscriminantHists(hits)
         
         # Both of these methods loop through the hits
-        self.FillPlaneMultiplicity()
-        self.FillFiredBarCorrelation()
+        # self.FillPlaneMultiplicity(hits)
+        # self.FillFiredBarCorrelation(hits)
 
         # Loops through hits
-        self.FillPullHists()
+        # self.FillPullHists(hits)
         
         # Loops through hits
-        self.FillnSiPMs()
+        self.FillnSiPMs(hits)
         
         # Loops through hits
-        self.Fillyresidual()
+        self.Fillyresidual(hits)
         
-        self.FilldeltaDSH()
+        self.FilldeltaDSH(hits)
         
         # Loops through hits, requires at least 6 SiPMs per side in Veto and 4 large SiPMs per side in US
-        self.FillAverageBarTime()
+        # self.FillAverageBarTime(hits)
 
-        if inVeto and inDS:
-            self.FillScifiDSresidual()
+        # if inVeto and inDS:
+        #     self.FillScifiDSresidual()
              
-        if randint(0,1) and self.options.WriteOutTrackInfo:
-            self.WriteOutTrack()            
+        # if randint(0,1) and self.options.WriteOutTrackInfo:
+        #     self.WriteOutTrack()            
 
-    # def Fillyresidual(self,detID):
-    def Fillyresidual(self):
+    def Fillyresidual(self, hits):
     
-        hits=self.M.eventTree.Digi_MuFilterHits
         for hit in hits:
             detID=hit.GetDetectorID()
             s,p,b=self.muAna.parseDetID(detID)
@@ -265,17 +265,17 @@ class MuonSelectionCriteria(object):
             # zEx=self.zPos['MuFilter'][s*10+p]
             # lam=(zEx-self.pos.z())/self.mom.z()
             # self.Ex=ROOT.TVector3(self.pos.x()+lam*self.mom.x(), self.pos.y()+lam*self.mom.y(), self.pos.z()+lam*self.mom.z())
-            self.MuFilter.GetPosition(detID, A,B)
+            self.tw.MuFilter.GetPosition(detID, A,B)
             
             # MuonSelectionCriteria.Getyresidual(detID) requires that A has been filled already with the coordinates of detID! 
-            pq = A-self.pos
-            uCrossv= (B-A).Cross(self.mom)
+            pq = A-self.tw.pos
+            uCrossv= (B-A).Cross(self.tw.mom)
             doca = pq.Dot(uCrossv)/uCrossv.Mag()
             self.hists[f'dy_{10*s+p}'].Fill(doca)
     
     def Getyresidual(self, detID):
-        pq = A-self.pos
-        uCrossv= (B-A).Cross(self.mom)
+        pq = A-self.tw.pos
+        uCrossv= (B-A).Cross(self.tw.mom)
         doca = pq.Dot(uCrossv)/uCrossv.Mag()
         return doca   
 
@@ -307,8 +307,8 @@ class MuonSelectionCriteria(object):
         if abs(slopeX)>slopecut or abs(slopeY)>slopecut: return 0
         else: return 1
 
-    def FillnSiPMs(self):
-        hits=self.M.eventTree.Digi_MuFilterHits
+    def FillnSiPMs(self, hits):
+
         for hit in hits:
             detID=hit.GetDetectorID()
             nLeft, nRight=self.muAna.GetnFiredSiPMs(hit)
@@ -327,8 +327,8 @@ class MuonSelectionCriteria(object):
             pass 
         return True
 
-    def FillPullHists(self):
-        hits=self.M.eventTree.Digi_MuFilterHits
+    def FillPullHists(self, hits):
+
         for hit in hits:
             vertical=False
             detID=hit.GetDetectorID()
@@ -339,7 +339,7 @@ class MuonSelectionCriteria(object):
             plane=self.muAna.GetDSPlaneNumber(detID)
             key=10*s+plane
             z=self.zPos['MuFilter'][key]
-            self.MuFilter.GetPosition(detID, A, B)
+            self.tw.MuFilter.GetPosition(detID, A, B)
             if self.muAna.DSVcheck(detID): vertical=True 
             
             if vertical: 
@@ -371,10 +371,9 @@ class MuonSelectionCriteria(object):
             self.hists[f'trackfitting-1USb'].Fill(self.trackchi2NDF)
             if ndf!=0:self.hists[f'Probtrackfitting-1USb'].Fill(prob)
          
-    def FillAverageBarTime(self, state=None):
+    def FillAverageBarTime(self, hits, state=None):
         if not state: state=self.state
         
-        hits=self.M.eventTree.Digi_MuFilterHits
         for hit in hits:
             detID=hit.GetDetectorID()
             s,p,b=self.muAna.parseDetID(detID)
@@ -384,7 +383,7 @@ class MuonSelectionCriteria(object):
             if len(medians)!=2: continue
             
             zEx=self.zPos['MuFilter'][s*10+p]
-            lam=(zEx-self.pos.z())/self.mom.z()
+            lam=(zEx-self.tw.pos.z())/self.tw.mom.z()
             self.Ex=ROOT.TVector3(self.pos.x()+lam*self.mom.x(), self.pos.y()+lam*self.mom.y(), self.pos.z()+lam*self.mom.z())
             self.MuFilter.GetPosition(detID, A, B)
             xpred=ROOT.TMath.Sqrt((A.x()-self.Ex.x())**2+(A.y()-self.Ex.y())**2+(A.z()-self.Ex.z())**2)
@@ -393,8 +392,8 @@ class MuonSelectionCriteria(object):
             hist=self.hists[f'{s*10+p}_bar{b}_averagetime_{self.state}']
             hist.Fill(xpred, averagetime)
             
-    def FillPlaneMultiplicity(self):
-        hits=self.M.eventTree.Digi_MuFilterHits
+    def FillPlaneMultiplicity(self, hits):
+        
         multiplicity = {s:{i:[] for i in range(self.systemAndPlanes[s])} for s in (1,2)}
 
         for hit in hits:
@@ -407,69 +406,33 @@ class MuonSelectionCriteria(object):
                 bs=multiplicity[s][p]
                 for b in bs: self.hists[f'{s}_multiplicity'].Fill(len(bs), b)
                 
-                
-    def FillTimingDiscriminantHists(self, hits, tmp):
+    def FillTimingDiscriminantHists(self, hits):
         
-        timingdiscriminant=self.GetTimingDiscriminant()
+        timingdiscriminant=self.muAna.GetTimingDiscriminant(hits)
         if timingdiscriminant==-420:
             return
         
         self.hists['timingdiscriminant'].Fill(timingdiscriminant)
+        if self.slopecut: self.hists['timingdiscriminant-slopecut'].Fill(timingdiscriminant)
         
-        timingdistfrommedian=self.GetTimingDiscriminant(mode='median')
+        # timingdistfrommedian=self.GetTimingDiscriminant(mode='median')
 
-        ds3haverage=self.muAna.GetDSHaverage(self.MuFilter, hits, mode='timingdiscriminant')
+        ds3haverage=self.muAna.GetDSHaverage(hits, mode='timingdiscriminant')
         if ds3haverage>-420: 
             us1averagetime = -1*(timingdiscriminant - ds3haverage)
             self.hists['averageDS3Htime'].Fill(ds3haverage)
             self.hists['averageUS1time'].Fill(us1averagetime)
-            if self.OneHitPerUS: 
-                self.hists['timingdiscriminant-1USb'].Fill(timingdiscriminant)
-                self.hists['averageDS3Htime-1USb'].Fill(ds3haverage)
-                self.hists['averageUS1time-1USb'].Fill(us1averagetime)
-            if self.OneHitPerDS:
-                self.hists['timingdiscriminant-1DSb'].Fill(timingdiscriminant)
-                self.hists['averageDS3Htime-1DSb'].Fill(ds3haverage)
-                self.hists['averageUS1time-1DSb'].Fill(us1averagetime)
-                    
+            # if self.OneHitPerUS: 
+            #     self.hists['timingdiscriminant-1USb'].Fill(timingdiscriminant)
+            #     self.hists['averageDS3Htime-1USb'].Fill(ds3haverage)
+            #     self.hists['averageUS1time-1USb'].Fill(us1averagetime)
+            # if self.OneHitPerDS:
+            #     self.hists['timingdiscriminant-1DSb'].Fill(timingdiscriminant)
+            #     self.hists['averageDS3Htime-1DSb'].Fill(ds3haverage)
+            #     self.hists['averageUS1time-1DSb'].Fill(us1averagetime)                    
                 
-    def GetTimingDiscriminant(self, mode='mean'):
+    def FillFiredBarCorrelation(self, hits):
         
-        hits=self.M.eventTree.Digi_MuFilterHits
-        US1hits=[h.GetDetectorID() for h in hits if all([h.GetDetectorID()//10000==2, self.muAna.parseDetID(h.GetDetectorID())[1]==0])]
-        
-        if len(US1hits)==0: return -999
-        elif len(US1hits)==1:
-            
-            x=US1hits[0]
-            tmp={h.GetDetectorID():h for h in hits}
-            us1hit=tmp[x]
-            
-        elif len(US1hits)>1:
-            docas={}
-            for US1detID in US1hits:
-                self.MuFilter.GetPosition(US1detID, A, B)
-                docas[self.Getyresidual(US1detID)]=US1detID
-            x=docas.pop(min(docas))
-            tmp={h.GetDetectorID():h for h in hits}
-            us1hit=tmp[x]  
-        else: 
-            print('shite')
-            return -999
-
-        if mode=='mean':averageUS1time=self.muAna.GetAverageTime(us1hit)
-        if mode=='median':
-            medians=self.muAna.GetMedianTime(us1hit)
-            if not medians: return -999
-            averageUS1time=sum(medians.values())/len(medians)
-        if not averageUS1time: return -998
-
-        DS3Haverage=self.muAna.GetDSHaverage(self.MuFilter, hits, mode='timingdiscriminant')
-
-        return DS3Haverage-averageUS1time                    
-                
-    def FillFiredBarCorrelation(self):
-        hits=self.M.eventTree.Digi_MuFilterHits
         multiplicity = {s:{i:[] for i in range(self.systemAndPlanes[s])} for s in (1,2)}
         for hit in hits:
             subsystem, plane, bar = self.muAna.parseDetID(hit.GetDetectorID())
@@ -483,14 +446,14 @@ class MuonSelectionCriteria(object):
                 docas={}
                 for bar in bars:
                     detID=self.muAna.MakeDetID((subsystem, plane, bar))
-                    self.MuFilter.GetPosition(detID, A, B)
+                    self.tw.MuFilter.GetPosition(detID, A, B)
                     docas[self.Getyresidual(detID)]=bar
 
                 closest_bar=docas.pop(min(docas))
                 for x in docas: self.hists[f'{10*subsystem+plane}_barcorrelation'].Fill(closest_bar, docas[x])
 
-    def FilldeltaDSH(self):
-        res=self.muAna.GetDSHaverage(self.MuFilter, self.M.eventTree.Digi_MuFilterHits, mode='deltastations')
+    def FilldeltaDSH(self, hits):
+        res=self.muAna.GetDSHaverage(hits, mode='deltastations')
         if not res: return
         [self.hists[i].Fill(res[i]) for i in res]
 
@@ -551,17 +514,17 @@ class MuonSelectionCriteria(object):
 
     def WriteOutHistograms(self):
 
-        outpath=f'{self.outpath}/splitfiles/run{self.runNr}/SelectionCriteria/'
+        outpath=f'{self.outpath}splitfiles/run{self.runNr}/SelectionCriteria/'
         path_obj=Path(outpath)
         path_obj.mkdir(parents=True, exist_ok=True)        
         outfile=f'SelectionCriteria_{self.options.nStart}.root'
-        f=ROOT.TFile.Open(outpath+outfile, 'update')
+        f=ROOT.TFile.Open(outpath+outfile, 'recreate')
         
         additionalkeys=['averagetime', 'DSxvScifix']
-        for histname in self.M.h:
+        for histname in self.hists:
             if not any( [histname.find(additionalkey)>-1 for additionalkey in additionalkeys] ):
                 
-                hist=self.M.h[histname]
+                hist=self.hists[histname]
                 f.WriteObject(hist, hist.GetName(), 'kOverwrite')
             else:
                 for additionalkey in additionalkeys:
@@ -569,10 +532,10 @@ class MuonSelectionCriteria(object):
                         if not hasattr(f, additionalkey): residualsfolder=f.mkdir(additionalkey)
                         else: residualsfolder=f.Get(additionalkey)
                         residualsfolder.cd()
-                        hist=self.M.h[histname]
+                        hist=self.hists[histname]
                         hist.Write(histname, 2) # The 2 means it will overwrite a hist of the same name
         f.Close()
-        print(f'{len(self.M.h)} histograms saved to {outpath}{outfile}')
+        print(f'{len(self.hists)} histograms saved to {outpath}{outfile}')
         
     def WriteOutToTestFile(self):       
         outfile=f'testing_{self.options.runNumber}_{self.options.nStart}_{self.options.nEvents}.root'

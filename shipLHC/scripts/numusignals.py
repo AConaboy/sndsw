@@ -63,7 +63,7 @@ parser.add_argument('--eosH8', dest='eosH8', type=str, default='/eos/experiment/
 parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TI18/')
 parser.add_argument('--mode', dest='mode', type=str, default='showerprofiles')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', action='store_true')
-parser.add_argument('--numusignalevents', dest='numusignalevents', type=int, default=1)
+parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)

@@ -186,10 +186,7 @@ if options.Task=='TimeWalk':
         print('=='*20+f'\nNo mode given for time walk task. Give mode as zeroth, tof or tw.\n'+'=='*20)
         pyExit()
     if options.numusignalevents: options.mode='numusignalevents'
-    monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
-for m in monitorTasks:
-    monitorTasks[m].Init(options, M)
-    # monitorTasks[m]
+    monitorTasks['TimeWalk'] = TimeWalk.TimeWalk(options, M) 
 c=0
 
 # else:

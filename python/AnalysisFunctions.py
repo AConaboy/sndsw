@@ -193,6 +193,10 @@ class Analysis(object):
 		pass
 
 	def GetDSHaverage(self, hits, mode='tds0'):
+
+		"""
+		For tds0, I am only using DS2 and 3 due to the delta tds21 plot being broad and asymmetric... not implemented, should I?
+		"""
 		stations={k:{} for k in range(4)} # only k=0,1,2 are used
 		for i,hit in enumerate(hits):
 			detID=hit.GetDetectorID()
@@ -203,8 +207,8 @@ class Analysis(object):
 			stations[p][i]=hit
 
 		# if not all( [len(stations[p])==1 for p in range(nPlanes)] ): return -999. # Event selection: only accept events with 1 bar in all DS planes
-		total=0.
-		counter=0
+		total={i:0 for i in range(4)}
+		counter={i:0 for i in range(4)}
 		if mode=='tds0':
 			for p in range(4):
 				hits=list(stations[p].values())
@@ -217,14 +221,24 @@ class Analysis(object):
 					for item in tdcs: 
 						SiPM, clock = item
 						dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
-						total+=dscorrectedtime
-						counter+=1
-			if counter==0: 
-				return -999
+						# total+=dscorrectedtime
+						total[p]+=dscorrectedtime
+						# counter+=1
+						counter[p]+=1
 
-			dsh_average=total/counter
+			sum_total, counter_total = sum(total.values()), sum(counter.values())
+			dsh_average, nfired = sum_total/counter_total, counter_total
+   
+			"""
+			# Only using DS3 and DS2
 			
-			return dsh_average, counter
+			sum_total, counter_total = sum(total[2]) + sum(total[1]), sum(counter[2]) + sum(counter[1])
+			dsh_average, nfired = sum_total/counter_total, counter_total
+			"""
+   
+			if nfired==0: return -999
+   
+			return dsh_average, nfired
 
 		elif mode=='timingdiscriminant': # Take k=2 for the 3rd horizontal plane
 			DS3H_hits=list(stations[2].values())
@@ -260,7 +274,7 @@ class Analysis(object):
 						ts[i].append(dscorrectedtime)
 			if any([len(ts[i])==0 for i in ts]): return False
 			res['delta32']=sum(ts[2])/len(ts[2]) - sum(ts[1])/len(ts[1])
-			res['delta21']=sum(ts[2])/len(ts[2]) - sum(ts[0])/len(ts[0])
+			res['delta21']=sum(ts[1])/len(ts[1]) - sum(ts[0])/len(ts[0])
 			return res
 
 	def fit_langau(self, hist,o,bmin,bmax):
@@ -329,28 +343,42 @@ class Analysis(object):
 			#
 		return (par[2] * step * summe * invsq2pi / par[3])
 
-	def GetAverageTime(self, mufiHit, side='both'):
+	def GetAverageTime(self, mufiHit, side='both', correctTW=True):
 		value=[0, 0]
 		count=[0, 0]
 		nSiPMs=mufiHit.GetnSiPMs()
-		times=mufiHit.GetAllTimes()
+		if correctTW: times = self.GetCorrectedTimes(mufiHit) # in nanoseconds
+		else: times = mufiHit.GetAllTimes() # in clockcycles
 		
-		s, p, b = self.parseDetID(mufiHit.GetDetectorID())
+		detID=mufiHit.GetDetectorID()
+		s, p, b = self.parseDetID(detID)
 		for element in times:
 			SiPM, clock = element
+
+			# Check if this channel has determined alignment parameters
+			fixed_ch = f'{detID}_{SiPM}'
+			if correctTW and not fixed_ch in self.alignmentparameters: continue 
+			elif correctTW and fixed_ch in self.alignmentparameters: d = self.alignmentparameters[fixed_ch]
 			if s==2 and self.IsSmallSiPMchannel(SiPM):continue
+			
 			if SiPM<nSiPMs:
-				value[0]+=clock*self.TDC2ns
+				if not correctTW: value[0]+=clock*self.TDC2ns # in nanoseconds. 
+				else: value[0]+= clock - d[0] # in nanoseconds ## I can't subtract d[0] here because then I have a sign error 
+				# else: value[0]+= clock # in nanoseconds    
 				count[0]+=1
 			else:
-				value[1]+=clock*self.TDC2ns
+				if not correctTW: value[0]+=clock*self.TDC2ns
+				else: value[0]+= clock - d[0] # in nanoseconds ## I can't subtract d[0] here because then I have a sign error 
+				# else: value[0]+= clock
 				count[1]+=1
+    
 		if s == 2:
 			if count[0] != 0 and count[1] != 0:
-				if side=='both':
-					average = 0.5*(value[0]/count[0]+value[1]/count[1])
+				if side == 'both':
+					# average = 0.5*(value[0]/count[0]+value[1]/count[1])
+					average = sum(value) / sum(count) 
 					return average
-				if side=='L':
+				if side == 'L':
 					return value[0]/count[0]
 				elif side == 'R':
 					return value[1]/count[1]
@@ -767,19 +795,20 @@ class Analysis(object):
 	def GetBarAveragecscint(self, runNr, detID, state):
 
 		subsystem, plane, bar = self.parseDetID(detID)
-		cscintvalues={}
+		cscintvalues={'left':[], 'right':[]}
 		for SiPM in self.systemAndSiPMs[subsystem]:
 			fixed_ch=self.MakeFixedCh((subsystem, plane, bar, SiPM))
+			side='left' if SiPM<8 else 'right'
 			if fixed_ch not in self.cscintvalues:continue
 			cscint=self.cscintvalues[fixed_ch]
 			if not cscint: continue
-			cscintvalues[fixed_ch]=cscint
+			cscintvalues[side].append(cscint)
 
-		average_cscint = sum( [cscintvalues[ch][0] for ch in cscintvalues] ) / len(cscintvalues.items())
-		uncertainty_sq = sum( [cscintvalues[ch][1]**2 for ch in cscintvalues] ) 
-		uncertainty=ROOT.TMath.Sqrt(uncertainty_sq)
+		average_left_cscint, average_right_cscint = sum( [ci[0] for ci in cscintvalues['left']] ) / len(cscintvalues['left']), sum( [ci[0] for ci in cscintvalues['right']] ) / len(cscintvalues['right'])
+		uncertainty_sq_left, uncertainty_sq_right = sum( [ci[1]**2 for ci in cscintvalues['left']] ), sum( [ci[1]**2 for ci in cscintvalues['right']] ) 
+		uncertainty_left, uncertainty_right = ROOT.TMath.Sqrt(uncertainty_sq_left), ROOT.TMath.Sqrt(uncertainty_sq_right)
 	
-		return average_cscint, uncertainty
+		return (average_left_cscint, uncertainty_left), (average_right_cscint, uncertainty_right)
 
 	def GetBarAveragesigmat(self, runNr, detID, state):
 
@@ -1146,18 +1175,20 @@ class Analysis(object):
 		
 		return ToFTWcorrectedtime
 
-	def GetTimingDiscriminant(self):
+	def GetTimingDiscriminant(self, hits):
 
-		hits=self.task.M.eventTree.Digi_MuFilterHits
 		US1hits=[h.GetDetectorID() for h in hits if all([h.GetDetectorID()//10000==2, self.parseDetID(h.GetDetectorID())[1]==0])]
 
+		# If no US1 hits found, disregard event
 		if len(US1hits)==0: return -999
 
+		# If 1 US1 hit found, ideal
 		elif len(US1hits)==1:
 			x=US1hits[0]
 			tmp={h.GetDetectorID():h for h in hits}
 			us1hit=tmp[x]
 
+		# If multiple US1 hits found, take hit with lowest DOCA to extrapolated DS tracklet
 		elif len(US1hits)>1:
 			docas={}
 			for US1detID in US1hits:
@@ -1170,12 +1201,23 @@ class Analysis(object):
 			print('shite')
 			return -999
 
-		averageUS1time=self.GetAverageTime(us1hit)
-		if not averageUS1time: return -998
+		# averageUS1time=self.GetAverageTime(us1hit, correctTW=True)
+		# if not averageUS1time: return -998 
 
 		DS3Haverage=self.GetDSHaverage(hits, mode='timingdiscriminant')
 
-		return DS3Haverage-averageUS1time
+		# Manual determination of timing disc.
+		res=[]
+		us1correctedtimes = self.GetCorrectedTimes(us1hit)
+		detID = us1hit.GetDetectorID()
+		for x in us1correctedtimes:
+			SiPM, ctime = x 
+			fixed_ch = f'{detID}_{SiPM}'
+			if not fixed_ch in self.alignmentparameters: continue
+			d = self.alignmentparameters[fixed_ch]
+			res.append(DS3Haverage - (ctime - d[0]))
+		if len(res)==0: return -999
+		return sum(res)/len(res)
 
 	def GetQDCpeak(self, runNr, fixed_ch):
 		
