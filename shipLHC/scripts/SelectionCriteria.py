@@ -574,6 +574,17 @@ class MuonSelectionCriteria(ROOT.FairTask):
             if td < mean-2*stddev or td > mean+2*stddev: return False
             else: return True       
 
+    def GetTimingDiscriminant(self, hits,DST0):
+        for hit in hits:
+            detID=hit.GetDetectorID()
+            s,p,b=muAna.parseDetID(detID)
+            if s==2 and p==0:
+                US1hit=hit
+                break
+        averageUS1TDC=muAna.GetAverageTDC(US1hit)
+        averageUS1time=averageUS1TDC*6.25
+        return DST0-averageUS1time
+
     def WriteOutHistograms(self):
 
         outpath=f'{self.outpath}/splitfiles/run{self.runNr}/SelectionCriteria/'
