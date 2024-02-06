@@ -1,0 +1,74 @@
+[daq]
+# address and port of the DAQ server, as seen by the DAQ control client
+addr = 'localhost'
+port = 42070
+# address and port of the DAQ server, as seen by the DAQ boards
+addr_daq = '128.178.89.70'
+port_daq = 42069
+
+
+[daq_server]
+# true to build events, false to save packets
+build_events = true
+# location on the daq server where the data will be saved
+data_path = "/home/ecal/Documents/qdc_us_ds/data/"
+# wether to produce a file with the run status and the name of that file, located in data_path
+write_run_status = true
+run_status_file_name = "run_status.json"
+
+# if build_events is true, these are the settings of the event builder
+[daq_server.event_builder]
+builder = 'trigless'
+# align_with_clock = false
+# clock_align_period = 4
+# clock_align_phase = 3
+# minimum_event_duration = 4
+# maximum_event_duration = 4
+# maximum_hits_gap = 0
+# fix_desync = false
+
+[daq_server.event_processors]
+# processors = ['snd_fast_noise_filter', 'tofpet_calibrator']
+processors = ['tofpet_calibrator']
+
+# [daq_server.event_processors.snd_fast_noise_filter.scifi]
+# n_boards_min = 4
+# n_total_hits_min = -1   
+
+# [daq_server.event_processors.snd_fast_noise_filter.us]
+# [daq_server.event_processors.snd_fast_noise_filter.ds]
+# [daq_server.event_processors.snd_fast_noise_filter.veto]
+
+# settings of the event writer, relevant if build_events is true
+[daq_server.event_writer]
+writer = 'events_root'
+events_per_file = 1000000
+compression_algorithm = 'lz4'
+compression_level = 1
+auto_save_n_events = 1000
+auto_save_delay_min = 60.0
+auto_save_delay_max = 60.0
+data_tree_name = 'event_data'
+
+# if build_events is false, these are the packet writer settings
+[daq_server.packet_writer]
+writer = 'packets_raw'
+
+# [vme]
+# addr = 'localhost'
+
+[[boards]]
+id = 26 
+addr = '128.178.67.164' # ip address of DAQ board used for EPFL studies by Andrew
+port = 41968
+# relative path to the board configuration
+conf_path = 'US_board'
+# name of the board (can be different from the conf_path)
+name = 'board'
+
+# [[boards]]
+# id = 53
+# addr = '128.178.67.164'
+# port = 41968
+# conf_path = 'board_y'
+# name = 'board_y'

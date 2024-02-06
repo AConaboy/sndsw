@@ -93,12 +93,12 @@ class SystemAlignment(object):
 
             qdc=self.muAna.GetChannelVal(SiPM, qdcs)
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            # aligned_times[side][SiPM] = self.tw.TDS0 - (correctedtime - d[0])
-            times[side][SiPM] = correctedtime - d[0]
+            aligned_times[side][SiPM] = self.tw.TDS0 - correctedtime - d[0]
+            # times[side][SiPM] = correctedtime - d[0]
 
-        if any([len(times[i])==0 for i in ('left', 'right')]): return
-        averages={side:self.tw.TDS0 - (sum(times[side].values()) / len(times[side])) for side in times}
-        fastest = {side:self.tw.TDS0 - min(times[side].values()) for side in times}
+        if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
+        averages={side:self.tw.TDS0 - (sum(aligned_times[side].values()) / len(aligned_times[side])) for side in aligned_times}
+        fastest = {side:self.tw.TDS0 - min(aligned_times[side].values()) for side in aligned_times}
         averagetime = 1/2 * sum(averages.values())
 
         baraveragecscint_left, baraveragecscint_right = self.muAna.GetBarAveragecscint(self.runNr, detID, 'corrected')
@@ -116,36 +116,48 @@ class SystemAlignment(object):
         if not xL in self.hists:
             title='x_{L};x_{L} [cm];Counts'
             self.hists[xL]=ROOT.TH1F(xL,title,80, 0, 80)
-
-        dt = f'dt-{x}_plane{p}'
-        if not dt in self.hists:
-            title='#Delta t(left, right);#Delta t_{L, R} [ns];Counts'
-            self.hists[dt]=ROOT.TH1F(dt,title,50, -5, 5)
-            
-        sumt = f'sumt-{x}_plane{p}'
-        if not sumt in self.hists:
-            title = 'corrected and aligned t_{right} + t_{left};t_{right} + t_{left} [ns];Counts'
-
-        lamx_hist = f'lambda-{x}_plane{p}'
-        if not lamx_hist in self.hists:
-            title='Deposition width c_{scint}(t_{right} + t_{left});c_{scint}(t_{right} + t_{left}) [cm];Counts'
-            self.hists[lamx_hist] = ROOT.TH1F(lamx_hist, title, 160, -90, 60)
-
-        barycentrex_hist = f'xbarycentre-{x}_plane{p}'
-        if not barycentrex_hist in self.hists:
-            title='Barycentre in x, #frac{c_{scint}}{2}(t_{right}+t_{left});#frac{c_{scint}}{2}(t_{right}+t_{left}) [cm];Counts'
-            self.hists[barycentrex_hist] = ROOT.TH1F(barycentrex_hist, title, 160, -90, 60)
-
         self.hists[xL].Fill(self.tw.pred)
-        self.hists[dt].Fill(delta_averagetime)
 
-        lamx = baraveragecscint*delta_averagetime
-        barycentrex = 0.5*baraveragecscint*(averages['right'] + averages['left'])
-        self.hists[lamx_hist].Fill(lamx)
-        self.hists[barycentrex_hist].Fill(barycentrex)
+            barycentrex_hist = f'xbarycentre-{x}_plane{p}_{timer}'
+            if not barycentrex_hist in self.hists:
+                title='Barycentre in x, #frac{c_{scint}}{2}(t_{right}+t_{left});#frac{c_{scint}}{2}(t_{right}+t_{left}) [cm];Counts'
+                self.hists[barycentrex_hist] = ROOT.TH1F(barycentrex_hist, title, 160, -90, 60)
 
-        # self.hists[xlvcdt].Fill(self.tw.pred, cdt)
-        # self.hists[lamx].Fill(L-2*self.tw.pred+cdt)
+        # Looking at differences depending on whether the average or fastest times are used
+        for timer in ('fastest', 'average'):
+            dt = f'dt-{x}_plane{p}_{timer}'
+            if not dt in self.hists:
+                title='#Delta t(left, right);#Delta t_{L, R} [ns];Counts'
+                self.hists[dt]=ROOT.TH1F(dt,title,50, -5, 5)
+                
+            sumt = f'sumt-{x}_plane{p}_{timer}'
+            if not sumt in self.hists:
+                title = 'corrected and aligned t_{right} + t_{left};t_{right} + t_{left} [ns];Counts'
+
+            lamx_hist = f'lambda-{x}_plane{p}_{timer}'
+            if not lamx_hist in self.hists:
+                title='Deposition width c_{scint}(t_{right} + t_{left});c_{scint}(t_{right} + t_{left}) [cm];Counts'
+                self.hists[lamx_hist] = ROOT.TH1F(lamx_hist, title, 160, -90, 60)
+
+            barycentrex_hist = f'xbarycentre-{x}_plane{p}_{timer}'
+            if not barycentrex_hist in self.hists:
+                title='Barycentre in x, #frac{c_{scint}}{2}(t_{right}+t_{left});#frac{c_{scint}}{2}(t_{right}+t_{left}) [cm];Counts'
+                self.hists[barycentrex_hist] = ROOT.TH1F(barycentrex_hist, title, 160, -90, 60)
+                
+
+            if timer=='fastest':        
+                self.hists[dt].Fill(delta_fastesttime)
+                lamx = baraveragecscint*delta_fastesttime
+                barycentrex = 0.5*baraveragecscint*(fastest['right'] + fastest['left'])
+                self.hists[lamx_hist].Fill(lamx)
+                self.hists[barycentrex_hist].Fill(barycentrex)
+            
+            elif timer=='average':
+                self.hists[dt].Fill(delta_averagetime)
+                lamx = baraveragecscint*delta_averagetime
+                barycentrex = 0.5*baraveragecscint*(averages['right'] + averages['left'])
+                self.hists[lamx_hist].Fill(lamx)
+                self.hists[barycentrex_hist].Fill(barycentrex)
         
         averagebartimehistname=f'averagetime_{detID}_aligned'
         if not averagebartimehistname in self.hists:

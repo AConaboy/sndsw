@@ -57,7 +57,7 @@ parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', type=int, default=1)
 parser.add_argument('--CrossTalk', dest='CrossTalk', type=int, default=1)
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
-parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
+parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/user/a/aconsnd/Timing')
 parser.add_argument('--eosH8', dest='eosH8', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TB_H8_october/')
 parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TI18/')
 parser.add_argument('--mode', dest='mode', type=str, default='zeroth')
