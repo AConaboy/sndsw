@@ -207,9 +207,10 @@ class Analysis(object):
 			stations[p][i]=hit
 
 		# if not all( [len(stations[p])==1 for p in range(nPlanes)] ): return -999. # Event selection: only accept events with 1 bar in all DS planes
-		total={i:0 for i in range(4)}
-		counter={i:0 for i in range(4)}
+
 		if mode=='tds0':
+			total={i:0 for i in range(4)}
+			counter={i:0 for i in range(4)}
 			for p in range(4):
 				hits=list(stations[p].values())
 				for hit in hits:
@@ -226,18 +227,15 @@ class Analysis(object):
 						# counter+=1
 						counter[p]+=1
 
-			sum_total, counter_total = sum(total.values()), sum(counter.values())
-			dsh_average, nfired = sum_total/counter_total, counter_total
+			# sum_total, counter_total = sum(total.values()), sum(counter.values())
+			# dsh_average, nfired = sum_total/counter_total, counter_total
    
-			"""
 			# Only using DS3 and DS2
-			
-			sum_total, counter_total = sum(total[2]) + sum(total[1]), sum(counter[2]) + sum(counter[1])
+			sum_total, counter_total = total[2] + total[1], counter[2] + counter[1]
+			if counter_total==0: return -999
+
 			dsh_average, nfired = sum_total/counter_total, counter_total
-			"""
-   
-			if nfired==0: return -999
-   
+
 			return dsh_average, nfired
 
 		elif mode=='timingdiscriminant': # Take k=2 for the 3rd horizontal plane
@@ -270,9 +268,75 @@ class Analysis(object):
 
 					for idx in times:
 						SiPM, clock=idx
+						if SiPM>1:
+							print(detID, SiPM, self.task.M.EventNumber)
+							continue
 						dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
 						ts[i].append(dscorrectedtime)
 			if any([len(ts[i])==0 for i in ts]): return False
+			res['delta32']=sum(ts[2])/len(ts[2]) - sum(ts[1])/len(ts[1])
+			res['delta21']=sum(ts[1])/len(ts[1]) - sum(ts[0])/len(ts[0])
+			return res
+
+		elif mode=='testing-tds0': 
+			total={i:0 for i in range(4)}
+			counter={i:0 for i in range(4)}
+			theTrack = self.task.M.Reco_MuonTracks[0]
+			for nM in range(theTrack.getNumPointsWithMeasurement()):
+				M=theTrack.getPointWithMeasurement(nM)
+				W=M.getRawMeasurement()
+				detID=W.getDetId()
+				s,p,b = self.parseDetID(detID)
+				hkey=W.getHitId()
+				trackHit=hits[hkey]
+				tdcs = trackHit.GetAllTimes()
+				if not all ( [p in (0,1,2), b<60, len(tdcs)!=2] ): continue
+
+				if len(tdcs) != 2: continue # pass
+				for item in tdcs: 
+					SiPM, clock = item
+					if SiPM>1: 
+						print(detID, SiPM, self.task.M.EventNumber)
+						continue
+					dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
+					total[p]+=dscorrectedtime
+					counter[p]+=1
+
+			# Only using DS3 and DS2
+			sum_total, counter_total = total[2] + total[1], counter[2] + counter[1]
+			if counter_total==0: return -999
+
+			dsh_average, nfired = sum_total/counter_total, counter_total
+
+			return dsh_average, nfired				
+
+		elif mode=='testing-deltastations': 
+			res={f'delta32':0, 'delta21':0}
+			ts={k:[] for k in range(3)}
+			theTrack = self.task.M.Reco_MuonTracks[0]
+			for nM in range(theTrack.getNumPointsWithMeasurement()):
+				M=theTrack.getPointWithMeasurement(nM)
+				W=M.getRawMeasurement()
+				detID=W.getDetId()
+				s,p,b = self.parseDetID(detID)
+				if not all ( [p in (0,1,2), b<60] ): continue
+
+				hkey=W.getHitId()
+				trackHit=hits[hkey]
+				times=trackHit.GetAllTimes()
+				if not len(times)==2: continue
+
+				for idx in times:
+					SiPM, clock=idx
+					if SiPM>1: 
+						print(detID, SiPM, self.task.M.EventNumber)
+						continue					
+					dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
+					ts[p].append(dscorrectedtime)
+
+			if any([len(ts[i])==0 for i in ts]): 
+				# print(f'ts: {ts}')
+				return False
 			res['delta32']=sum(ts[2])/len(ts[2]) - sum(ts[1])/len(ts[1])
 			res['delta21']=sum(ts[1])/len(ts[1]) - sum(ts[0])/len(ts[0])
 			return res
@@ -340,7 +404,7 @@ class Analysis(object):
 			xx = xupp - (i-.5) * step
 			fland = ROOT.TMath.Landau(xx,mpc,par[0]) / par[0]
 			summe += fland * ROOT.TMath.Gaus(x[0],xx,par[3])
-			#
+
 		return (par[2] * step * summe * invsq2pi / par[3])
 
 	def GetAverageTime(self, mufiHit, side='both', correctTW=True):
@@ -741,6 +805,25 @@ class Analysis(object):
 		doca = pq.Dot(uCrossv)/uCrossv.Mag()
 		return doca
 
+	def GetExtrapolatedBarDetID(self, plane):
+		zEx = self.zPos['MuFilter'][20+plane]
+		lam = (zEx-self.task.pos.z())/self.task.mom.z()
+		yEx = self.task.pos.y() + lam*self.task.mom.y()
+		xEx = self.task.pos.x() + lam*self.task.mom.x()
+		detIDEx = self.task.nav.FindNode(xEx, yEx, zEx).GetName()
+		if not detIDEx.split('_')[0] == 'volMuUpstreamBar': 
+			print('Does not extrapolate to US bar')
+			return
+		else: return int(detIDEx.split('_')[1])
+
+	def GetExtrapolatedPosition(self, plane):
+		zEx = self.zPos['MuFilter'][20+plane]
+		lam = (zEx-self.task.pos.z())/self.task.mom.z()
+		yEx = self.task.pos.y() + lam*self.task.mom.y()
+		xEx = self.task.pos.x() + lam*self.task.mom.x()
+		
+		return (xEx, yEx, zEx)
+
 	def GetdtCalc(self, xpred, L, cs):
 		left, right=list(filter(lambda x : x[0]<8, cs)), list(filter(lambda x : x[0]>7, cs))
 		NL, NR=len(left), len(right)
@@ -980,48 +1063,44 @@ class Analysis(object):
 		chi2, NDF= res.Chi2(), res.Ndf()
 		return (MPV, MPV_err, chi2, NDF)
 
-	def Getchi2_info(self, runNr, fixed_ch, state, n=5):
+	# def Getchi2_info(self, runNr, fixed_ch, state, n=5):
 
-		fname=f'{self.path}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
-		if not os.path.exists(fname): return 
-		with open(fname, 'r') as handle:
-			reader=csv.reader(handle)
-			alldata=[row for row in reader]
-			if len(alldata)==0 or len(alldata)<iteration: return 
-			data=alldata[iteration-1]
-			try:
-				chi2info=str(data[0]), float(data[1]), int(data[2])
-			except ValueError:
-				print(f'Non-integer NDF for {fixed_ch}')
-				return 
-		return chi2info
+	# 	fname=f'{self.path}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
+	# 	if not os.path.exists(fname): return 
+	# 	with open(fname, 'r') as handle:
+	# 		reader=csv.reader(handle)
+	# 		alldata=[row for row in reader]
+	# 		if len(alldata)==0 or len(alldata)<iteration: return 
+	# 		data=alldata[iteration-1]
+	# 		try:
+	# 			chi2info=str(data[0]), float(data[1]), int(data[2])
+	# 		except ValueError:
+	# 			print(f'Non-integer NDF for {fixed_ch}')
+	# 			return 
+	# 	return chi2info
 
 	def Getchi2pNDF(self, runNr, fixed_ch, state, n=5):
 
-		iteration=0 if state=='uncorrected' else 1   
-		fname=f'{self.path}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.csv'
-		if not os.path.exists(fname): return 
-		with open(fname, 'r') as handle:
-			reader=csv.reader(handle)
-			alldata=[row for row in reader]
-			if len(alldata)==0 or len(alldata)<iteration: return 
-			data=alldata[iteration-1]
-			try:
-				chi2pNDF=float(data[1])/int(data[2])
-			except ValueError:
-				print(f'Non-integer NDF for {fixed_ch}')
-				return 
+		# iteration=0 if state=='uncorrected' else 1   
+		fname=f'{self.path}chi2s/run{runNr}/chi2s{n}_{fixed_ch}.json'
+		if not os.path.exists(fname): 
+			print(f'no file {fname}')
+			return 
+		with open(fname) as jf:
+			data=json.load(jf)
+		chi2pNDF = data[state][0]/data[state][1]
+
 		return chi2pNDF
 
-	def GetNDF(self, runNr, fixed_ch, iteration):
-		fname=self.path+'chi2s/run'+str(runNr)+'/chi2s_'+fixed_ch+'.csv'
-		if not os.path.exists(fname): return -999.
-		with open(fname, 'r') as handle:
-			reader=csv.reader(handle)
-			alldata=[row for row in reader]
-			if len(alldata)==0 or len(alldata)<iteration: return -999.
-			data=alldata[iteration-1]
-		return int(data[2])
+	# def GetNDF(self, runNr, fixed_ch, iteration):
+	# 	fname=self.path+'chi2s/run'+str(runNr)+'/chi2s_'+fixed_ch+'.csv'
+	# 	if not os.path.exists(fname): return -999.
+	# 	with open(fname, 'r') as handle:
+	# 		reader=csv.reader(handle)
+	# 		alldata=[row for row in reader]
+	# 		if len(alldata)==0 or len(alldata)<iteration: return -999.
+	# 		data=alldata[iteration-1]
+	# 	return int(data[2])
 
 	def GetBadchi2pNDFdict(self, runNr, subsystem, state):
 
@@ -1141,6 +1220,9 @@ class Analysis(object):
 			qdc=self.GetChannelVal(SiPM, qdcs)
 			correctedtime=self.MuFilterCorrectedTime(fixed_ch, qdc, clock, x, mode)
 			if not correctedtime: continue
+			if mode=='aligned': 
+				d = self.alignmentparameters[f'{detID}_{SiPM}']
+				correctedtime = self.task.TDS0 - correctedtime - d[0]
 			alignedtimes.append((SiPM, correctedtime))
 		return alignedtimes
 

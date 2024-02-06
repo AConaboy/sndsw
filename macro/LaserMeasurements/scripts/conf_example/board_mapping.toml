@@ -1,0 +1,17 @@
+# snd Veto, two slots, left and right
+# snd scifi, three boards, from channel 0 to 1536
+# snd us, two slots, left and right
+# snd dsh, two slots, left and right
+# snd dsv, one slot
+
+[us.1]
+class = 'multislot'
+type = 'snd_us'
+board = 26
+slots = ['A']
+
+# [ds.1]
+# class = 'multislot'
+# type = 'snd_dsv'
+# board = 26
+# slots = ['A']

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import ROOT, csv, os
+import numpy as np
 
 class ShowerProfiles(object):
 
@@ -46,6 +47,10 @@ class ShowerProfiles(object):
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
         
         if options.signalpartitions: self.Loadnumuevents()
+
+        if tw.numuStudy: 
+            self.numuStudy=True
+            self.barycentres={}
         
     def Loadnumuevents(self):
         numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
@@ -68,6 +73,7 @@ class ShowerProfiles(object):
             2. Find the next event where the each of the 4 small SiPMs fire. 
             3. Correlate the clock cycles with that delay with the number of fired channels on the PCB
         """
+
         self.nSiPMsPCB = self.muAna.GetFiredSiPMsOnPCBs(hits)
         
         for hit in hits: # Looking now at all hits, should start here incase d(phi)z between hadronic shower and the muon is sub 1 bar
@@ -97,34 +103,35 @@ class ShowerProfiles(object):
             frac_n = ( len(found_large_SiPMs) + len(found_small_SiPMs) ) / 16
             self.hists[fractionSiPMs_histname].Fill(frac_n) 
 
-            """
-            Soooo now I make the delta evt_timestamp histogram.
-            Fill it with 0 for each small SiPM that fires in the hit.
-            Call method to search next 100 events for the small SiPMs
-            """
-            
-            next_smallSiPM_timestamp_histname=f'next_smallSiPM_timestamp'
-            if not next_smallSiPM_timestamp_histname in self.hists:
-                title = 'Clock cycles until expected small SiPM next fires;#Delta clock cycles [n];Counts'
-                self.hists[next_smallSiPM_timestamp_histname] = ROOT.TH1I(next_smallSiPM_timestamp_histname, title, 50, 0, 50)
-            
-            # For the small SiPMs in this event, fill dt hist with 0 and remove it from the list of small SiPMs
-            for smallSiPM in found_small_SiPMs: 
-                self.hists[next_smallSiPM_timestamp_histname].Fill(0)
+            if self.options.SmallSiPMcheck:
+                """
+                Soooo now I make the delta evt_timestamp histogram.
+                Fill it with 0 for each small SiPM that fires in the hit.
+                Call method to search next 100 events for the small SiPMs
+                """
                 
-            """
-            Look for the other small SiPMs over the next 100 events 
-            Fill histograms of:
+                next_smallSiPM_timestamp_histname=f'next_smallSiPM_timestamp'
+                if not next_smallSiPM_timestamp_histname in self.hists:
+                    title = 'Clock cycles until expected small SiPM next fires;#Delta clock cycles [n];Counts'
+                    self.hists[next_smallSiPM_timestamp_histname] = ROOT.TH1I(next_smallSiPM_timestamp_histname, title, 50, 0, 50)
                 
-                1. Correlating the delay with nSiPMs/PCB 
-                2. Correlating the delay with QDC 
-            """
-            
-            missing_small_SiPMs = [i for i in [2,5,10,13] if not i in found_small_SiPMs]
-            
-            if len(missing_small_SiPMs) != 0:
-                x=self.FindExpectedSmallSiPMs(detID, qdcs, missing_small_SiPMs)
-                if x==-999: continue # Skip event if no large SiPMs fire.
+                # For the small SiPMs in this event, fill dt hist with 0 and remove it from the list of small SiPMs
+                for smallSiPM in found_small_SiPMs: 
+                    self.hists[next_smallSiPM_timestamp_histname].Fill(0)
+                    
+                """
+                Look for the other small SiPMs over the next 100 events 
+                Fill histograms of:
+                    
+                    1. Correlating the delay with nSiPMs/PCB 
+                    2. Correlating the delay with QDC 
+                """
+                
+                missing_small_SiPMs = [i for i in [2,5,10,13] if not i in found_small_SiPMs]
+                
+                if len(missing_small_SiPMs) != 0:
+                    x=self.FindExpectedSmallSiPMs(detID, qdcs, missing_small_SiPMs)
+                    if x==-999: continue # Skip event if no large SiPMs fire.
             
             ### Apply time-walk correction to all times in the hit.
             correctedtimes=self.muAna.GetCorrectedTimes(hit)
@@ -182,31 +189,7 @@ class ShowerProfiles(object):
             #     title='Muon DIS shower radius estimate;L - c_{bar}(#frac{1}{t_{L}} - #frac{1}{t_{R}}) [cm];Counts'
             #     self.hists[radiusestimate]=ROOT.TH1F(radiusestimate, title, 200, -50, 50)
             # r=0.5*(self.barlengths[s] - baraveragecscint[0]*(1/averages['left'] - 1/averages['left']) )
-            # self.hists[radiusestimate].Fill(r)
-
-    def WriteOutHistograms(self):
-
-        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root'
-        if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
-        else: outfile=ROOT.TFile.Open(outfilename, 'create')
-
-        additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt', 'y-barycentre']
-        for h in self.hists:
-            if h=='TDS0':
-                outfile.WriteObject(self.hists[h], self.hists[h].GetName(),'kOverwrite')
-
-            elif len(h.split('_'))>1:
-                for additionalkey in additionalkeys:
-                    if h.find(additionalkey)==-1: continue
-                    
-                    hist=self.hists[h]
-                    if not hasattr(outfile, additionalkey): folder=outfile.mkdir(additionalkey)
-                    else: folder=outfile.Get(additionalkey)
-                    folder.cd()
-                    hist.Write(h, 2) # The 2 means it will overwrite a hist of the same name                
-
-        outfile.Close()
-        print(f'{len(self.hists)} histograms saved to {outfilename}')        
+            # self.hists[radiusestimate].Fill(r)    
 
     def nSiPMscut(self, hit, nLeft, nRight):
         s,p,b=self.muAna.parseDetID(hit.GetDetectorID())
@@ -256,7 +239,10 @@ class ShowerProfiles(object):
 
         if self.options.signalpartitions: # If I'm looking at mu_nu candidates
             n_partition = list(self.options.signalpartitions.keys()).index(f'{str(runNr).zfill(6)}')
-            signal_event = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6) 
+            event_in_partition = self.nu_mu_events[runNr][0] % 1e6 # self.nu_mu_events[runNr] stores: (event in partition, interaction wall)
+            
+            # signal_event = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6) 
+            signal_event = int(n_partition * 1e6 + event_in_partition) 
         else: signal_event = self.tw.M.EventNumber
         
         # Loop over subsequent 100 events
@@ -362,7 +348,13 @@ class ShowerProfiles(object):
 
     def ShowerDirection(self, hits):
         
-        planedata={i:{} for i in range(5)}
+        self.all_times={i:{} for i in range(5)}
+        self.all_qdcs={i:{} for i in range(5)}
+        
+        # For numu study, 
+        if self.numuStudy: 
+            self.runId = self.tw.M.eventTree.EventHeader.GetRunId()
+            if not int(self.runId) in self.barycentres: self.barycentres[self.runId] = {}
 
         """
         1. Plot shower baricentre in y (x) by using a QDC weighting, aligned timing
@@ -378,97 +370,173 @@ class ShowerProfiles(object):
             
             if s!=2: continue
 
-            ### Apply time-walk correction to all times in the hit.
-            qdcs = hit.GetAllSignals()
-            qdc_sides = {'left':[], 'right':[]}
-            
-            for idx in qdcs: 
-                SiPM, qdc = idx 
-                if SiPM < 8: qdc_sides['left'].append(qdc)
-                else: qdc_sides['right'].append(qdc)
-            larger_side = 'left' if sum(qdc_sides['left']) > sum(qdc_sides['right']) else 'right'
-            largerQDCs = qdc_sides[larger_side]
- 
-            correctedtimes=self.muAna.GetCorrectedTimes(hit)
-            alignedtimes=self.GetAlignedTimes(detID, correctedtimes, qdcs)
-            
-            aligned_times={'left':{}, 'right':{}}
-            for i in correctedtimes: 
-                SiPM, correctedtime = i
-                fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
+            # Using statistical method: comparing the previously computed dy residual
+            if self.tw.yresidual3(detID): self.trackrelated = True
+            else: self.trackrelated=False
 
-                if not fixed_ch in self.muAna.alignmentparameters: continue
-                d=self.muAna.alignmentparameters[fixed_ch]
+            # Extrapolate DS track to zPos for this plane, then simply not considering the bar which the DS track extrapolates to for the shower direction
+            if self.muAna.GetExtrapolatedBarDetID(p) == detID: self.trackInBar = True
+            else: self.trackInBar = False
 
-                qdc=self.muAna.GetChannelVal(SiPM, qdcs)
-                side=self.muAna.GetSide(f'{detID}_{SiPM}')
-                aligned_times[side][SiPM] = self.tw.TDS0 - (correctedtime - d[0])
-                # times[side][SiPM] = correctedtime - d[0]            
+            # run numusignals.py with --dycut to require US hits are NOT correlated in y with the DS track
+            if self.options.dycut and self.trackrelated: continue
+            elif self.options.notDSbar and self.trackInBar: continue
 
-            if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
-            averages={side:sum(aligned_times[side].values()) / len(aligned_times[side]) for side in aligned_times}
-            fastest = {side:min(aligned_times[side].values()) for side in aligned_times}
-            averagetime = 1/2 * sum(averages.values())
+            self.DetermineAverages(hit)
 
-            delta_averagetime = averages['left'] - averages['right']
-            delta_fastesttime = fastest['left'] - fastest['right']
-            
-            # delta_sidetime = sum(alignedtimes['left'].values()) - sum(alignedtimes['right'].values())
+        self.FillBarycentrePlots()
 
-            planedata[p][detID] = (averages, largerQDCs)
+    def DetermineAverages(self, hit):
+        
+        detID = hit.GetDetectorID()
+        s,p,b = self.muAna.parseDetID(detID)
+        
+        ### Apply time-walk correction to all times in the hit.
+        qdcs = hit.GetAllSignals()
+
+        # nSiPMs criteria on hits. Should replace with a histogram check
+        if len(qdcs) < 11: return
+
+        qdc_sides = {'left':[], 'right':[]}
+        
+        for idx in qdcs: 
+            SiPM, qdc = idx 
+            if SiPM < 8: qdc_sides['left'].append(qdc)
+            else: qdc_sides['right'].append(qdc)
+
+        correctedtimes=self.muAna.GetCorrectedTimes(hit, mode='aligned')
+        
+        aligned_times={'left':{}, 'right':{}}
+        # for i in correctedtimes: 
+        for i in aligned_times:
+            SiPM, correctedtime = i
+            if SiPM>8: aligned_times.append([SiPM, correctedtime])
+
+        if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
+        averages={side:sum(aligned_times[side].values()) / len(aligned_times[side]) for side in aligned_times}
+        fastest = {side:min(aligned_times[side].values()) for side in aligned_times}
+        averagetime = 1/2 * sum(averages.values())
+
+        delta_averagetime = averages['left'] - averages['right']
+        delta_fastesttime = fastest['left'] - fastest['right']
+        
+        self.all_times[p][detID] = averages
+        self.all_qdcs[p][detID] = qdc_sides
+
+    def FillBarycentrePlots(self):
 
         for plane in range(5):
-            data = planedata[plane]
-            if len(data) == 0: continue
-            y_barycentre = self.GetYBarycentre(data)
-            x_barycentre = self.GetXBarycentre(data)
-            if not y_barycentre: continue
+
+            Nfiredbars = len(self.all_times[plane])
+            times, qdcs = self.all_times[plane], self.all_qdcs[plane]
+
+            # Extrapolate DS track to this plane
+            zEx = self.zPos['MuFilter'][20+plane]
+            lam = (zEx-self.tw.pos.z())/self.tw.mom.z()
+            yEx = self.tw.pos.y() + lam*self.tw.mom.y()
+            xEx = self.tw.pos.x() + lam*self.tw.mom.x()
+
+            # Maintain dictionary stucture
+            if any([len(data) == 0 for data in (times, qdcs)]): 
+                if self.numuStudy: self.barycentres[self.runId][plane] = [[(-999,-999), (-999,-999)],[xEx, yEx]]
+                continue
+
+            # Both return -999 if fucked
+            y_barycentre = self.GetYBarycentre(qdcs)
+            x_barycentre = self.GetXBarycentre(qdcs, times, Nfiredbars)
+
+            if self.numuStudy: self.barycentres[self.runId][plane] = [[x_barycentre, y_barycentre], [xEx, yEx]]
+
+            deltay = yEx - y_barycentre[0]
+            deltax = xEx - x_barycentre[0]
+
+            # if self.numuStudy:
+            #     self.barycentres[runId][plane] = [[x_barycentre, y_barycentre], []]
             
             y_barycentre_hist = f'y-barycentre_plane{plane}'
             if not y_barycentre_hist in self.hists:
                 title = f'Barycentre in y from QDC weighting;y-barycentre [cm];Counts'
                 self.hists[y_barycentre_hist] = ROOT.TH1F(y_barycentre_hist, title, 150, 0, 150)
-            self.hists[y_barycentre_hist].Fill(y_barycentre)
-            
-    def GetYBarycentre(self, data):
+            self.hists[y_barycentre_hist].Fill(y_barycentre[0])
 
-        qdcs = [i[1] for i in data.values()]
-        qdcs = [i for j in qdcs for i in j]
-        if len(qdcs)==0: return
-        
-        maxA,maxB,minA,minB = ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3()
-        self.MuFilter.GetPosition(max(data.keys()), maxA, maxB)
-        self.MuFilter.GetPosition(min(data.keys()), minA, minB) 
+            x_barycentre_hist = f'x-barycentre_plane{plane}'
+            if not x_barycentre_hist in self.hists:
+                title = 'Barycentre in x: 1/2*c_{scint}*(t_{L}+t_{R});x-barycentre [cm];Counts'
+                self.hists[x_barycentre_hist] = ROOT.TH1F(x_barycentre_hist, title, 200, -100, 100)
+            self.hists[x_barycentre_hist].Fill(x_barycentre[0])            
 
-        # GetPosition returns the midpoint of the bar. So I add on the y-width of 1 bar to compensate 
-        ymin, ymax = 1/2*(minA.y()+minB.y()), 1/2*(maxA.y()+maxB.y())
-        yrange = ymax - ymin + self.MuFilter.GetConfParF('MuFilter/UpstreamBarY')
-        totalQDC = sum(qdcs)
-        normalised_qdcs = [i/totalQDC for i in qdcs]
+            deltaymuonbarycentre = f'deltay-muonbarycentre_plane{plane}'
+            if not deltaymuonbarycentre in self.hists:
+                title='Difference in y between muon and barycentre from QDC for plane '+str(plane+1)+';#Delta y (DS track, QDC barycentre);Counts'
+                self.hists[deltaymuonbarycentre] = ROOT.TH1F(deltaymuonbarycentre, title, 140, -70, 70)
+            self.hists[deltaymuonbarycentre].Fill(deltay)
         
-        y_barycentre = max(normalised_qdcs)*yrange + ymin 
+            deltaxmuonbarycentre = f'deltax-muonbarycentre_plane{plane}'
+            if not deltaxmuonbarycentre in self.hists:
+                title='Difference in x between muon and barycentre from timing for plane '+str(plane+1)+';#Delta x (DS track, QDC barycentre);Counts'
+                self.hists[deltaxmuonbarycentre] = ROOT.TH1F(deltaxmuonbarycentre, title, 140, -70, 70)
+            self.hists[deltaxmuonbarycentre].Fill(deltax)
 
-        return y_barycentre
+    def GetYBarycentre(self, qdcs):
         
-    def GetXBarycentre(self, data):
+        barQDCs = {k:0 for k in qdcs}
+        for detID in qdcs:
+            barQDCs[detID] = sum( [sum(innerlist) for innerlist in qdcs[detID].values()] )
+
+        sumQDC = sum([i for i in barQDCs.values()])
+
+        A,B = ROOT.TVector3(), ROOT.TVector3()
+        weighted_y_positions = []
+        for key in qdcs:
+            self.MuFilter.GetPosition(key, A, B)
+            weighted_y_positions.append( barQDCs[key]/sumQDC * 1/2 * (A.y() +B.y()) )
+
+        if not len(weighted_y_positions)==0: return sum(weighted_y_positions)/len(weighted_y_positions), 0
+        else: return -999, -999
+        
+    def GetXBarycentre(self, qdcs, times, Nfiredbars):
+        
         """
         Determine x-barycentre using bar with largest QDC
         Already, data contains the qdcs of the larger side max( sum(right_qdcs), sum(left_qdcs) )
         So I can use detID:[qdcs] to find the bar with the largest QDC deposit
         """
-        
+        x = {}
+        for detID in times:
+            s,p,b = self.muAna.parseDetID(detID)
 
-        averages = [i[0] for i in data.values()] 
-        if len(averages) == 0: return
-        # print(data)
-        largestQDC_bar = max(data, key=lambda k:sum(data[k][1]))
-        # print(largestQDC_bar)
-        
-        average_left_cscint, average_right_cscint = self.muAna.GetBarAveragecscint(self.runNr, largestQDC_bar, 'corrected')
-        x_barycentre = 0.5*(average_left_cscint+average_right_cscint) * 0.5 * (averages['right'] + averages['left'])
-        
-        return x_barycentre
-        
+            averages = times[detID]       
+            if len(averages) == 0: return -999,-999
+
+            average_left_cscint, average_right_cscint = self.muAna.GetBarAveragecscint(self.runNr, detID, 'corrected')
+
+            if detID == self.muAna.GetExtrapolatedBarDetID(p): 
+                xEx, yEy, zEx = self.muAna.GetExtrapolatedPosition(p)
+                self.MuFilter.GetPosition(detID, self.A, self.B) # A is left, B is right
+                shower_side = 'right' if abs(self.A.x() - xEx)>abs(self.B.x() - xEx) else 'left'
+                c_showerside = average_left_cscint if shower_side=='left' else average_right_cscint
+                x_shower = averages[shower_side] * c_showerside[0]
+                x_barycentre = x_shower + Nfiredbars/2*6 # 6 cm is from MuFilter.GetConfParF('MuFilter/UpstreamBarY')
+                x_barycentre_uncertainty = 3
+                x[detID] = [x_barycentre, x_barycentre_uncertainty]
+            else:
+            
+                x_barycentre = 0.5*(average_left_cscint[0]+average_right_cscint[0]) * 0.5 * (averages['right'] + averages['left'])
+
+                # Approximate uncertainty right now as:  [ (dcscint/cscint)**2 + 1/2*(150ps/(tL+tR)**2 )]**(1/2)
+                # rel_cscint_uncetainty_sq = 1/4 *( (average_left_cscint[1]/average_left_cscint[0])**2 + (average_right_cscint[1]/average_right_cscint[0])**2 ) / (average_left_cscint[0] + average_right_cscint[0])
+                rel_cscint_uncetainty_sq = 1/4 *( (average_left_cscint[1]/average_left_cscint[0])**2 + (average_right_cscint[1]/average_right_cscint[0])**2 )
+                
+                rel_tL_tR_uncetainty_sq = 1/np.sqrt(2) * 0.150 **2
+
+                x_barycentre_uncertainty_sq = x_barycentre**2 * (rel_cscint_uncetainty_sq + rel_tL_tR_uncetainty_sq)
+                x_barycentre_uncertainty = np.sqrt(x_barycentre_uncertainty_sq)
+
+                x[detID] = [x_barycentre, x_barycentre_uncertainty]
+
+        mean_value = sum(item[0] for item in x.values()) / len(x)
+        mean_uncertainty = sum(item[1] for item in x.values()) / len(x)
+        return mean_value, mean_uncertainty
         
     def GetAlignedTimes(self, detID, correctedtimes, qdcs):
         times={'left':{}, 'right':{}}
@@ -485,6 +553,30 @@ class ShowerProfiles(object):
             times[side][SiPM]=self.tw.TDS0 - (correctedtime - d[0])
         return times
         
+    def WriteOutHistograms(self):
+
+        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root'
+        if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
+        else: outfile=ROOT.TFile.Open(outfilename, 'create')
+
+        additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt', 'y-barycentre', 'x-barycentre', 'deltay-muonbarycentre', 'deltax-muonbarycentre']
+        for h in self.hists:
+            if h=='TDS0':
+                outfile.WriteObject(self.hists[h], self.hists[h].GetName(),'kOverwrite')
+
+            elif len(h.split('_'))>1:
+                for additionalkey in additionalkeys:
+                    if h.find(additionalkey)==-1: continue
+                    
+                    hist=self.hists[h]
+                    if not hasattr(outfile, additionalkey): folder=outfile.mkdir(additionalkey)
+                    else: folder=outfile.Get(additionalkey)
+                    folder.cd()
+                    hist.Write(h, 2) # The 2 means it will overwrite a hist of the same name
+
+        outfile.Close()
+        print(f'{len(self.hists)} histograms saved to {outfilename}')    
+
     @staticmethod
     def dycut(hist, nsig=1):    
         dymin=hist.GetMean()-nsig*hist.GetStdDev()

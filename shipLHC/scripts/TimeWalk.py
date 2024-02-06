@@ -20,6 +20,7 @@ class TimeWalk(ROOT.FairTask):
                     'systemalignment':'corrected',
                     'showerprofiles':'corrected', 
                     'numusignalevents':'corrected',
+                    'tds0-studies':'uncorrected',
                     '2muon':'corrected'}
         
         self.state=statedict[options.mode]
@@ -105,29 +106,30 @@ class TimeWalk(ROOT.FairTask):
         #### Time walk correction run is independent of time alignment settings. 
         self.TWCorrectionRun=str(5408).zfill(6)
 
-        if options.mode in ('selectioncriteria', 'systemalignment', 'showerprofiles', 'numusignalevents'):
-
-            ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
-            if options.AlignmentRun==None:
+        ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
+        if options.AlignmentRun==None:
+            if self.timealignment=='old': self.AlignmentRun=str(5097).zfill(6)
+            elif self.timealignment=='new': self.AlignmentRun=str(5408).zfill(6)
+            elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
+        ### Check that the time-walk correction run selected has the same time alignment has the data set
+        else:
+            if self.muAna.GetTimeAlignmentType(runNr=options.AlignmentRun) != self.timealignment:
                 if self.timealignment=='old': self.AlignmentRun=str(5097).zfill(6)
                 elif self.timealignment=='new': self.AlignmentRun=str(5408).zfill(6)
                 elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
-            ### Check that the time-walk correction run selected has the same time alignment has the data set
-            else:
-                if self.muAna.GetTimeAlignmentType(runNr=options.AlignmentRun) != self.timealignment:
-                    if self.timealignment=='old': self.AlignmentRun=str(5097).zfill(6)
-                    elif self.timealignment=='new': self.AlignmentRun=str(5408).zfill(6)
-                    elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
-                else: self.AlignmentRun=str(options.AlignmentRun).zfill(6)
-            self.muAna.AlignmentRun=self.AlignmentRun
+            else: self.AlignmentRun=str(options.AlignmentRun).zfill(6)
+        self.muAna.AlignmentRun=self.AlignmentRun
 
-            self.muAna.MakeAlignmentParameterDict(self.AlignmentRun)
+        if options.mode in ('selectioncriteria', 'systemalignment', 'showerprofiles', 'numusignalevents'):
+            
             if options.mode == 'systemalignment':
                 from systemalignment import SystemAlignment
                 self.sa = SystemAlignment(options, self)
             elif options.mode == 'showerprofiles':
                 from showerprofiles import ShowerProfiles
+                if options.numuStudy: self.numuStudy=True
                 self.sp = ShowerProfiles(options, self) 
+
             elif options.mode == 'selectioncriteria':
                 from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
                 self.sc = SelectionCriteria(options, self)
@@ -144,14 +146,19 @@ class TimeWalk(ROOT.FairTask):
         if 'timingdiscriminant' in self.cutdists:
             tdmin = self.cutdists['timingdiscriminant'].GetMean() - 3*self.cutdists['timingdiscriminant'].GetStdDev()
             tdmax = self.cutdists['timingdiscriminant'].GetMean() + 3*self.cutdists['timingdiscriminant'].GetStdDev()
-            print(f'td-min, td-max: {tdmin}, {tdmax}')
+            # print(f'td-min, td-max: {tdmin}, {tdmax}')
 
         ### Dictionary of cscint values using time-walk correction run
-        if options.mode != 'zeroth':
-            self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
+        # if options.mode != 'zeroth':
+        #     self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
 
-        if options.mode in ('TW', 'res', 'systemalignment', 'showerprofiles', 'numusignalevents', 'selectioncriteria'):
-            self.muAna.MakeTWCorrectionDict(self.TWCorrectionRun)
+        # if options.mode in ('TW', 'res', 'systemalignment', 'showerprofiles', 'numusignalevents', 'selectioncriteria'):
+        self.muAna.MakeAlignmentParameterDict(self.AlignmentRun)
+        self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
+        self.muAna.MakeTWCorrectionDict(self.TWCorrectionRun)
+
+        with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
+            self.histformatting=json.load(x)            
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -225,7 +232,11 @@ class TimeWalk(ROOT.FairTask):
         
         if self.options.mode=='showerprofiles':
             # self.sp.FillHists(hits)
-            if self.passslopecut: self.sp.ShowerDirection(hits)
+            self.sp.ShowerDirection(hits)
+            return
+
+        if self.options.mode == 'tds0-studies':            
+            self.tds0_studies(hits)
             return
 
         for hit in event.Digi_MuFilterHits:
@@ -235,6 +246,7 @@ class TimeWalk(ROOT.FairTask):
 
             detID=hit.GetDetectorID()
             s,p,b=self.muAna.parseDetID(detID)
+            if s==3: continue
 
             # Only investigate veto hits if there is a Scifi track!
             if not inVeto and s==1: continue
@@ -261,6 +273,8 @@ class TimeWalk(ROOT.FairTask):
 
             # Only investigate track related hits
             if not self.trackrelated:continue 
+            # Apply slope cut, res of code block is for passing muons
+            if not self.passslopecut:continue
             
             for channel in channels_t:
                 SiPM,clock=channel
@@ -310,8 +324,10 @@ class TimeWalk(ROOT.FairTask):
             splittitle='#splitline{'+ReadableFixedCh+'}'+title
             axestitles=coord+'_{predicted} [cm];t_{0}^{DS}-t^{uncorr}_{SiPM} [ns]'
             fulltitle=splittitle+';'+axestitles
-            hists[dtvpred]=ROOT.TH2F(dtvpred,fulltitle,110,-10,100, 800, -20, 20.)
-        
+            histformat = self.histformatting["dtvxpred"][self.state]
+            # hists[dtvpred]=ROOT.TH2F(dtvpred,fulltitle,110,-10,100, 800, -20, 20.)
+            hists[dtvpred]=ROOT.TH2F(dtvpred,fulltitle,*histformat[0], *histformat[1])
+
         attlen=f'attlen_{fixed_ch}_{self.state}'
         if not attlen in hists:
             coord='x' if not self.muAna.DSVcheck(detID) else 'y'
@@ -330,8 +346,8 @@ class TimeWalk(ROOT.FairTask):
 
         # cdata=self.muAna.Getcscint(self.runNr, fixed_ch, self.state)
         if not fixed_ch in self.muAna.cscintvalues:return
-        # cdata=self.muAna.cscintvalues[fixed_ch]
-        cdata=self.systemobservables[fixed_ch]['cscint']['uncorrected']
+        cdata=self.muAna.cscintvalues[fixed_ch]
+        # cdata=self.systemobservables[fixed_ch]['cscint']['uncorrected']
     
         s, SiPM=int(fixed_ch[0]), int(fixed_ch.split('_')[-1])
         ToFcorrectedtime=self.muAna.correct_ToF(fixed_ch, clock, self.pred)[1]
@@ -339,7 +355,9 @@ class TimeWalk(ROOT.FairTask):
         if not dtvqdc in hists:
             subtitle='{No time-walk correction t_{0}^{DS}-t^{uncorr}_{SiPM} v QDC_{SiPM}};QDC_{SiPM} [a.u];t_{0}^{DS}-t^{uncorr}_{SiPM} [ns]'
             title='#splitline{'+ReadableFixedCh+'}'+subtitle
-            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 800, -20, 20)
+            histformat=self.histformatting["dtvqdc"][self.state]
+            # hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 800, -20, 20)
+            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, *histformat[0],*histformat[1])
         t_rel=self.TDS0-ToFcorrectedtime
         self.hists[dtvqdc].Fill(qdc,t_rel)
 
@@ -375,7 +393,9 @@ class TimeWalk(ROOT.FairTask):
             coord='x' if not self.muAna.DSVcheck(detID) else 'y'
             subtitle='{Time-walk corrected t_{0}^{DS}-t^{tw corr}_{SiPM} v '+coord+'-position w/ run'+str(self.TWCorrectionRun)+'};'+coord+'_{predicted} [cm];t_{0}^{DS}-t^{tw corr}_{SiPM} [ns]'
             title='#splitline{'+ReadableFixedCh+'}'+subtitle
-            hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,110,-10,100, 800, -20, 20.)          
+            histformat = self.histformatting['dtvxpred'][self.state]
+            # hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,110,-10,100, 800, -20, 20.)          
+            hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,*histformat[0], *histformat[1])
     
         hists[dtvxpred].Fill(self.pred, TWt_rel)
         
@@ -390,7 +410,7 @@ class TimeWalk(ROOT.FairTask):
         cdata=self.muAna.cscintvalues[fixed_ch]
         twparams=self.muAna.twparameters[fixed_ch]
 
-        ToFtime=self.muAna.correct_ToF(fixed_ch, clock, self.pred)[1]
+        ToFtime=self.muAna.correct_ToF(fixed_ch, clock, self.pred)[1] # method returns (SiPM, ToF corrected time)
         twcorrection = self.correctionfunction(twparams, qdc)
 
         ### TW corrected time then ToF & TW corrected time
@@ -404,15 +424,63 @@ class TimeWalk(ROOT.FairTask):
         if not dtvqdc in hists:
             subtitle='{Time-walk corrected t_{0}^{DS}-t^{tw corr}_{SiPM '+str(SiPM)+'} v QDC_{SiPM '+str(SiPM)+'} w/ run'+str(self.TWCorrectionRun)+'};QDC_{SiPM '+str(SiPM)+'} [a.u];t_{0}^{DS}-t^{tw corr}_{SiPM '+str(SiPM)+'} [ns]'
             title='#splitline{'+ReadableFixedCh+'}'+subtitle
-            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 3000, -5, 10)     
+            histformat = self.histformatting['dtvqdc'][self.state]
+            # hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 3000, -5, 10)
+            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, *histformat[0], *histformat[1])     
 
         ### Fill histograms 
         hists[dtvqdc].Fill(qdc, ToFTWt_rel)
 
+    def tds0_studies(self, hits):
 
-    def WriteOutHistograms(self):                    
+        if self.passslopecut:
+            name=f'tds0-slopecut'
+            if not name in self.hists:
+                title = 't_{0}^{ds} with slope cut;t_{0}^{ds} [ns];Counts'
+                self.hists[name]=ROOT.TH1F(name, title, 200, 0, 50)
+            self.hists[name].Fill(self.TDS0)
+        
+        if self.passtdcut:
+            name=f'tds0-tdcut'
+            if not name in self.hists:
+                title = 't_{0}^{ds} with timing discriminant cut;t_{0}^{ds} [ns];Counts'
+                self.hists[name]=ROOT.TH1F(name, title, 200, 0, 50)
+            self.hists[name].Fill(self.TDS0)
 
-        if self.options.mode not in ('systemalignment', 'selectioncriteria', 'showerprofiles'):
+        if self.passtdcut and self.slopecut:
+            name=f'tds0-tdcut+slopecut'
+            if not name in self.hists:
+                title = 't_{0}^{ds} with timing discriminant cut and slope cut;t_{0}^{ds} [ns];Counts'
+                self.hists[name]=ROOT.TH1F(name, title, 200, 0, 50)
+            self.hists[name].Fill(self.TDS0)
+
+        for mode in ('testing-tds0','testing-deltastations'):
+            testing_value = self.muAna.GetDSHaverage(hits, mode)
+            
+            if mode.find('tds0')!=-1:
+
+                if testing_value==-999.: continue
+                tds0, firedDSHbars = testing_value
+
+                if not mode in self.hists:
+                    title = f'{mode.replace("-", " ")}; [ns];Counts'
+                    bins = (200, 0, 50)
+                    self.hists[mode] = ROOT.TH1F(mode, title, *bins)
+                self.hists[mode].Fill(tds0)
+
+            else: 
+                if isinstance(testing_value, bool): continue
+                bins = (100, -12.5, 12.5)
+                for d in ('32', '21'):
+                    name = f'{mode}{d}'
+                    if not name in self.hists:
+                        title = f'{mode.replace("-", " ")} {d}; [ns];Counts'
+                        self.hists[name] = ROOT.TH1F(name, title, *bins)
+                    self.hists[name].Fill(testing_value[f'delta{d}'])
+
+    def WriteOutHistograms(self):
+
+        if self.options.mode not in ('systemalignment', 'selectioncriteria', 'showerprofiles', 'tds0-studies'):
             for h in self.hists:
                 if len(h.split('_'))==4:
                     if len(h.split('_'))==4: histkey,detID,SiPM,state=h.split('_')
@@ -422,7 +490,7 @@ class TimeWalk(ROOT.FairTask):
                     path_obj=Path(outpath)
                     path_obj.mkdir(parents=True, exist_ok=True)
                     outfile=f'timewalk_{fixed_ch}_{self.options.nStart}.root'
-                    if os.path.exists(outpath+outfile): f=ROOT.TFile.Open(outpath+outfile, 'update')
+                    if os.path.exists(outpath+outfile): f=ROOT.TFile.Open(outpath+outfile, 'recreate')
                     else: f=ROOT.TFile.Open(outpath+outfile, 'create')
                     f.WriteObject(hist, hist.GetName(), 'kOverwrite')
                     if self.options.mode=='zeroth':
@@ -438,6 +506,15 @@ class TimeWalk(ROOT.FairTask):
             
         elif self.options.mode == 'selectioncriteria':
             self.sc.WriteOutHistograms()
+        
+        elif self.options.mode == 'tds0-studies':
+            outfilename=f'{self.outpath}/splitfiles/run{self.runNr}/tds0-studies.root'
+            f=ROOT.TFile.Open(outfilename, 'recreate')
+            for h in self.hists:
+                hist=self.hists[h]
+                f.WriteObject(hist, hist.GetName(), 'kOverwrite')
+            print(f'Hists written to {outfilename}')
+            f.Close()
 
     def LoadSystemObservables(self):
         systemobservablesfilename=f'{self.afswork}SystemObservables/run{self.TWCorrectionRun}/systemparameters.json'

@@ -233,7 +233,7 @@ class MuonSelectionCriteria(ROOT.FairTask):
         # If fitted DS track passes slope criteria. Then fill correlate red-chi2 with xy-position
         if self.cuts['SlopesCut'] and not self.slopecut(): return
         
-        TDS0, firedDSHbars=self.muAna.GetDSHaverage(self.MuFilter, hits) # Now returns in ns
+        x=self.muAna.GetDSHaverage(hits) # Now returns in ns
         if TDS0==-999: print(f'Event {self.M.EventNumber} has a fitted DS track but no DS horizontal bars with both SiPMs firing.')
         self.hists['TDS0'].Fill(TDS0)
         self.hists['firedDSHbars'].Fill(firedDSHbars)
@@ -435,7 +435,8 @@ class MuonSelectionCriteria(ROOT.FairTask):
                 
     def FillTimingDiscriminantHists(self, hits, tmp):
         
-        timingdiscriminant=self.GetTimingDiscriminant()
+        # timingdiscriminant=self.GetTimingDiscriminant()
+        timingdiscriminant=self.muAna.GetTimingDiscriminant()
         if timingdiscriminant==-420:
             return
         
@@ -458,40 +459,40 @@ class MuonSelectionCriteria(ROOT.FairTask):
                 self.hists['averageUS1time-1DSb'].Fill(us1averagetime)
                     
                 
-    def GetTimingDiscriminant(self, mode='mean'):
+    # def GetTimingDiscriminant(self, mode='mean'):
         
-        hits=self.M.eventTree.Digi_MuFilterHits
-        US1hits=[h.GetDetectorID() for h in hits if all([h.GetDetectorID()//10000==2, self.muAna.parseDetID(h.GetDetectorID())[1]==0])]
+    #     hits=self.M.eventTree.Digi_MuFilterHits
+    #     US1hits=[h.GetDetectorID() for h in hits if all([h.GetDetectorID()//10000==2, self.muAna.parseDetID(h.GetDetectorID())[1]==0])]
         
-        if len(US1hits)==0: return -999
-        elif len(US1hits)==1:
+    #     if len(US1hits)==0: return -999
+    #     elif len(US1hits)==1:
             
-            x=US1hits[0]
-            tmp={h.GetDetectorID():h for h in hits}
-            us1hit=tmp[x]
+    #         x=US1hits[0]
+    #         tmp={h.GetDetectorID():h for h in hits}
+    #         us1hit=tmp[x]
             
-        elif len(US1hits)>1:
-            docas={}
-            for US1detID in US1hits:
-                self.MuFilter.GetPosition(US1detID, A, B)
-                docas[self.Getyresidual(US1detID)]=US1detID
-            x=docas.pop(min(docas))
-            tmp={h.GetDetectorID():h for h in hits}
-            us1hit=tmp[x]  
-        else: 
-            print('shite')
-            return -999
+    #     elif len(US1hits)>1:
+    #         docas={}
+    #         for US1detID in US1hits:
+    #             self.MuFilter.GetPosition(US1detID, A, B)
+    #             docas[self.Getyresidual(US1detID)]=US1detID
+    #         x=docas.pop(min(docas))
+    #         tmp={h.GetDetectorID():h for h in hits}
+    #         us1hit=tmp[x]  
+    #     else: 
+    #         print('shite')
+    #         return -999
 
-        if mode=='mean':averageUS1time=self.muAna.GetAverageTime(us1hit)
-        if mode=='median':
-            medians=self.muAna.GetMedianTime(us1hit)
-            if not medians: return -999
-            averageUS1time=sum(medians.values())/len(medians)
-        if not averageUS1time: return -998
+    #     if mode=='mean':averageUS1time=self.muAna.GetAverageTime(us1hit)
+    #     if mode=='median':
+    #         medians=self.muAna.GetMedianTime(us1hit)
+    #         if not medians: return -999
+    #         averageUS1time=sum(medians.values())/len(medians)
+    #     if not averageUS1time: return -998
 
-        DS3Haverage=self.muAna.GetDSHaverage(self.MuFilter, hits, mode='timingdiscriminant')
+    #     DS3Haverage=self.muAna.GetDSHaverage(self.MuFilter, hits, mode='timingdiscriminant')
 
-        return DS3Haverage-averageUS1time                    
+    #     return DS3Haverage-averageUS1time                    
                 
     def FillFiredBarCorrelation(self):
         hits=self.M.eventTree.Digi_MuFilterHits

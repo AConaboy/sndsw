@@ -1,0 +1,11 @@
+{
+    "eospath":"/eos/experiment/sndlhc/raw_data/commissioning/US_tests_LabLausanne_2023/",
+    "Optics set up":"n=1.5, 1720DG",
+    "Run Length (s)":5.0,
+    "Pulse frequency (kHz)": 10.0,
+    "Trigger type": "External",
+    "Gaussian beam parameters": [2.28251807, -4.63798426, 29.11228065,  0.87511679],
+    "calibration_channel_gain":95,
+    "calibration_channel_area": 0.405,
+    "calibration_channel_PDE": 0.42
+}

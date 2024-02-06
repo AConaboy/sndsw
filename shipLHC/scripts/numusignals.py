@@ -7,7 +7,9 @@ import SndlhcMuonReco
 import SndlhcTracking
 import SndlhcGeo
 import TimeWalk, SelectionCriteria, SystemAlignment
-import AnalysisFunctions as Analysis
+import AnalysisFunctions as Analysis 
+import matplotlib.pyplot as plt 
+import matplotlib.gridspec as gridspec
 
 ROOT.gROOT.SetBatch(True)
 
@@ -45,6 +47,7 @@ parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default
 parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
 parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function or log function", default=5, type=int, required=False)
 parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
+parser.add_argument("--numuevents", action='store_true', default=True)
 parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=3)
 parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int)
 parser.add_argument("--AlignmentRun", dest="AlignmentRun", help="AlignmentRun", type=int)
@@ -64,6 +67,13 @@ parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experim
 parser.add_argument('--mode', dest='mode', type=str, default='showerprofiles')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', action='store_true')
 parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
+
+# Investigate small SiPMs
+parser.add_argument('--SmallSiPMcheck', dest='SmallSiPMcheck', action='store_true')
+# Run showerprofiles.ShowerDirection with a cut on IsTrackRelated
+parser.add_argument('--dycut', dest='dycut', action='store_true')
+# Run showerprofiles.ShowerDirection without considering the exact bar that the DS track extrapolates to
+parser.add_argument('--notDSbar', dest='notDSbar', action='store_true')
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -86,13 +96,13 @@ options = parser.parse_args()
 
 class Numusignaleventtiming(object):
 
-    def __init__(self, options):
+    def __init__(self, options=options):
        
         self.colours={0:ROOT.kRed, 1:ROOT.kBlack, 2:ROOT.kMagenta, 3: ROOT.kGreen}
         self.options=options
         self.afswork=f'{options.afswork}-physics2022/'
         self.hists={}
-        self.muAna = Analysis.Analysis(options)
+        # self.muAna = Analysis.Analysis(options)
         self.numucandidatescale=5
         self.legend=ROOT.TLegend(0.14, 0.60, 0.40, 0.85)
         self.planelegends={i:ROOT.TLegend(0.14, 0.60, 0.40, 0.85) for i in range(5)}
@@ -111,13 +121,13 @@ class Numusignaleventtiming(object):
         with open(numusignalevent_filepath, 'r') as f:
             reader=csv.reader(f)
             nu_mu_data=[r for r in reader]
-        self.nu_mu_events={int(x[0]):int(x[1]) for x in nu_mu_data}
+        self.nu_mu_events={int(x[0]):(int(x[1]),int(x[2])) for x in nu_mu_data}
 
         self.signalpartitions={}
         self.eventChain=ROOT.TChain("rawConv")
         
         for runNr in self.nu_mu_events:
-            eventNumber=self.nu_mu_events[runNr]
+            eventNumber=self.nu_mu_events[runNr][0]
 
             runNumber = str(runNr).zfill(6)
             partition = int(eventNumber // 1E6)
@@ -142,13 +152,13 @@ class Numusignaleventtiming(object):
         self.monitorTasks = {}
 
         if options.Task=='TimeWalk':
-            if options.numusignalevents: options.mode='showerprofiles'
-            self.monitorTasks['TimeWalk'] = TimeWalk.TimeWalk() 
+            options.mode='showerprofiles'
+            options.numuStudy=True
+            self.monitorTasks['TimeWalk'] = TimeWalk.TimeWalk(options, self.M) 
               
-        for m in self.monitorTasks:
-            self.monitorTasks[m].Init(options, self.M)
-
         self.tw = self.monitorTasks['TimeWalk']
+        self.muAna = self.tw.muAna
+        
         self.hists=self.tw.hists
 
     def InvestigateSignalEvents(self):
@@ -187,14 +197,13 @@ class Numusignaleventtiming(object):
         nVeto = len([i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==1])
         if nVeto != 0: 
             print(f'Veto in this event. Cannot be correct event')
-        print(f'Looking for detIDs: {firedUSDetIds}')
 
         for m in self.monitorTasks:
             self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
             
     def GetSignalEventNumber(self, runNr):
         n_partition = list(self.nu_mu_events.keys()).index(runNr)
-        evt_number = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6)            
+        evt_number = int(n_partition * 1e6 + self.nu_mu_events[runNr][0] % 1e6)            
         return evt_number
     
     def testing(self):
@@ -206,7 +215,6 @@ class Numusignaleventtiming(object):
             hits = self.M.eventTree.Digi_MuFilterHits
             self.fired_detIDs[run] = [i.GetDetectorID() for i in hits if i.GetDetectorID()//10000!=3]
             
-
     def LoadSignalHists(self):
 
         fname = f'{self.afswork}Results/SignalComparisonPlots.root'
@@ -253,6 +261,7 @@ class Numusignaleventtiming(object):
         for i in signalhists:
 
             if len(i.split('_'))!=3: continue
+            if i.lower().find('smallsipm'): continue
             key, detID, state = i.split('_')
             if len(detID.split('-')) != 1: continue
             
@@ -432,6 +441,47 @@ class Numusignaleventtiming(object):
         
         if not plane: self.legend.Draw()
         else: self.planelegends[p].Draw()
+
+    def MakeAngularPlots(self):
+        import pandas as pd
+
+        zPositions = [self.M.zPos['MuFilter'][20+i] for i in range(5)]
+
+        self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
+        'dx':[], 'ybarycentre':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
+        
+        for runNr in self.tw.sp.barycentres.keys():
+            barycentres = self.tw.sp.barycentres[runNr]
+            
+            planes = [i for i in barycentres.keys() if len(barycentres[i])!=0]
+            xbcs = [barycentres[i][0][0] for i in planes]
+            xbarycentres, dxs = zip(*xbcs)
+            
+            ybcs = [barycentres[i][0][1] for i in planes]
+            ybarycentres, dys = zip(*ybcs)
+
+            extrapolations = [barycentres[i][1] for i in planes]
+            xExs, yExs = zip(*extrapolations)
+
+            interactionwall = self.nu_mu_events[runNr][1]
+
+            self.data['runNr'].append(runNr)
+            self.data['planes'].append(planes)
+            self.data['xbarycentre'].append(xbarycentres)
+            self.data['dx'].append(dxs)
+            self.data['ybarycentre'].append(ybarycentres)
+            self.data['dy'].append(dys)
+            self.data['xEx'].append(xExs)
+            self.data['yEx'].append(yExs)
+            self.data['interaction wall'].append(interactionwall)
+
+        self.df=pd.DataFrame(self.data)
+
+        filename='barycentres'
+        if self.options.notDSbar!=-1: filename+='-notDSbar'
+        elif self.options.dycut!=-1: filename+='-dycut'
+        self.df.to_csv(f'{filename}.csv')
+        print(f'Data written to {filename}.csv')
 
     def WriteOutSignalHists(self):
 
