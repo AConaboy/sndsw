@@ -43,6 +43,9 @@ class Analysis(object):
 		self.gelsides={0:'right', 1:'left', 2:'right', 3:'left', 4:'left'}
 		self.subsystemNames={1:'veto', 2:'upstream', 3:'downstream'}
 		self.verbose=False
+		
+		if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype
+		else: self.fileext='csv'
 
 		self.sigmatds0=0.263, 9.5E-5
 
