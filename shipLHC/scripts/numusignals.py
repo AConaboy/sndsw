@@ -74,6 +74,7 @@ parser.add_argument('--SmallSiPMcheck', dest='SmallSiPMcheck', action='store_tru
 parser.add_argument('--dycut', dest='dycut', action='store_true')
 # Run showerprofiles.ShowerDirection without considering the exact bar that the DS track extrapolates to
 parser.add_argument('--notDSbar', dest='notDSbar', action='store_true')
+parser.add_argument('--SiPMtimeCut', dest='SiPMtimeCut', action='store_true')
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -83,6 +84,7 @@ parser.add_argument("--Mufixmin", dest="Mufixmin", default=-10.)
 parser.add_argument("--chi2xpred_zpos", dest="chi2xpred_zpos", help="z-position for plotting DS track red-chi2 values", type=int, default=0)
 parser.add_argument("--WriteOutTrackInfo", dest="WriteOutTrackInfo", type=int, default=0)
 parser.add_argument('--numbering', dest='numbering', type=str, default='systemPCB')
+parser.add_argument('--referencesystem', dest='referencesystem', type=int, default=3)
 
 parser.add_argument("--goodEvents", dest="goodEvents", action='store_true',default=False)
 parser.add_argument("--withTrack", dest="withTrack", action='store_true',default=False)
@@ -195,8 +197,14 @@ class Numusignaleventtiming(object):
         # print(f'Investigating run {runNr}, run event {evt_number}')
         firedUSDetIds = [i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==2]
         nVeto = len([i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==1])
+        
+        # Sanity check that correct event is loaded
         if nVeto != 0: 
             print(f'Veto in this event. Cannot be correct event')
+
+        # Get time alignment type of signal event
+        alignment = self.muAna.GetTimeAlignmentType(runId)
+        self.muAna.MakeAlignmentParameterDict(alignment) # Load appropriate alignment parameters into muAna
 
         for m in self.monitorTasks:
             self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
@@ -450,10 +458,20 @@ class Numusignaleventtiming(object):
         self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
         'dx':[], 'ybarycentre':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
         
+        """
+        sp.barycentres = {
+                            runNr:
+                                {
+                                    plane: [[x_barycentre, y_barycentre], [xEx, yEx]]
+                                }
+                        }
+        """
+
         for runNr in self.tw.sp.barycentres.keys():
-            barycentres = self.tw.sp.barycentres[runNr]
+            barycentres = self.tw.sp.barycentres[runNr] # { plane: [ [(x_barycentre,dxbc), (y_barycentre,dxbc)], [xEx, yEx]] }
             
             planes = [i for i in barycentres.keys() if len(barycentres[i])!=0]
+            
             xbcs = [barycentres[i][0][0] for i in planes]
             xbarycentres, dxs = zip(*xbcs)
             
@@ -468,18 +486,19 @@ class Numusignaleventtiming(object):
             self.data['runNr'].append(runNr)
             self.data['planes'].append(planes)
             self.data['xbarycentre'].append(xbarycentres)
-            self.data['dx'].append(dxs)
+            self.data['dx'].append(dxs) # uncertainty on xbarycentre
             self.data['ybarycentre'].append(ybarycentres)
-            self.data['dy'].append(dys)
-            self.data['xEx'].append(xExs)
-            self.data['yEx'].append(yExs)
+            self.data['dy'].append(dys) # uncertainty on xbarycentre
+            self.data['xEx'].append(xExs) # DS track extrapolated to plane 
+            self.data['yEx'].append(yExs) # DS track extrapolated to plane
             self.data['interaction wall'].append(interactionwall)
 
         self.df=pd.DataFrame(self.data)
 
-        filename='barycentres'
-        if self.options.notDSbar!=-1: filename+='-notDSbar'
-        elif self.options.dycut!=-1: filename+='-dycut'
+        filename='/eos/home-a/aconsnd/SWAN_projects/LaserMeasurements/barycentres'
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
         self.df.to_csv(f'{filename}.csv')
         print(f'Data written to {filename}.csv')
 
@@ -542,7 +561,4 @@ class Numusignaleventtiming(object):
         print(f'Signal comparison canvases written to {outfilename}')
 
 if options.HTCondor==1:
-    numu=Numusignaleventtiming(options)
-    # numu.LoadSignalHists()
-    # numu.LoadPassingMuonHists()
-    # numu.MakeSignalComparisonCanvases()
+    numu=Numusignaleventtiming()

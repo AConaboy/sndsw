@@ -69,7 +69,7 @@ class SystemAlignment(object):
 
             d=self.muAna.alignmentparameters[fixed_ch]
 
-            self.hists[SiPMtime].Fill(self.tw.TDS0 - time - d[0])
+            self.hists[SiPMtime].Fill(self.tw.reft - time - d[0])
 
     def FillBarHists(self, hit):
 
@@ -93,12 +93,12 @@ class SystemAlignment(object):
 
             qdc=self.muAna.GetChannelVal(SiPM, qdcs)
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            aligned_times[side][SiPM] = self.tw.TDS0 - correctedtime - d[0]
+            aligned_times[side][SiPM] = self.tw.reft - correctedtime - d[0]
             # times[side][SiPM] = correctedtime - d[0]
 
         if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
-        averages={side:self.tw.TDS0 - (sum(aligned_times[side].values()) / len(aligned_times[side])) for side in aligned_times}
-        fastest = {side:self.tw.TDS0 - min(aligned_times[side].values()) for side in aligned_times}
+        averages={side:self.tw.reft - (sum(aligned_times[side].values()) / len(aligned_times[side])) for side in aligned_times}
+        fastest = {side:self.tw.reft - min(aligned_times[side].values()) for side in aligned_times}
         averagetime = 1/2 * sum(averages.values())
 
         baraveragecscint_left, baraveragecscint_right = self.muAna.GetBarAveragecscint(self.runNr, detID, 'corrected')
@@ -193,15 +193,15 @@ class SystemAlignment(object):
             d=self.muAna.alignmentparameters[fixed_ch]
 
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            times[side][SiPM]=self.tw.TDS0 - correctedtime - d[0]
+            times[side][SiPM]=self.tw.reft - correctedtime - d[0]
 
-        xtds0histname=f'timingxt_tds0_{self.subsystemdict[s]}'
-        if not xtds0histname in self.hists:
+        xrefthistname=f'timingxt_reft_{self.subsystemdict[s]}'
+        if not xrefthistname in self.hists:
             title='Timing correlation between all '+self.subsystemdict[s]+' SiPMs and t_{0}^{DS}'
             axestitles='t_{0}^{DS} - t_{SiPM}^{tw corr} [ns];t_{0}^{DS} [ns];Counts'
             fulltitle=title+';'+axestitles
-            if self.timealignment=='old': self.hists[xtds0histname]=ROOT.TH1F(xtds0histname,fulltitle, 150, -5, 20, 125, 0, 25)
-            else: self.hists[xtds0histname]=ROOT.TH2F(xtds0histname,fulltitle, 150, -5, 20, 125, 0, 25)
+            if self.timealignment=='old': self.hists[xrefthistname]=ROOT.TH1F(xrefthistname,fulltitle, 150, -5, 20, 125, 0, 25)
+            else: self.hists[xrefthistname]=ROOT.TH2F(xrefthistname,fulltitle, 150, -5, 20, 125, 0, 25)
 
         for side in times:
             for combination in self.SiPMcombinations[s][side]:
@@ -220,7 +220,7 @@ class SystemAlignment(object):
                     else: self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
 
                 self.hists[xthistname].Fill(time_i, time_j)
-                self.hists[xtds0histname].Fill(time_i, self.tw.TDS0)
+                self.hists[xrefthistname].Fill(time_i, self.tw.reft)
 
     def WriteOutHistograms(self):
 
@@ -231,7 +231,7 @@ class SystemAlignment(object):
         additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt',
                         'xL', 'dt', 'sumt', 'lambda', 'xbarycentre']
         for h in self.hists:
-            if h=='TDS0':
+            if h=='reft':
                 outfile.WriteObject(self.hists[h], self.hists[h].GetName(),'kOverwrite')
 
             elif len(h.split('_'))==3:
@@ -306,11 +306,11 @@ class SystemAlignment(object):
         if abs(slopeX)>slopecut or abs(slopeY)>slopecut: return 0
         else: return 1
 
-    def TDS0cut(self,TDS0):
-        if TDS0==-6237.5: return 0
-        TDS0ns=TDS0*self.TDC2ns
-        if TDS0ns<13.75 or TDS0ns>15.45: return 0
-        return TDS0ns 
+    def reftcut(self,reft):
+        if reft==-6237.5: return 0
+        reftns=reft*self.TDC2ns
+        if reftns<13.75 or reftns>15.45: return 0
+        return reftns 
     
     def GetDistanceToSiPM(self,A):
         self.pred=ROOT.TMath.Sqrt((A.x()-self.Ex.x())**2+(A.y()-self.Ex.y())**2+(A.z()-self.Ex.z())**2)

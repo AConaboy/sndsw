@@ -28,7 +28,7 @@ parser.add_argument("-M", "--online", dest="online", help="online mode",default=
 parser.add_argument("--batch", dest="batch", help="batch mode",default=False,action='store_true')
 parser.add_argument("--server", dest="server", help="xrootd server",default=os.environ["EOSSHIP"])
 parser.add_argument("-r", "--runNumber", dest="runNumber", help="run number", type=int,default=-1)
-parser.add_argument('-p', '--path', dest='path', help='path', type=str, required=False)
+parser.add_argument('-p', '--path', dest='path', help='path', type=str, default='/eos/experiment/sndlhc/convertedData/physics/')
 parser.add_argument("-P", "--partition", dest="partition", help="partition of data", type=int,required=False,default=-1)
 parser.add_argument("-d", "--debug", dest="debug", help="debug", type=int, default=False)
 parser.add_argument("-cpp", "--convRawCPP", action='store_true', dest="FairTask_convRaw", help="convert raw data using ConvRawData FairTask", default=False)
@@ -49,6 +49,7 @@ parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select wh
 parser.add_argument("--AlignmentRun", dest="AlignmentRun", help="AlignmentRun", type=int)
 parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, default='physics')
 parser.add_argument('--state', dest='state', type=str, default='uncorrected')
+parser.add_argument('--referencesystem', dest='referencesystem', type=int, default=3)
 
 # Cuts
 parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', type=int, default=0)
@@ -64,6 +65,7 @@ parser.add_argument('--mode', dest='mode', type=str, default='zeroth')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', help='int (0/1), is on HTCondor?', default=0, type=int, required=False)
 parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
 parser.add_argument('--signalpartitions', dest='signalpartitions', required=False)
+parser.add_argument('--numuStudy', dest='numuStudy', action='store_true')
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)

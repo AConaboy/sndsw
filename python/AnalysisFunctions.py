@@ -189,69 +189,100 @@ class Analysis(object):
 		res=str(self.subsystemNames[s])+', plane '+str(p+1)+', bar '+str(b+1)
 		return res
 
-	def GetScifiAverageTime(self, hits):
-		pass
+	def GetScifiAverageTime(self, scifihits):
+
+		stations = {i.GetDetectorID():i for i in scifihits}
+		times=[]
+
+		total={i:0 for i in range(4)}
+		counter={i:0 for i in range(4)}
+		track = self.task.track
+		nM = track.getNumPointsWithMeasurement()
+
+		for n in range(nM):
+			M=track.getPointWithMeasurement(n)
+			W=M.getRawMeasurement()
+			detID=W.getDetId()
+	
+			# hkey=W.getHitId()
+			if detID not in stations:
+				print(stations)
+				print(f'Event {self.task.M.EventNumber}')
+			trackHit = stations[detID]
+			time = trackHit.GetTime()*self.TDC2ns
+			times.append(time)
+		
+		if len(times)==0: return 
+		averagetime = sum(times) / len(times)
+		return averagetime
 
 	def GetDSHaverage(self, hits, mode='tds0'):
 
 		"""
 		For tds0, I am only using DS2 and 3 due to the delta tds21 plot being broad and asymmetric... not implemented, should I?
 		"""
-		stations={k:{} for k in range(4)} # only k=0,1,2 are used
-		for i,hit in enumerate(hits):
-			detID=hit.GetDetectorID()
-			s,p,b=self.parseDetID(detID)
-			if s!=3:continue
-			if b>59: continue # The bar IDs in DS4V start at 60 so the vertical bars are not contaminating here.
-			
-			stations[p][i]=hit
-
-		# if not all( [len(stations[p])==1 for p in range(nPlanes)] ): return -999. # Event selection: only accept events with 1 bar in all DS planes
+		stations = {i.GetDetectorID():i for i in hits}
+		# print(f'stations: {stations}')
 
 		if mode=='tds0':
 			total={i:0 for i in range(4)}
 			counter={i:0 for i in range(4)}
-			for p in range(4):
-				hits=list(stations[p].values())
-				for hit in hits:
-					if not hit.isValid():continue
-					detID=hit.GetDetectorID()
-					tdcs=hit.GetAllTimes()
-					if len(tdcs) != 2: continue # pass
-					# for all 3 horizontal DS planes.
-					for item in tdcs: 
-						SiPM, clock = item
-						dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
-						# total+=dscorrectedtime
-						total[p]+=dscorrectedtime
-						# counter+=1
-						counter[p]+=1
+			theTrack = self.task.M.Reco_MuonTracks[0]
+			nM = theTrack.getNumPointsWithMeasurement()
+			# print(f'{nM} measurements')
+			for n in range(nM):
+				M=theTrack.getPointWithMeasurement(n)
+				W=M.getRawMeasurement()
+				detID=W.getDetId()
+				s,p,b = self.parseDetID(detID)
+				hkey=W.getHitId()
+				trackHit = stations[detID]
+				tdcs = trackHit.GetAllTimes()
+				# print(f'DetID: {detID}, len(tdcs)={len(tdcs)}')
+				if not all ( [p in (0,1,2), b<60, len(tdcs)==2] ): continue
 
-			# sum_total, counter_total = sum(total.values()), sum(counter.values())
-			# dsh_average, nfired = sum_total/counter_total, counter_total
-   
+				if len(tdcs) != 2: continue # pass
+
+				for item in tdcs: 
+					SiPM, clock = item
+					dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
+					total[p]+=dscorrectedtime
+					counter[p]+=1
+
 			# Only using DS3 and DS2
 			sum_total, counter_total = total[2] + total[1], counter[2] + counter[1]
+			# print(f'total, counter: {sum_total}, {counter_total}')
 			if counter_total==0: return -999
 
 			dsh_average, nfired = sum_total/counter_total, counter_total
 
-			return dsh_average, nfired
+			return dsh_average, nfired	
 
 		elif mode=='timingdiscriminant': # Take k=2 for the 3rd horizontal plane
-			DS3H_hits=list(stations[2].values())
+
 			total=[]
 
-			for DS3H_hit in DS3H_hits:
-				if not DS3H_hit.isValid(): continue
-				detID=DS3H_hit.GetDetectorID()
-				times=DS3H_hit.GetAllTimes()
-				if len(times)!=2: continue # Require left and right SiPMs fire 
-				
-				for idx in times: 
-					SiPM,clock=idx
+			theTrack = self.task.M.Reco_MuonTracks[0]
+			nM = theTrack.getNumPointsWithMeasurement()
+			# print(f'{nM} measurements')
+			for n in range(nM):
+				M=theTrack.getPointWithMeasurement(n)
+				W=M.getRawMeasurement()
+				detID=W.getDetId()
+				s,p,b = self.parseDetID(detID)
+				hkey=W.getHitId()
+				trackHit = stations[detID]
+				tdcs = trackHit.GetAllTimes()
+				# print(f'DetID: {detID}, len(tdcs)={len(tdcs)}')
+				if not all ( [p in (0,1,2), b<60, len(tdcs)==2] ): continue
+
+				if len(tdcs) != 2: continue # pass
+
+				for item in tdcs: 
+					SiPM, clock = item
 					dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
 					total.append(dscorrectedtime)
+
 			if len(total)==0:
 				return -420					
 			return sum(total)/len(total)
@@ -259,20 +290,28 @@ class Analysis(object):
 		elif mode=='deltastations':
 			res={f'delta32':0, 'delta21':0}
 			ts={k:[] for k in range(3)}
-			for i in range(3):
-				dshits=list(stations[i].values())
-				
-				for hit in dshits:
-					detID=hit.GetDetectorID()
-					times=hit.GetAllTimes()
 
-					for idx in times:
-						SiPM, clock=idx
-						if SiPM>1:
-							print(detID, SiPM, self.task.M.EventNumber)
-							continue
-						dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
-						ts[i].append(dscorrectedtime)
+			theTrack = self.task.M.Reco_MuonTracks[0]
+			nM = theTrack.getNumPointsWithMeasurement()
+			# print(f'{nM} measurements')
+			for n in range(nM):
+				M=theTrack.getPointWithMeasurement(n)
+				W=M.getRawMeasurement()
+				detID=W.getDetId()
+				s,p,b = self.parseDetID(detID)
+				hkey=W.getHitId()
+				trackHit = stations[detID]
+				tdcs = trackHit.GetAllTimes()
+				# print(f'DetID: {detID}, len(tdcs)={len(tdcs)}')
+				if not all ( [p in (0,1,2), b<60, len(tdcs)==2] ): continue
+
+				if len(tdcs) != 2: continue # pass
+
+				for item in tdcs: 
+					SiPM, clock = item
+					dscorrectedtime=self.task.MuFilter.GetCorrectedTime(detID, SiPM, clock*self.TDC2ns, 0)
+					ts[p].append(dscorrectedtime)
+
 			if any([len(ts[i])==0 for i in ts]): return False
 			res['delta32']=sum(ts[2])/len(ts[2]) - sum(ts[1])/len(ts[1])
 			res['delta21']=sum(ts[1])/len(ts[1]) - sum(ts[0])/len(ts[0])
@@ -288,11 +327,13 @@ class Analysis(object):
 				detID=W.getDetId()
 				s,p,b = self.parseDetID(detID)
 				hkey=W.getHitId()
-				trackHit=hits[hkey]
+				# trackHit=hits[hkey]
+				trackHit = stations[detID]
 				tdcs = trackHit.GetAllTimes()
 				if not all ( [p in (0,1,2), b<60, len(tdcs)!=2] ): continue
 
 				if len(tdcs) != 2: continue # pass
+
 				for item in tdcs: 
 					SiPM, clock = item
 					if SiPM>1: 
@@ -322,7 +363,7 @@ class Analysis(object):
 				if not all ( [p in (0,1,2), b<60] ): continue
 
 				hkey=W.getHitId()
-				trackHit=hits[hkey]
+				trackHit = stations[detID]
 				times=trackHit.GetAllTimes()
 				if not len(times)==2: continue
 
@@ -1212,6 +1253,10 @@ class Analysis(object):
 	def GetCorrectedTimes(self, hit,x=0, mode='unaligned'):
 		detID=hit.GetDetectorID()
 
+		if self.options.numuStudy:
+			runID = self.task.M.eventTree.EventHeader.GetRunId()
+			print('****'*10, f'\nRunId: {runID}\nTime alignment of run: {self.GetTimeAlignmentType(runID)}\nStored alignment parameters of type:{self.timealignment}\n', '****'*10)
+
 		alignedtimes=[]
 		clocks, qdcs=hit.GetAllTimes(), hit.GetAllSignals()
 		for i in clocks:
@@ -1222,7 +1267,7 @@ class Analysis(object):
 			if not correctedtime: continue
 			if mode=='aligned': 
 				d = self.alignmentparameters[f'{detID}_{SiPM}']
-				correctedtime = self.task.TDS0 - correctedtime - d[0]
+				correctedtime = self.task.reft - correctedtime - d[0] 
 			alignedtimes.append((SiPM, correctedtime))
 		return alignedtimes
 
@@ -1554,21 +1599,43 @@ class Analysis(object):
 						d[fixed_ch]=params
 		if len(d)==0: self.twparameters=None
 		self.twparameters=d
+	def WriteTWParamDict(self):
+		if not hasattr(self, "twparameters"): self.MakeTWCorrectionDict(self.runNr)
+
+		twparamsdir = f'{self.path}/Polyparams/run{self.runNr}/'
+		twparamsfilename=twparamsdir+f'twparams.json'	
+		with open(twparamsfilename, 'w') as jf: 
+			json.dump(self.twparameters, jf)
 
 	### Make dictionary of the alignment parameter determined as the truncated y-mean of tw-corr (tds0 - tSiPM)
-	def MakeAlignmentParameterDict(self, runNr):
+	def MakeAlignmentParameterDict(self, alignment):
+
+		# Update stored string for alignment params stored
+		self.timealignment=alignment
+
+		if alignment=='old': run=str(5097).zfill(6)
+		elif alignment=='new': run=str(5408).zfill(6)
+		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
+
 		d={}
 		for s in (1,2):
 			for p in range(self.systemAndPlanes[s]):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-						# correction=self.Gettds0mean(runNr, fixed_ch)
-						correction=self.GetAlignmentParameters(runNr, fixed_ch)
+						correction=self.GetAlignmentParameters(run, fixed_ch)
 						if not correction: continue
 						d[fixed_ch]=correction
 		if len(d)==0: self.alignmentparameters=None
 		self.alignmentparameters=d
+
+	def WriteAlignmentParamDict(self):
+		if not hasattr(self, "alignmentparameters"): self.MakeAlignmentParameterDict(self.timealignment)
+
+		alignmentparamsdir = f'{self.path}/Alignmentparams/run{self.runNr}/'
+		alignmentparamsfilename=alignmentparamsdir+f'alignmentparams.json'	
+		with open(alignmentparamsfilename, 'w') as jf: 
+			json.dump(self.alignmentparameters, jf)
 
 	def MakeTimingCovarianceDict(self, runNr):
 		filename=f'{self.path}TimingCovariance/run{self.runNr}/timingcovariance.json'
@@ -1579,6 +1646,20 @@ class Analysis(object):
 		filename=f'{self.path}TimingCovariance/run{self.runNr}/timingcorrelation.json'
 		with open(filename) as jsonfile:
 			self.timingcorrelation=json.load(jsonfile)
+
+	# def MakeAllParamFile(self):
+	# 	if not hasattr(self, alignmentparameters): self.MakeAlignmentParameterDict(self.runNr)
+	# 	if not hasattr(self, twparameters): self.MakeTWCorrectionDict(self.runNr)
+
+	# 	total_dict = {}
+
+	# 	for key in twparameters:
+	# 		twparams = self.twparameters[key].copy()
+
+	# 		if key in self.alignmentparameters: 
+	# 			d=self.alignmentparameters[key][0] 
+	# 			twparams.append(d)
+			
 
 	def MakeQDCMIPJson(self, runNr):
 		### Currently 

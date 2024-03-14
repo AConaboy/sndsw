@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os, json
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 
@@ -19,6 +20,7 @@ class TimeWalk(object):
 		self.qdc_colour='C0'
 		self.colours = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'tab:orange', 'tab:purple']
 		self.GetQDCvTimestamp()
+		self.dts={'TI18':{}, 'laser':{}}
 
 	def GetQDCvTimestamp(self):
 
@@ -95,7 +97,11 @@ class TimeWalk(object):
 
 		qdc_ax.grid(True, linestyle='--', alpha=0.7, color='gray')
 		qdc_ax.set_title(f'Time walk measured with laser for SiPM {self.M.SiPM}\n{self.M.titledict[self.M.mode]} illumination')
-		plotlocation = f'{self.M.sndswpath}analysis-plots/timewalk/SiPM{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
+		
+		d=f'{self.M.sndswpath}analysis-plots/timewalk/'
+		os.makedirs(d, exist_ok=True)
+		
+		plotlocation = d+f'SiPM{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
 		plt.savefig(f'{plotlocation}', bbox_inches='tight')
 		print(f'SiPM {self.M.SiPM} timewalk figure saved to {plotlocation}')
 
@@ -132,7 +138,10 @@ class TimeWalk(object):
 
 		for i in range(2): axes[i].legend()
 
-		plotlocation = f'{self.M.sndswpath}analysis-plots/timewalk/bar{bar}_{self.M.titledict[self.M.mode]}.png'
+		d=f'{self.M.sndswpath}analysis-plots/timewalk/'
+		os.makedirs(d, exist_ok=True)
+		
+		plotlocation = d+f'SiPM{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')
 	
@@ -168,7 +177,7 @@ class TimeWalk(object):
 					ax.errorbar(qdcs, timestamps, color=self.colours[idx], 
 						xerr=[d[0] for d in self.errors.values()], yerr=[d[1] for d in self.errors.values()], 
 						label=label)
-			ax.legend()
+			ax.legend(loc=(0.5, 0.2))
 				
 		if style=='subplots':
 			fig, axes = plt.subplots(2,2, figsize = (12, 12))
@@ -188,7 +197,10 @@ class TimeWalk(object):
 						xerr=[d[0] for d in self.errors.values()], yerr=[d[1] for d in self.errors.values()], 
 						label=f'SiPM {self.M.SiPM}')
 
-		plotlocation = f'{self.M.sndswpath}analysis-plots/timewalk/illuminations/{style}-SiPM{self.M.SiPM}.png'
+		d=f'{self.M.sndswpath}analysis-plots/timewalk/illuminations/'
+		os.makedirs(d, exist_ok=True)
+		
+		plotlocation = d+f'compare-run-types_SiPM{self.M.SiPM}.png'
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')		
 
@@ -246,9 +258,15 @@ class TimeWalk(object):
 		for i in range(len(TI18_qdcs)):
 			if TI18_qdcs[i]>=5 and TI18mip==None:
 				TI18mip = (TI18_qdcs[i], TI18_timestamps[i])
-			if TI18_qdcs[i]>=100:
+
+			# Get TI18 QDC closest to the laser QDC value
+			if TI18_qdcs[i]>=laser100[0]:
 				TI18100 = (TI18_qdcs[i-1], TI18_timestamps[i-1])
 				break 		
+
+		if any([TI18100==None, TI18mip==None]): return
+		self.dts['TI18'][self.M.SiPM]=abs(TI18100[1]-TI18mip[1])
+		self.dts['laser'][self.M.SiPM]=abs(laser100[1]-lasermip[1])
 
 		laserlabel = f't({laser100[0]}) - t({lasermip[0]}) = {round(laser100[1]-lasermip[1], 2)} ns'
 		TI18label = f't({TI18100[0]}) - t({TI18mip[0]}) = {round(TI18100[1]-TI18mip[1], 2)} ns'
@@ -266,8 +284,8 @@ class TimeWalk(object):
 		axes[1].set_title('Laser')
 
 		# TI18 data
-		axes[0].errorbar(TI18_qdcs, TI18_timestamps, color="C1",
-			yerr=TI18_errors, fmt='o', label=TI18label)
+		axes[0].errorbar(TI18_qdcs, [-i for i in TI18_timestamps], color="C1", 
+			yerr=TI18_errors, fmt='o', label=TI18label) # Invert trend just for better comparison with laser, done for DPG2024
 		axes[0].legend()
 
 		# Laser data
@@ -276,6 +294,48 @@ class TimeWalk(object):
 			label=laserlabel)
 		axes[1].legend()
 
-		plotlocation = f'{self.M.sndswpath}/analysis-plots/timewalk/TI18-comparison/SiPM_{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
+		# Make directory if not already there
+		d=f'{self.M.sndswpath}analysis-plots/timewalk/TI18-comparison/'
+		os.makedirs(d, exist_ok=True)
+
+		plotlocation = d+f'SiPM_{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')
+
+	def LoadTI18comparisondata(self):
+		
+		d = f'{self.M.sndswpath}analysis-plots/timewalk/TI18-comparison/'
+		picklelocation= d+f'{self.M.titledict[self.M.mode]}-comparison.json'
+		with open(picklelocation, 'r') as f:
+			self.dt = json.loads(f.read())
+
+	def PlotSystemTI18LaserDifference(self):
+
+		fig, axes = plt.subplots(2,1, figsize=(8, 12))
+		fig_title=fig.suptitle(f'Comparison of time walk between laser and TI18 for all SiPMs\n{self.M.titledict[self.M.mode]} illumination')
+
+		for i in range(2):
+			axes[i].set_xlabel('SiPM number', position=(1,0), horizontalalignment='right')
+			axes[i].grid(which='major', axis='both', linestyle='--')
+		axes[0].set_ylabel('|dt| [ns]', position=(0,1), horizontalalignment='right')
+		axes[0].set_title(f'Degree of timewalk observed over fixed QDC range')
+		axes[1].set_ylabel('Timewalk laser/TI18', position=(0,1), horizontalalignment='right')
+		axes[1].set_title('Ratio of timewalk observed between TI18 and laser')			
+
+		for i, x in enumerate((('laser', 'o'), ('TI18', 'D'))):
+			axes[0].errorbar([int(i) for i in self.dts[x[0]].keys()],self.dts[x[0]].values(), label=f'{x[0]} data', marker=x[1])
+		axes[0].legend()
+
+		d_data = {int(SiPM):abs(self.dts['TI18'][SiPM]/self.dts['laser'][SiPM]) for SiPM in self.dts['laser'].keys()}
+		axes[1].errorbar(d_data.keys(), d_data.values())
+
+		d = f'{self.M.sndswpath}analysis-plots/timewalk/TI18-comparison/'
+
+		plotlocation = d+f'SystemTimewalkComparison_{self.M.titledict[self.M.mode]}.png'
+		fig.savefig(plotlocation, bbox_inches='tight')
+		print(f'Timewalk comparison plot saved to {plotlocation}')
+
+		jsonlocation = d+f'{self.M.titledict[self.M.mode]}-comparison.json'
+		with open(jsonlocation, 'w') as f:
+			json.dump(self.dts, f)
+		print(f'Timewalk comparison data written to {jsonlocation}')
