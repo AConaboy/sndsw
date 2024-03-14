@@ -51,6 +51,7 @@ class ShowerProfiles(object):
         if tw.numuStudy: 
             self.numuStudy=True
             self.barycentres={}
+            self.data={}
         
     def Loadnumuevents(self):
         numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
@@ -146,7 +147,7 @@ class ShowerProfiles(object):
 
                 qdc=self.muAna.GetChannelVal(SiPM, qdcs)
                 side=self.muAna.GetSide(f'{detID}_{SiPM}')
-                times[side][SiPM]=self.tw.TDS0 - correctedtime - d[0]
+                times[side][SiPM]=self.tw.reft - correctedtime - d[0]
                 
                 QDC_histname = f'US-SiPMQDC'
                 if not QDC_histname in self.hists:
@@ -385,10 +386,18 @@ class ShowerProfiles(object):
             self.DetermineAverages(hit)
 
         self.FillBarycentrePlots()
+        # self.WriteOutRecordedTimes()
+        # self.data[self.tw.M.EventHeader.GetRunId()] = {}
 
     def DetermineAverages(self, hit):
         
-        detID = hit.GetDetectorID()
+        data=self.RecordData(hit)
+        runNr=self.tw.M.eventTree.EventHeader.GetRunId()
+        detID=hit.GetDetectorID()
+        if not runNr in self.data: self.data[runNr]={}
+        if not detID in self.data[runNr]: self.data[runNr][detID]={}
+        self.data[runNr][hit.GetDetectorID()][self.tw.M.EventNumber]=data 
+            
         s,p,b = self.muAna.parseDetID(detID)
         
         ### Apply time-walk correction to all times in the hit.
@@ -403,14 +412,22 @@ class ShowerProfiles(object):
             SiPM, qdc = idx 
             if SiPM < 8: qdc_sides['left'].append(qdc)
             else: qdc_sides['right'].append(qdc)
-
+        
+        # Analysis.GetCorrectedTimes returns tw.TDS0 - twcorrtime - d
         correctedtimes=self.muAna.GetCorrectedTimes(hit, mode='aligned')
         
         aligned_times={'left':{}, 'right':{}}
-        # for i in correctedtimes: 
-        for i in aligned_times:
+        
+        median_time = np.median([[i[1] for i in correctedtimes]])
+        
+        for i in correctedtimes:
             SiPM, correctedtime = i
-            if SiPM>8: aligned_times.append([SiPM, correctedtime])
+
+            # Experiment with cutting on aligned time
+            if self.options.SiPMtimeCut and np.abs(median_time - correctedtime)>1: continue
+            
+            if SiPM<8: aligned_times['right'][SiPM] = correctedtime
+            else: aligned_times['left'][SiPM] = correctedtime
 
         if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
         averages={side:sum(aligned_times[side].values()) / len(aligned_times[side]) for side in aligned_times}
@@ -491,7 +508,7 @@ class ShowerProfiles(object):
             self.MuFilter.GetPosition(key, A, B)
             weighted_y_positions.append( barQDCs[key]/sumQDC * 1/2 * (A.y() +B.y()) )
 
-        if not len(weighted_y_positions)==0: return sum(weighted_y_positions)/len(weighted_y_positions), 0
+        if not len(weighted_y_positions)==0: return sum(weighted_y_positions)/len(weighted_y_positions), 3
         else: return -999, -999
         
     def GetXBarycentre(self, qdcs, times, Nfiredbars):
@@ -519,8 +536,8 @@ class ShowerProfiles(object):
                 x_barycentre = x_shower + Nfiredbars/2*6 # 6 cm is from MuFilter.GetConfParF('MuFilter/UpstreamBarY')
                 x_barycentre_uncertainty = 3
                 x[detID] = [x_barycentre, x_barycentre_uncertainty]
-            else:
             
+            else:
                 x_barycentre = 0.5*(average_left_cscint[0]+average_right_cscint[0]) * 0.5 * (averages['right'] + averages['left'])
 
                 # Approximate uncertainty right now as:  [ (dcscint/cscint)**2 + 1/2*(150ps/(tL+tR)**2 )]**(1/2)
@@ -538,20 +555,51 @@ class ShowerProfiles(object):
         mean_uncertainty = sum(item[1] for item in x.values()) / len(x)
         return mean_value, mean_uncertainty
         
-    def GetAlignedTimes(self, detID, correctedtimes, qdcs):
-        times={'left':{}, 'right':{}}
-        for i in correctedtimes: 
-            SiPM, correctedtime = i
-            # fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
-            fixed_ch=f'{detID}_{SiPM}'
+    def RecordData(self, hit):
+        detID = hit.GetDetectorID()
+        qdcs = [(SiPM, qdc) for SiPM,qdc in hit.GetAllSignals()]
+        rawtimes = [(SiPM, cc*self.TDC2ns) for SiPM,cc in hit.GetAllTimes()]
+        twctimes = self.muAna.GetCorrectedTimes(hit)
+        atimes =self.muAna.GetCorrectedTimes(hit, mode='aligned')
 
-            if not fixed_ch in self.muAna.alignmentparameters: continue
-            d=self.muAna.alignmentparameters[fixed_ch]
+        data={}
+        for idx, lst in enumerate([qdcs, rawtimes, twctimes, atimes]): 
+            for SiPM, t in lst:
+                if not SiPM in data: 
+                    data[SiPM] = {} 
+                if idx==0:data[SiPM]['qdc']=t 
+                elif idx==1:data[SiPM]['rawtimes']=t 
+                elif idx==2:data[SiPM]['twctimes']=t 
+                elif idx==3:
+                    data[SiPM]['atimes']=t 
+                    data[SiPM]['reft']=self.tw.reft
+                    if f'{detID}_{SiPM}' in self.muAna.alignmentparameters:
+                        data[SiPM]['d'] = self.muAna.alignmentparameters[f'{detID}_{SiPM}']
+                        data[SiPM]['trackrelated'] = self.trackrelated
 
-            qdc=self.muAna.GetChannelVal(SiPM, qdcs)
-            side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            times[side][SiPM]=self.tw.TDS0 - (correctedtime - d[0])
-        return times
+        return data
+
+    def WriteOutRecordedTimes(self):
+        import pickle
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/LaserMeasurements/numuhits-timing.data'
+        with open(filename, 'wb') as f:
+            pickle.dump(self.data, f)
+        print(f'File saved to {filename}')
+
+    # def GetAlignedTimes(self, detID, correctedtimes, qdcs):
+    #     times={'left':{}, 'right':{}}
+    #     for i in correctedtimes: 
+    #         SiPM, correctedtime = i
+    #         # fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
+    #         fixed_ch=f'{detID}_{SiPM}'
+
+    #         if not fixed_ch in self.muAna.alignmentparameters: continue
+    #         d=self.muAna.alignmentparameters[fixed_ch]
+
+    #         qdc=self.muAna.GetChannelVal(SiPM, qdcs)
+    #         side=self.muAna.GetSide(f'{detID}_{SiPM}')
+    #         times[side][SiPM]=self.tw.reft - (correctedtime - d[0])
+    #     return times
         
     def WriteOutHistograms(self):
 
@@ -561,7 +609,7 @@ class ShowerProfiles(object):
 
         additionalkeys=['averagetime', 'deltatime', 'sidetime', 'AlignedSiPMtime', 'timingxt', 'y-barycentre', 'x-barycentre', 'deltay-muonbarycentre', 'deltax-muonbarycentre']
         for h in self.hists:
-            if h=='TDS0':
+            if h=='reft':
                 outfile.WriteObject(self.hists[h], self.hists[h].GetName(),'kOverwrite')
 
             elif len(h.split('_'))>1:
@@ -589,11 +637,11 @@ class ShowerProfiles(object):
         if abs(slopeX)>slopecut or abs(slopeY)>slopecut: return 0
         else: return 1
 
-    def TDS0cut(self,TDS0):
-        if TDS0==-6237.5: return 0
-        TDS0ns=TDS0*self.TDC2ns
-        if TDS0ns<13.75 or TDS0ns>15.45: return 0
-        return TDS0ns 
+    def TDS0cut(self,reft):
+        if reft==-6237.5: return 0
+        reftns=reft*self.TDC2ns
+        if reftns<13.75 or reftns>15.45: return 0
+        return reftns 
     
     def GetDistanceToSiPM(self,A):
         self.pred=ROOT.TMath.Sqrt((A.x()-self.Ex.x())**2+(A.y()-self.Ex.y())**2+(A.z()-self.Ex.z())**2)
@@ -606,19 +654,4 @@ class ShowerProfiles(object):
         R=ROOT.TMath.Sqrt(R_sq)
 
         tofcorrection=R/30
-        return tofcorrection         
-
-    def muonvelocity(self, hits):
-        
-        # title='Average time recorded for single muon tracks in US system;z-position [cm];#bar{t_{bar}} [ns]' 
-        finalhist=ROOT.TH1F('MuonVelocity',title,130,350,480)
-
-        for idx,hit in enumerate(hits):
-            SiPMtimes=[]
-            detID=hit.GetDetectorID()
-            s,p,b=self.muAna.parseDetID(detID)
-            if s!=2:continue
-            for ch in hit.GetAllTimes():
-                SiPM,clock=ch
-                SiPMtimes.append(t)
-                      
+        return tofcorrection 

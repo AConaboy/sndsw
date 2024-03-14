@@ -13,11 +13,11 @@ from SmallSiPMDelay import SmallSiPMDelays
 from AnalysisFunctions import Analysis as LaserAna
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--SiPM', dest='SiPM',type=int, default=1)
+parser.add_argument('--SiPM', dest='SiPM',type=int, default=20)
 parser.add_argument('--bar', dest='bar',type=int, default=-1)
 parser.add_argument('--PCB', dest='PCB',type=str, default='US')
 parser.add_argument('--trigger', dest='trigger',type=str, default='ext')
-parser.add_argument('-m','--mode', dest='mode',type=str, default='SiPM')
+parser.add_argument('-m','--mode', dest='mode',type=str, default='1')
 parser.add_argument('--triggerphase', dest='triggerphase',type=int, default=100)
 parser.add_argument('--LaserMeasurements', action='store_true', default=True)
 parser.add_argument('--laser-mode', dest='laser_mode', type=str, default='adc')
@@ -392,16 +392,21 @@ def timewalk_overlay_all():
 def TI18_timewalk_comparison():
     tw.TI18_laser_comparison()
     
-def TI18_timewalk_comparison_all():
+def TI18_timewalk_comparison_allmodes():
     for i in ('SiPM', '1', '2', '3'):
         tw.SetMode(i)
-        if i!='3':SiPMrange=range(1,81)
-        else: SiPMrange=range(9,49)
-        for SiPM in SiPMrange:
-            print(f'SiPM {SiPM}')
-            tw.SetSiPM(SiPM)
-            if lds.SiPMsize=='small': continue
-            tw.TI18_laser_comparison()
+        TI18_timewalk_comparison_all()
+
+def TI18_timewalk_comparison_all():
+    if lds.mode!='3':SiPMrange=range(1,81)
+    else: SiPMrange=range(9,49)
+    for SiPM in SiPMrange:
+        print(f'SiPM {SiPM}')
+        tw.SetSiPM(SiPM)
+        if lds.SiPMsize=='small': continue
+        tw.TI18_laser_comparison()
+    tw.PlotSystemTI18LaserDifference()
+        
 
 def pcbdelays():
     delays.GetData()
@@ -445,7 +450,8 @@ if options.TI18_timewalk_comparison:
     TI18_timewalk_comparison()
     
 if options.TI18_timewalk_comparison_all:
-    TI18_timewalk_comparison_all()    
+    TI18_timewalk_comparison_all() 
+
 
 if options.pcbdelays:
     pcbdelays()

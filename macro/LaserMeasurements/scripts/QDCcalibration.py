@@ -5,8 +5,9 @@ from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import numpy as np
 import json
 from scipy.optimize import curve_fit
-import csv
+import csv, os
 plt.rcParams['font.size'] = 16
+plt.rcParams['lines.markersize'] = 8
 
 class QDCcalibration(object):
 	def __init__(self, M):
@@ -86,7 +87,7 @@ class QDCcalibration(object):
 
 		fig, ax = plt.subplots(figsize=(10,6))
 		ax.set_xlim(0,max(self.current))
-		ax.errorbar(self.current, self.qdcs, yerr=self.errors, label=f'SiPM {self.M.SiPM}')
+		ax.errorbar(self.current.array, self.qdcs, yerr=self.errors, fmt='o', linestyle='-', markersize=8, label=f'SiPM {self.M.SiPM}')
 
 		if self.laser_mode.find('gamma')!=-1:
 			fracpixels_ax=ax.twiny()
@@ -125,12 +126,17 @@ class QDCcalibration(object):
 		
 		ax.set_xlabel(self.int_title)
 
-		if self.laser_mode.find('gamma')!=-1: ax.legend(lines + lines2, labels + labels2, loc='upper right')
+		if self.laser_mode.find('gamma')!=-1: ax.legend(lines + lines2, labels + labels2, loc='lower right')
 		else: ax.legend()
 
 		ax.grid(True, linestyle='--', alpha=0.7, color='gray')
 		ax.set_title(f'SiPM {self.M.SiPM} QDC measured as a function of {self.int_title.lower()}\n{self.M.titledict[self.M.mode]} illumination')
-		plotlocation = f'{self.M.afswork}analysis-plots/qdc_calibration/SiPM{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
+		
+		# Create directories if not existing already
+		d=f'{self.M.sndswpath}/analysis-plots/qdc_calibration/'
+		os.makedirs(d, exist_ok=True)
+
+		plotlocation = d+f'SiPM{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
 		plt.savefig(f'{plotlocation}', bbox_inches='tight')
 		print(f'SiPM {self.M.SiPM} qdc v intensity figure saved to {plotlocation}')
 
@@ -180,12 +186,12 @@ class QDCcalibration(object):
 		smallSiPMs_plot = ax.bar(smallSiPMs, smalloffsets, color='green', edgecolor='black', label='Small SiPMs')
 		ax.legend()
   
-		outfilename=f"{self.M.afswork}analysis-plots/qdc_calibration/qdcoffsets_{self.M.titledict[self.M.mode]}.png"
+		outfilename=f"{self.M.sndswpath}analysis-plots/qdc_calibration/qdcoffsets_{self.M.titledict[self.M.mode]}.png"
 		fig.savefig(outfilename)
 		print(f'Offsets plot save to: {outfilename}')
 		
 	def WriteOutOffsets(self):
-		offsets_filename = f'{self.M.afswork}Results/Offsets/qdcoffsets_{self.M.titledict[self.M.mode]}.csv'
+		offsets_filename = f'{self.M.sndswpath}Results/Offsets/qdcoffsets_{self.M.titledict[self.M.mode]}.csv'
 		# offsets_df = pd.DataFrame(self.linear_params, columns=['SiPM number', 'Linear fit'])
 		# offsets_df.to_csv(offsets_filename, index=False)
 		
@@ -217,7 +223,11 @@ class QDCcalibration(object):
 
 		for i in range(2): axes[i].legend()
 
-		plotlocation = f'{self.M.afswork}analysis-plots/qdc_calibration/bar{bar}_{self.M.titledict[self.M.mode]}.png'
+		# Create directories if not existing already
+		d=f'{self.M.sndswpath}/analysis-plots/qdc_calibration/'
+		os.makedirs(d, exist_ok=True)
+
+		plotlocation = d+f'bar{bar}_{self.M.titledict[self.M.mode]}.png'
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')
 
@@ -260,7 +270,11 @@ class QDCcalibration(object):
 				axes[idx//2, idx%2].grid(which='major', axis='both', linestyle='--')
 				axes[idx//2, idx%2].errorbar(self.current, self.qdcs, yerr=self.errors, fmt='o', color=self.colours[idx], label=f'SiPM {self.M.SiPM}')
 
-		plotlocation = f'{self.M.afswork}analysis-plots/qdc_calibration/illuminations/{style}-SiPM{self.M.SiPM}.png'
+		# Create directories if not existing already
+		d=f'{self.M.sndswpath}analysis-plots/qdc_calibration/illuminations/'
+		os.makedirs(d, exist_ok=True)
+
+		plotlocation = d+f'{style}-SiPM{self.M.SiPM}.png'
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')		
 

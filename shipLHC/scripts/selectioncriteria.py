@@ -114,7 +114,7 @@ class MuonSelectionCriteria(object):
             else: name='chi2xypred'
             self.hists[name]=ROOT.TH3F(name, chi2xypredtitle, 100, -90, 10, 80, 0, 80, 400, 0, 400)
 
-        self.hists['TDS0']=ROOT.TH1F('TDS0','Average of fired DS horizontal SiPMs;DS horizontal average [ns];Counts', 200, 0, 50)
+        self.hists['reft']=ROOT.TH1F('reft','Average of fired DS horizontal SiPMs;DS horizontal average [ns];Counts', 200, 0, 50)
 
         for i in (3,2):
             name=f'delta{i}{i-1}'
@@ -208,9 +208,9 @@ class MuonSelectionCriteria(object):
         if self.slopecut(): self.slopecut=True
         else: self.slopecut=False
         
-        self.TDS0, firedDSHbars=self.muAna.GetDSHaverage(self.MuFilter, hits) # Now returns in ns
-        if self.TDS0==-999: print(f'Event {self.M.EventNumber} has a fitted DS track but no DS horizontal bars with both SiPMs firing.')
-        self.hists['TDS0'].Fill(self.TDS0)
+        self.reft, firedDSHbars=self.muAna.GetDSHaverage(self.MuFilter, hits) # Now returns in ns
+        if self.reft==-999: print(f'Event {self.M.EventNumber} has a fitted DS track but no DS horizontal bars with both SiPMs firing.')
+        self.hists['reft'].Fill(self.reft)
         self.hists['firedDSHbars'].Fill(firedDSHbars)
 
         # Use the correct subsystems for 1 bar / plane cut
@@ -541,7 +541,7 @@ class MuonSelectionCriteria(object):
         outfile=f'testing_{self.options.runNumber}_{self.options.nStart}_{self.options.nEvents}.root'
         f=ROOT.TFile.Open(outfile, 'update')
         
-        # mainhistkeys=['dy', 'slopes', 'nSiPMs', 'timingdiscriminant', 'trackfitting', 'TDS0', ]
+        # mainhistkeys=['dy', 'slopes', 'nSiPMs', 'timingdiscriminant', 'trackfitting', 'reft', ]
         additionalhistkeys=['averagetime', 'DSxvScifix']
         for histname in self.M.h:
             if not any( [histname.find(additionalhistkey)>-1 for additionalhistkey in additionalhistkeys] ):
