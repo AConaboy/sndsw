@@ -118,10 +118,6 @@ class SystemAlignment(object):
             self.hists[xL]=ROOT.TH1F(xL,title,80, 0, 80)
         self.hists[xL].Fill(self.tw.pred)
 
-            barycentrex_hist = f'xbarycentre-{x}_plane{p}_{timer}'
-            if not barycentrex_hist in self.hists:
-                title='Barycentre in x, #frac{c_{scint}}{2}(t_{right}+t_{left});#frac{c_{scint}}{2}(t_{right}+t_{left}) [cm];Counts'
-                self.hists[barycentrex_hist] = ROOT.TH1F(barycentrex_hist, title, 160, -90, 60)
 
         # Looking at differences depending on whether the average or fastest times are used
         for timer in ('fastest', 'average'):
@@ -129,7 +125,12 @@ class SystemAlignment(object):
             if not dt in self.hists:
                 title='#Delta t(left, right);#Delta t_{L, R} [ns];Counts'
                 self.hists[dt]=ROOT.TH1F(dt,title,50, -5, 5)
-                
+            
+            barycentrex_hist = f'xbarycentre-{x}_plane{p}_{timer}'
+            if not barycentrex_hist in self.hists:
+                title='Barycentre in x, #frac{c_{scint}}{2}(t_{right}+t_{left});#frac{c_{scint}}{2}(t_{right}+t_{left}) [cm];Counts'
+                self.hists[barycentrex_hist] = ROOT.TH1F(barycentrex_hist, title, 160, -90, 60)
+               
             sumt = f'sumt-{x}_plane{p}_{timer}'
             if not sumt in self.hists:
                 title = 'corrected and aligned t_{right} + t_{left};t_{right} + t_{left} [ns];Counts'
@@ -224,7 +225,7 @@ class SystemAlignment(object):
 
     def WriteOutHistograms(self):
 
-        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/SystemAlignment_{self.options.nStart}.root'
+        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/SystemAlignment_{self.options.nStart}-TestingNewMethod.root'
         if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
         else: outfile=ROOT.TFile.Open(outfilename, 'create')
 
