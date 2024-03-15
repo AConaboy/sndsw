@@ -225,7 +225,7 @@ class SystemAlignment(object):
 
     def WriteOutHistograms(self):
 
-        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/SystemAlignment_{self.options.nStart}-TestingNewMethod.root'
+        outfilename=f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/SystemAlignment_{self.options.nStart}.root'
         if os.path.exists(outfilename): outfile=ROOT.TFile.Open(outfilename, 'recreate')
         else: outfile=ROOT.TFile.Open(outfilename, 'create')
 
