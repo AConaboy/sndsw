@@ -2,11 +2,7 @@
 import ROOT,os,sys, csv, subprocess,atexit,time
 from XRootD import client
 from XRootD.client.flags import DirListFlags, OpenFlags, MkDirFlags, QueryCode
-import Monitor
-import SndlhcMuonReco
-import SndlhcTracking
-import SndlhcGeo
-import TimeWalk, SelectionCriteria, SystemAlignment
+import Monitor, SndlhcMuonReco, SndlhcTracking, SndlhcGeo, TimeWalk
 import AnalysisFunctions as Analysis 
 import matplotlib.pyplot as plt 
 import matplotlib.gridspec as gridspec
@@ -75,6 +71,8 @@ parser.add_argument('--dycut', dest='dycut', action='store_true')
 # Run showerprofiles.ShowerDirection without considering the exact bar that the DS track extrapolates to
 parser.add_argument('--notDSbar', dest='notDSbar', action='store_true')
 parser.add_argument('--SiPMtimeCut', dest='SiPMtimeCut', action='store_true')
+# Update geofile, takes longer
+parser.add_argument('--updateGeoFile', dest='updateGeoFile', action='store_true')
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -180,19 +178,17 @@ class Numusignaleventtiming(object):
         # print(f'RunNr: {runNr}, runId: {runId}')
         # print(f'signal event in M.eventTree: {evt_number}, M.EventNumber: {self.M.EventNumber}, event number in partition: {eventheader.GetEventNumber()}')
 
-        """
-        # Temporarily commenting this out to minimise std out
-        if runNr < 4575:     options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
-        elif runNr < 4855:   options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
-        elif runNr < 5172:   options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
-        elif runNr < 5485:   options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
-        else:                options.geoFile =  "geofile_sndlhc_TI18_V1_2023.root"            
+        if options.updateGeoFile:
+            if runNr < 4575:     options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
+            elif runNr < 4855:   options.geoFile =  "geofile_sndlhc_TI18_V5_14August2022.root"
+            elif runNr < 5172:   options.geoFile =  "geofile_sndlhc_TI18_V6_08October2022.root"
+            elif runNr < 5485:   options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
+            else:                options.geoFile =  "geofile_sndlhc_TI18_V1_2023.root"            
 
-        self.M.snd_geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
-        self.M.MuFilter = self.M.snd_geo.modules['MuFilter']
-        self.M.Scifi       = self.M.snd_geo.modules['Scifi']
-        self.M.zPos = self.M.getAverageZpositions()
-        """
+            self.M.snd_geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
+            self.M.MuFilter = self.M.snd_geo.modules['MuFilter']
+            self.M.Scifi       = self.M.snd_geo.modules['Scifi']
+            self.M.zPos = self.M.getAverageZpositions()
         
         # print(f'Investigating run {runNr}, run event {evt_number}')
         firedUSDetIds = [i.GetDetectorID() for i in self.M.eventTree.Digi_MuFilterHits if i.GetDetectorID()//10000==2]
