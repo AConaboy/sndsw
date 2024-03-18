@@ -46,7 +46,7 @@ class TimeWalk(ROOT.FairTask):
 
         ioman=ROOT.FairRootManager.Instance()
         self.OT=ioman.GetSink().GetOutTree()
-   
+        
         lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
         self.MuFilter=lsOfGlobals.FindObject('MuFilter')
         self.Scifi=lsOfGlobals.FindObject('Scifi')
