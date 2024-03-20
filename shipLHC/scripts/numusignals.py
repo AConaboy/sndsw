@@ -491,7 +491,7 @@ class Numusignaleventtiming(object):
 
         self.df=pd.DataFrame(self.data)
 
-        filename='/eos/home-a/aconsnd/SWAN_projects/LaserMeasurements/barycentres'
+        filename='/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/barycentres.csv'
         if self.options.notDSbar==True: filename+='-notDSbar'
         elif self.options.dycut==True: filename+='-dycut'
         if self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
