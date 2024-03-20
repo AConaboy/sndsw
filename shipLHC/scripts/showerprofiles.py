@@ -268,7 +268,9 @@ class ShowerProfiles(object):
         qdcs = hit.GetAllSignals()
 
         # nSiPMs criteria on hits. Should replace with a histogram check
-        if len(qdcs) < 11: return
+        if len(qdcs) < 11: 
+            print(f'Fewer than 11 SiPMs firing!\nrun number: {runNr}, detID: {runNr}')
+            return
 
         qdc_sides = {'left':[], 'right':[]}
         
@@ -446,7 +448,7 @@ class ShowerProfiles(object):
 
     def WriteOutRecordedTimes(self):
         import pickle
-        filename=f'/eos/home-a/aconsnd/SWAN_projects/LaserMeasurements/numuhits-timing.data'
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits-timing.data'
         with open(filename, 'wb') as f:
             pickle.dump(self.data, f)
         print(f'File saved to {filename}')
