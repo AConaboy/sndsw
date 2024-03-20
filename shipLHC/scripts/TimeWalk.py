@@ -147,7 +147,7 @@ class TimeWalk(ROOT.FairTask):
 
         self.muAna.MakeAlignmentParameterDict(self.timealignment)
         self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
-        self.muAna.MakeTWCorrectionDict(self.TWCorrectionRun)
+        self.muAna.MakeTWCorrectionDict(self.timealignment)
 
         with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
             self.histformatting=json.load(x)            

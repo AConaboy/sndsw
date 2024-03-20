@@ -51,10 +51,10 @@ parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, defau
 parser.add_argument('--state', dest='state', type=str, default='uncorrected')
 
 # Cuts
-parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', action='store_true',default=False)
-parser.add_argument('--SlopesCut', dest='SlopesCut', action='store_true',default=False)
-parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', action='store_true',default=False)
-parser.add_argument('--CrossTalk', dest='CrossTalk', action='store_true',default=False)
+parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', action='store_true')
+parser.add_argument('--SlopesCut', dest='SlopesCut', action='store_true')
+parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', action='store_true')
+parser.add_argument('--CrossTalk', dest='CrossTalk', action='store_true')
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
@@ -200,7 +200,9 @@ class Numusignaleventtiming(object):
 
         # Get time alignment type of signal event
         alignment = self.muAna.GetTimeAlignmentType(runId)
+        print('Alignment:', alignment)
         self.muAna.MakeAlignmentParameterDict(alignment) # Load appropriate alignment parameters into muAna
+        self.muAna.MakeTWCorrectionDict(alignment)
 
         for m in self.monitorTasks:
             self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
@@ -491,7 +493,7 @@ class Numusignaleventtiming(object):
 
         self.df=pd.DataFrame(self.data)
 
-        filename='/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/barycentres.csv'
+        filename='/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/barycentres'
         if self.options.notDSbar==True: filename+='-notDSbar'
         elif self.options.dycut==True: filename+='-dycut'
         if self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'

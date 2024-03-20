@@ -1545,53 +1545,22 @@ class Analysis(object):
 		f.Close()
 		return entries
 
-	# def GetPolyParamRanges(self, runNr, subsystem, state, n=5):
-	# 	params={i:[0.,0.] for i in ('A', 'B', 'C')}
-	# 	path=f'{self.path}Polyparams/run{runNr}/'
-	# 	files=[i for i in os.listdir(path) if int(i.split('_')[1][0])==subsystem]
-	# 	counter=0
-	# 	for f in files:
-	# 		if f.split('_')[0].find(str(n)) == -1:continue
-	# 		#if idx>1: break
-	# 		fixed_ch=f"{f.split('_')[1]}_{f.split('.')[0].split('_')[-1]}"
-	# 		tmp = self.GetPolyParams(runNr, fixed_ch, n, iteration)
-	# 		if isinstance(tmp, int): continue
-	# 		else: fps=tmp[0]
-	# 		if fps==-999.: 
-	# 			print(f'{fixed_ch} has no poly params')
-	# 			continue
-
-	# 		if n==1:
-	# 			vals={p:fps[i*2] for i,p in enumerate(('A', 'B', 'C'))}
-	# 			if counter==0:
-	# 				for i in ('A', 'B', 'C'): params[i]=[vals[i], 1.1*vals[i]]
-	# 				# for idx,x in enumerate(('A', 'B', 'C')): params[x]=[fps[idx*2], fps[idx*2+1]]
-	# 		else: 
-	# 			for i in ('A', 'B', 'C'):
-	# 				if vals[i] < params[i][0]: params[i][0]=vals[i]
-	# 				if vals[i] > params[i][1]: params[i][1]=1.1*vals[i]
-	# 			if n==5:
-	# 			vals={p:fps[i*2] for i,p in enumerate(('A', 'B', 'C'))}
-	# 			if counter==0:
-	# 				for i in ('A', 'B', 'C'): params[i]=[vals[i], 1.1*vals[i]]
-	# 				# for idx,x in enumerate(('A', 'B', 'C')): params[x]=[fps[idx*2], fps[idx*2+1]]
-	# 			else: 
-	# 				for i in ('A', 'B', 'C'):
-	# 					if vals[i] < params[i][0]: params[i][0]=vals[i]
-	# 					if vals[i] > params[i][1]: params[i][1]=1.1*vals[i]         
-	# 		counter+=1
-
-	# 	return params
-
-	def MakeTWCorrectionDict(self, runNr, withErrors=False):
+	def MakeTWCorrectionDict(self, alignment, withErrors=False):
   
+		# Update stored string for alignment params stored
+		self.timealignment=alignment
+	
+		if alignment=='old': run=str(5097).zfill(6)
+		elif alignment=='new': run=str(5408).zfill(6)
+		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
+
 		d={}
 		for s in (1,2):
 			for p in range(self.systemAndPlanes[s]):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-						tmp=self.GetPolyParams(runNr, fixed_ch, state='uncorrected', n=self.CorrectionType)
+						tmp=self.GetPolyParams(run, fixed_ch, state='uncorrected', n=self.CorrectionType)
 						if not tmp: continue
 						else: paramsAndErrors=tmp[0]
 						if not withErrors: params=self.correctionparams(paramsAndErrors)
@@ -1599,6 +1568,7 @@ class Analysis(object):
 						d[fixed_ch]=params
 		if len(d)==0: self.twparameters=None
 		self.twparameters=d
+
 	def WriteTWParamDict(self):
 		if not hasattr(self, "twparameters"): self.MakeTWCorrectionDict(self.runNr)
 
