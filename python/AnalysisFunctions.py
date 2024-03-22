@@ -1561,7 +1561,9 @@ class Analysis(object):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
 						tmp=self.GetPolyParams(run, fixed_ch, state='uncorrected', n=self.CorrectionType)
-						if not tmp: continue
+						if not tmp: 
+							print(f'No tw params for {fixed_ch}')
+							continue
 						else: paramsAndErrors=tmp[0]
 						if not withErrors: params=self.correctionparams(paramsAndErrors)
 						else: params=paramsAndErrors

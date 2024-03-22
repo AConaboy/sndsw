@@ -52,10 +52,10 @@ parser.add_argument('--state', dest='state', type=str, default='uncorrected')
 parser.add_argument('--referencesystem', dest='referencesystem', type=int, default=3)
 
 # Cuts
-parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', type=int, default=0)
-parser.add_argument('--SlopesCut', dest='SlopesCut', type=int, default=1)
-parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', type=int, default=1)
-parser.add_argument('--CrossTalk', dest='CrossTalk', type=int, default=1)
+parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', action='store_true')
+parser.add_argument('--SlopesCut', dest='SlopesCut', action='store_true')
+parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', action='store_true')
+parser.add_argument('--XT', dest='XT', action='store_true')
 
 parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
 parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/user/a/aconsnd/Timing')
