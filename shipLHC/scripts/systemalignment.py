@@ -36,7 +36,7 @@ class SystemAlignment(object):
 
         self.hists=tw.hists
 
-        if options.CrossTalk:
+        if options.XT:
             from itertools import combinations
             self.vetocombinations={'left':list(combinations(range(8), 2)), 'right':list(combinations(range(8, 16), 2))}
             self.UScombinations={'left':list(combinations([0,1,3,4,6,7], 2)), 'right':list(combinations([8,9,11,12,14,15], 2))}
@@ -48,10 +48,9 @@ class SystemAlignment(object):
         self.sigmatds0=0.263 # ns 
 
     def FillSiPMHists(self, hit):
-
         detID=hit.GetDetectorID()
 
-        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned')
+        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='aligned')
 
         for ch in correctedtimes:
             SiPM, time=ch
@@ -62,24 +61,24 @@ class SystemAlignment(object):
             if not SiPMtime in self.hists:
                 title=f'DS horizontal average relative, TW + ToF corrected + DS aligned SiPM time'
                 splittitle='#splitline{'+ReadableDetID+'}{'+title+'}'
-                axestitles='t^{0}_{DS} - t_{SiPM '+str(SiPM)+'}^{tw corr} - d_{SiPM '+str(SiPM)+'} [ns];Counts'
+                axestitles='t^{DS}_{0} - t_{SiPM '+str(SiPM)+'}^{tw corr} - d_{SiPM '+str(SiPM)+'} [ns];Counts'
                 fulltitle=splittitle+';'+axestitles
-                if self.timealignment=='old': self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, 0, 20)
-                else: self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 2000, -5, 5)
+                # if self.timealignment=='old': self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, -10, 10)
+                self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, -10, 10)
+                # else: self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 2000, -5, 5)
 
             d=self.muAna.alignmentparameters[fixed_ch]
 
-            self.hists[SiPMtime].Fill(self.tw.reft - time - d[0])
+            self.hists[SiPMtime].Fill(time)
 
     def FillBarHists(self, hit):
-
         # if not self.tw.passslopecut: return
         
         detID=hit.GetDetectorID()
         s, p, b= self.muAna.parseDetID(detID)
 
         # correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned')
-        correctedtimes = self.muAna.GetCorrectedTimes(hit, x=0, mode='unaligned')
+        correctedtimes = self.muAna.GetCorrectedTimes(hit, x=0, mode='aligned')
         qdcs = hit.GetAllSignals()
         aligned_times={'left':{}, 'right':{}}
         times={'left':{}, 'right':{}} # Only apply time walk correction
@@ -93,7 +92,8 @@ class SystemAlignment(object):
 
             qdc=self.muAna.GetChannelVal(SiPM, qdcs)
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            aligned_times[side][SiPM] = self.tw.reft - correctedtime - d[0]
+            # aligned_times[side][SiPM] = self.tw.reft - correctedtime - d[0]
+            aligned_times[side][SiPM] = correctedtime
             # times[side][SiPM] = correctedtime - d[0]
 
         if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
@@ -117,7 +117,6 @@ class SystemAlignment(object):
             title='x_{L};x_{L} [cm];Counts'
             self.hists[xL]=ROOT.TH1F(xL,title,80, 0, 80)
         self.hists[xL].Fill(self.tw.pred)
-
 
         # Looking at differences depending on whether the average or fastest times are used
         for timer in ('fastest', 'average'):
@@ -181,7 +180,7 @@ class SystemAlignment(object):
 
     def XTHists(self, hit):
 
-        correctedtimes, qdcs = self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='unaligned'), hit.GetAllSignals()
+        correctedtimes, qdcs = self.muAna.GetCorrectedTimes(hit, self.tw.pred, mode='aligned'), hit.GetAllSignals()
         times={'left':{}, 'right':{}}
         detID=hit.GetDetectorID()
         s,p,b = self.muAna.parseDetID(detID)
@@ -194,14 +193,14 @@ class SystemAlignment(object):
             d=self.muAna.alignmentparameters[fixed_ch]
 
             side=self.muAna.GetSide(f'{detID}_{SiPM}')
-            times[side][SiPM]=self.tw.reft - correctedtime - d[0]
+            times[side][SiPM] = correctedtime
 
         xrefthistname=f'timingxt_reft_{self.subsystemdict[s]}'
         if not xrefthistname in self.hists:
             title='Timing correlation between all '+self.subsystemdict[s]+' SiPMs and t_{0}^{DS}'
-            axestitles='t_{0}^{DS} - t_{SiPM}^{tw corr} [ns];t_{0}^{DS} [ns];Counts'
+            axestitles='t_{0}^{DS} - t_{SiPM}^{tw corr} - d_{SiPM} [ns];t_{0}^{DS} [ns];Counts'
             fulltitle=title+';'+axestitles
-            if self.timealignment=='old': self.hists[xrefthistname]=ROOT.TH1F(xrefthistname,fulltitle, 150, -5, 20, 125, 0, 25)
+            if self.timealignment=='old': self.hists[xrefthistname]=ROOT.TH2F(xrefthistname,fulltitle, 150, -5, 20, 125, 0, 25)
             else: self.hists[xrefthistname]=ROOT.TH2F(xrefthistname,fulltitle, 150, -5, 20, 125, 0, 25)
 
         for side in times:
@@ -217,7 +216,7 @@ class SystemAlignment(object):
                     splittitle='#splitline{'+title+'}{'+subtitle+'}'
                     axestitles='t_{0}^{DS} - t_{SiPM '+str(i)+'}^{tw corr} [ns];t_{0}^{DS} - t_{SiPM '+str(j)+'}^{tw corr} [ns];Counts'
                     fulltitle=splittitle+';'+axestitles
-                    if self.timealignment=='old': self.hists[xthistname]=ROOT.TH1F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
+                    if self.timealignment=='old': self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
                     else: self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
 
                 self.hists[xthistname].Fill(time_i, time_j)

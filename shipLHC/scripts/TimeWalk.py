@@ -207,13 +207,13 @@ class TimeWalk(ROOT.FairTask):
             self.reft, firedDSHbars=x
             if not 'reft' in self.hists:
                 self.hists['reft']=ROOT.TH1F('reft','Average time of DS horizontal bars;DS horizontal average time [ns];Counts', 200, 0, 50)
-                self.hists['reft'].Fill(self.reft)
+            self.hists['reft'].Fill(self.reft)
         elif self.referencesystem==1:
             self.reft = self.muAna.GetScifiAverageTime(scifi_hits)
             if not self.reft:return
             if not 'reft' in self.hists:
                 self.hists['reft']=ROOT.TH1F('reft','Average time of SiPMs in Scifi track;Time [ns];Counts', 200, 0, 50)
-                self.hists['reft'].Fill(self.reft)            
+            self.hists['reft'].Fill(self.reft)            
         ### Timing discriminant cut
         self.td = self.muAna.GetTimingDiscriminant(hits) # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
         if self.TimingDiscriminantCut(): self.passtdcut=True 
@@ -262,9 +262,9 @@ class TimeWalk(ROOT.FairTask):
             channels_t=hit.GetAllTimes()
             channels_qdc=hit.GetAllSignals()
 
-            if self.options.mode=='systemalignment' and s!=3:
+            if self.options.mode=='systemalignment' and s==2:
                 self.sa.FillSiPMHists(hit)
-                if self.options.CrossTalk: self.sa.XTHists(hit)
+                if self.options.XT: self.sa.XTHists(hit)
                 self.sa.FillBarHists(hit)
                 continue
 
@@ -497,7 +497,7 @@ class TimeWalk(ROOT.FairTask):
                     path_obj=Path(outpath)
                     path_obj.mkdir(parents=True, exist_ok=True)
                     outfile=f'timewalk_{fixed_ch}_{self.options.nStart}.root'
-                    if os.path.exists(outpath+outfile): f=ROOT.TFile.Open(outpath+outfile, 'recreate')
+                    if os.path.exists(outpath+outfile): f=ROOT.TFile.Open(outpath+outfile, 'update')
                     else: f=ROOT.TFile.Open(outpath+outfile, 'create')
                     f.WriteObject(hist, hist.GetName(), 'kOverwrite')
                     if self.options.mode=='zeroth':
