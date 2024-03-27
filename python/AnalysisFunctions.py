@@ -1255,7 +1255,7 @@ class Analysis(object):
 
 		if self.options.numuStudy:
 			runID = self.task.M.eventTree.EventHeader.GetRunId()
-			print('****'*10, f'\nRunId: {runID}\nTime alignment of run: {self.GetTimeAlignmentType(runID)}\nStored alignment parameters of type:{self.timealignment}\n', '****'*10)
+			# print('****'*10, f'\nRunId: {runID}\nTime alignment of run: {self.GetTimeAlignmentType(runID)}\nStored alignment parameters of type:{self.timealignment}\n', '****'*10)
 
 		alignedtimes=[]
 		clocks, qdcs=hit.GetAllTimes(), hit.GetAllSignals()
@@ -1720,3 +1720,15 @@ class Analysis(object):
 			outfile.WriteObject(canv, canv.GetName(), 'kOverwrite')
 		print(f'{i+1} canvases written to outfilename')
 		outfile.Close()
+
+	def MakePlaneWiseBarMapThing(self, MuFilter):
+
+		d={}
+		for plane in range(5):
+			for bar in range(10):
+				detID = int(f'2{plane}00{bar}')
+				MuFilter.GetPosition(detID, self.A, self.B)
+				d[detID] = [self.A.x(), self.B.x(), self.A.y(), self.B.y()]
+
+		return d
+

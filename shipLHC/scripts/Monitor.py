@@ -317,7 +317,7 @@ class Monitoring():
             if self.options.FairTask_convRaw:
                 self.options.online.sTree.GetEvent(self.options.online.sTree.GetEntries()-1)
             for t in self.FairTasks: 
-                if not t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=options.nDSPlanes)
+                if not t=='simpleTracking': self.FairTasks[t].ExecuteTask()
                 else: self.FairTasks[t].ExecuteTask(options.trackType)
             self.eventTree = self.options.online.sTree
       else: 
