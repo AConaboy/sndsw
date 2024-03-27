@@ -210,7 +210,6 @@ class ShowerProfiles(object):
             if td < mean-2*stddev or td > mean+2*stddev: return False
             else: return True
 
-
     def ShowerDirection(self, hits):
         
         self.all_times={i:{} for i in range(5)}
@@ -249,20 +248,13 @@ class ShowerProfiles(object):
 
             self.DetermineAverages(hit)
 
-        self.FillBarycentrePlots()
-        # self.WriteOutRecordedTimes()
-        # self.data[self.tw.M.EventHeader.GetRunId()] = {}
+        self.FillBarycentrePlots(hits)
 
     def DetermineAverages(self, hit):
-        
-        data=self.RecordData(hit)
-        runNr=self.tw.M.eventTree.EventHeader.GetRunId()
         detID=hit.GetDetectorID()
-        if not runNr in self.data: self.data[runNr]={}
-        if not detID in self.data[runNr]: self.data[runNr][detID]={}
-        self.data[runNr][hit.GetDetectorID()][self.tw.M.EventNumber]=data 
-            
         s,p,b = self.muAna.parseDetID(detID)
+        
+        runNr=self.tw.M.eventTree.EventHeader.GetRunId()
         
         ### Apply time-walk correction to all times in the hit.
         qdcs = hit.GetAllSignals()
@@ -306,7 +298,13 @@ class ShowerProfiles(object):
         self.all_times[p][detID] = averages
         self.all_qdcs[p][detID] = qdc_sides
 
-    def FillBarycentrePlots(self):
+        # if self.options.numuStudy:
+        #     data=self.RecordData(hit)
+        #     if not runNr in self.data: self.data[runNr]={}
+        #     if not detID in self.data[runNr]: self.data[runNr][detID]={}
+        #     self.data[runNr][hit.GetDetectorID()][self.tw.M.EventNumber]=data
+
+    def FillBarycentrePlots(self, hits):
 
         for plane in range(5):
 
@@ -321,45 +319,69 @@ class ShowerProfiles(object):
 
             # Maintain dictionary stucture
             if any([len(data) == 0 for data in (times, qdcs)]): 
-                if self.numuStudy: self.barycentres[self.runId][plane] = [[(-999,-999), (-999,-999)],[xEx, yEx]]
+                if self.numuStudy: 
+                    self.barycentres[self.runId][int(f'{plane}0000')] = [[(-999,-999), (-999,-999)],[xEx, yEx]]
+                    for hit in hits:
+                        detID = hit.GetDetectorID()
+                        s,p,b = self.muAna.parseDetID(detID)
+                        if not all([s==2, p==plane]): continue                     
+                        data=self.RecordData(hit, barycentres=((-999,-999), (-999,-999)), Ex=(xEx, yEx) )
+                        if not self.runId in self.data: self.data[self.runId]={}
+                        if not detID in self.data[self.runId]: self.data[self.runId][detID]={}
+                        self.data[self.runId][detID][self.tw.M.EventNumber]=data                        
                 continue
 
             # Both return -999 if fucked
             y_barycentre = self.GetYBarycentre(qdcs)
-            x_barycentre = self.GetXBarycentre(qdcs, times, Nfiredbars)
+            x_barycentres = self.GetXBarycentres(qdcs, times, Nfiredbars)
 
-            if self.numuStudy: self.barycentres[self.runId][plane] = [[x_barycentre, y_barycentre], [xEx, yEx]]
+            if self.numuStudy:  
+                
+                # [self.barycentres[self.runId][detID] = [[x_barycentres[detID], y_barycentre], [xEx, yEx]] for detID in x_barycentres]
+                for hit in hits:
+                    detID = hit.GetDetectorID()
+                    s,p,b = self.muAna.parseDetID(detID)
+                    if not all([s==2, p==plane]): continue 
 
-            deltay = yEx - y_barycentre[0]
-            deltax = xEx - x_barycentre[0]
+                    if detID in x_barycentres: 
+                        self.barycentres[self.runId][detID] = [[x_barycentres[detID], y_barycentre], [xEx, yEx]]
 
-            # if self.numuStudy:
-            #     self.barycentres[runId][plane] = [[x_barycentre, y_barycentre], []]
+                        data=self.RecordData(hit, barycentres=(x_barycentres[detID], y_barycentre), Ex=(xEx, yEx))
+                        if not self.runId in self.data: self.data[self.runId]={}
+                        if not detID in self.data[self.runId]: self.data[self.runId][detID]={}
+                        self.data[self.runId][detID][self.tw.M.EventNumber]=data
             
-            y_barycentre_hist = f'y-barycentre_plane{plane}'
-            if not y_barycentre_hist in self.hists:
-                title = f'Barycentre in y from QDC weighting;y-barycentre [cm];Counts'
-                self.hists[y_barycentre_hist] = ROOT.TH1F(y_barycentre_hist, title, 150, 0, 150)
-            self.hists[y_barycentre_hist].Fill(y_barycentre[0])
+            # Fill histograms for each detID's determined x_barycentre
+            for detID in x_barycentres:
+                xb = x_barycentres[detID]
 
-            x_barycentre_hist = f'x-barycentre_plane{plane}'
-            if not x_barycentre_hist in self.hists:
-                title = 'Barycentre in x: 1/2*c_{scint}*(t_{L}+t_{R});x-barycentre [cm];Counts'
-                self.hists[x_barycentre_hist] = ROOT.TH1F(x_barycentre_hist, title, 200, -100, 100)
-            self.hists[x_barycentre_hist].Fill(x_barycentre[0])            
+                deltay = yEx - y_barycentre[0]
+                deltax = xEx - xb[0]
+                
+                y_barycentre_hist = f'y-barycentre_plane{plane}'
+                if not y_barycentre_hist in self.hists:
+                    title = f'Barycentre in y from QDC weighting;y-barycentre [cm];Counts'
+                    self.hists[y_barycentre_hist] = ROOT.TH1F(y_barycentre_hist, title, 150, 0, 150)
+                self.hists[y_barycentre_hist].Fill(y_barycentre[0])
 
-            deltaymuonbarycentre = f'deltay-muonbarycentre_plane{plane}'
-            if not deltaymuonbarycentre in self.hists:
-                title='Difference in y between muon and barycentre from QDC for plane '+str(plane+1)+';#Delta y (DS track, QDC barycentre);Counts'
-                self.hists[deltaymuonbarycentre] = ROOT.TH1F(deltaymuonbarycentre, title, 140, -70, 70)
-            self.hists[deltaymuonbarycentre].Fill(deltay)
-        
-            deltaxmuonbarycentre = f'deltax-muonbarycentre_plane{plane}'
-            if not deltaxmuonbarycentre in self.hists:
-                title='Difference in x between muon and barycentre from timing for plane '+str(plane+1)+';#Delta x (DS track, QDC barycentre);Counts'
-                self.hists[deltaxmuonbarycentre] = ROOT.TH1F(deltaxmuonbarycentre, title, 140, -70, 70)
-            self.hists[deltaxmuonbarycentre].Fill(deltax)
+                x_barycentre_hist = f'x-barycentre_plane{plane}'
+                if not x_barycentre_hist in self.hists:
+                    title = 'Barycentre in x: 1/2*c_{scint}*(t_{L}+t_{R});x-barycentre [cm];Counts'
+                    self.hists[x_barycentre_hist] = ROOT.TH1F(x_barycentre_hist, title, 200, -100, 100)
+                self.hists[x_barycentre_hist].Fill(xb[0])            
 
+                deltaymuonbarycentre = f'deltay-muonbarycentre_plane{plane}'
+                if not deltaymuonbarycentre in self.hists:
+                    title='Difference in y between muon and barycentre from QDC for plane '+str(plane+1)+';#Delta y (DS track, QDC barycentre);Counts'
+                    self.hists[deltaymuonbarycentre] = ROOT.TH1F(deltaymuonbarycentre, title, 140, -70, 70)
+                self.hists[deltaymuonbarycentre].Fill(deltay)
+            
+                deltaxmuonbarycentre = f'deltax-muonbarycentre_plane{plane}'
+                if not deltaxmuonbarycentre in self.hists:
+                    title='Difference in x between muon and barycentre from timing for plane '+str(plane+1)+';#Delta x (DS track, QDC barycentre);Counts'
+                    self.hists[deltaxmuonbarycentre] = ROOT.TH1F(deltaxmuonbarycentre, title, 140, -70, 70)
+                self.hists[deltaxmuonbarycentre].Fill(deltax)
+    
     def GetYBarycentre(self, qdcs):
         
         barQDCs = {k:0 for k in qdcs}
@@ -377,7 +399,7 @@ class ShowerProfiles(object):
         if not len(weighted_y_positions)==0: return sum(weighted_y_positions)/len(weighted_y_positions), 3
         else: return -999, -999
         
-    def GetXBarycentre(self, qdcs, times, Nfiredbars):
+    def GetXBarycentres(self, qdcs, times, Nfiredbars):
         
         """
         Determine x-barycentre using bar with largest QDC
@@ -396,7 +418,7 @@ class ShowerProfiles(object):
             if detID == self.muAna.GetExtrapolatedBarDetID(p): 
                 xEx, yEy, zEx = self.muAna.GetExtrapolatedPosition(p)
                 self.MuFilter.GetPosition(detID, self.A, self.B) # A is left, B is right
-                shower_side = 'right' if abs(self.A.x() - xEx)>abs(self.B.x() - xEx) else 'left'
+                shower_side = 'right' if abs(self.A.x() - xEx) > abs(self.B.x() - xEx) else 'left'
                 c_showerside = average_left_cscint if shower_side=='left' else average_right_cscint
                 x_shower = averages[shower_side] * c_showerside[0]
                 x_barycentre = x_shower + Nfiredbars/2*6 # 6 cm is from MuFilter.GetConfParF('MuFilter/UpstreamBarY')
@@ -419,9 +441,10 @@ class ShowerProfiles(object):
 
         mean_value = sum(item[0] for item in x.values()) / len(x)
         mean_uncertainty = sum(item[1] for item in x.values()) / len(x)
-        return mean_value, mean_uncertainty
+        # return mean_value, mean_uncertainty
+        return x
         
-    def RecordData(self, hit):
+    def RecordData(self, hit, barycentres, Ex):
         detID = hit.GetDetectorID()
         qdcs = [(SiPM, qdc) for SiPM,qdc in hit.GetAllSignals()]
         rawtimes = [(SiPM, cc*self.TDC2ns) for SiPM,cc in hit.GetAllTimes()]
@@ -443,6 +466,18 @@ class ShowerProfiles(object):
                         data[SiPM]['d'] = self.muAna.alignmentparameters[f'{detID}_{SiPM}']
                         data[SiPM]['trackrelated'] = self.trackrelated
                         data[SiPM]['cscint'] = self.muAna.cscintvalues[f'{detID}_{SiPM}']
+                        
+                        # Writing out determined barycentres
+                        xbc, ybc = barycentres
+                        data[SiPM]['x-barycentre'] = xbc[0]
+                        data[SiPM]['d x-barycentre'] = xbc[1]
+                        data[SiPM]['y-barycentre'] = ybc[0]
+                        data[SiPM]['d y-barycentre'] = ybc[1]
+
+                        # Writing out extrapolated positions
+                        xEx, yEx = Ex
+                        data[SiPM]['xEx'] = xEx
+                        data[SiPM]['yEx'] = yEx
 
         return data
 

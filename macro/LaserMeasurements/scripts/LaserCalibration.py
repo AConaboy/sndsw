@@ -21,6 +21,7 @@ class LaserCalibration(object):
         self.intensityprofile=self.GetIntensityProfile()
         self.fig, self.axes = plt.subplots(3, 1, figsize=(10,20)) # plot: adc v uncalibrated, adc v calibrated, n_gamma v calibrated 
         self.calibratedADC_2_incidentPhotons_per_mmsq = 1/self.config['calibration_channel_gain'] * 1/self.config['calibration_channel_area'] * 1/self.config['calibration_channel_PDE']
+        # self.incidentPhotons_per_mmsq2Npe = self.config['cali']
         self.linearstartpoint=20
 
     def ReadConfig(self):
@@ -56,14 +57,6 @@ class LaserCalibration(object):
         self.axes[0].grid(True)
         self.axes[0].set_title('Uncalibrated intensities')
         self.axes[0].legend()
-
-        # Draw fit on plot
-        # textbox = patches.Rectangle((12,62), 25,5, linewidth=1, edgecolor='black', facecolor='white')
-        # plt.gca().add_patch(textbox)
-        # eqn_text = f'y={self.coefficients[0]:.2f}x {self.coefficients[1]:.2f}'
-        # chi2_text = f'$\\chi^2_\\nu$ = {red_chi2:.2f}' 
-        # self.axes[0].text(55,500, eqn_text, fontsize=12, color='black')
-        # self.axes[0].text(55,250, chi2_text, fontsize=12, color='black')
         
     def linearfunction(self, x, a, b):	
         return a*x + b
@@ -134,11 +127,8 @@ class LaserCalibration(object):
                 adc_error = adc_interpolated*adc_relerror
 
                 new_row=[intensity,intensity,adc_interpolated,adc_error,n_incident_photons] 
-                # new_row=[intensity,intensity,adc_interpolated,n_incident_photons] 
                 self.calibrated_data.loc[i] = new_row                
 
-        # sorted_indices = np.argsort(self.calibrated_data[:, 0])
-        # self.calibrated_data[sorted_indices]
         self.calibrated_data = self.calibrated_data.sort_values(by='Laser intensity [%]')
 
     def GetADCerror(self, intensity):
@@ -146,7 +136,6 @@ class LaserCalibration(object):
         # print(intensity)
         if intensity in self.df['Laser intensity [%]'].array: 
             adc_relerror = self.df.loc[self.df['Laser intensity [%]'] == intensity, 'Error [a.u]'].values[0] / self.df.loc[self.df['Laser intensity [%]'] == intensity, 'Average adc [a.u]'].values[0]
-
 
         else:
             # index of next largest value of laser intensity 
@@ -172,14 +161,8 @@ class LaserCalibration(object):
         self.axes[1].legend() 
         
     def PlotNincidentPhotons(self):
-
-        # self.axes[2].errorbar(self.calibrated_data[:, 1], self.calibrated_data[:, 3], yerr=np.sqrt(self.calibrated_data[:, 3]), color='C1', label='Incident $n_{\gamma}$ per $mm^{2}$')
         
         ax2 = self.axes[2].twinx()
-        
-        # detectedphotons = self.calibrated_data['Incident photons / mm_sq'] / self.cal
-        # self.axes[2].errorbar(self.calibrated_data['Calibrated laser intensity [%]'], detectedphotons, yerr=np.sqrt(detectedphotons), color='C0', label='Detected $n_{\gamma}$')
-        # self.axes[2].plot(self.x_fit, self.y_fit, label='Linear fit', color='orange', linestyle='-')
 
         self.axes[2].set_xlabel('Calibrated laser intensity [%]')
         self.axes[2].set_ylabel('$n_{\gamma} / mm^{2}$')
@@ -201,12 +184,6 @@ class LaserCalibration(object):
     def WriteOutCalibratedIntensities(self):
         calibrated_intensities_file = f"{self.path}/configuration/calibrated_intensities.csv"
         self.calibrated_data.to_csv(calibrated_intensities_file)   
-        # with open(calibrated_intensities_file, 'w', newline='') as f:
-        #     writer=csv.writer(f)
-        #     writer.writerow(["Laser intensity [%]", "Calibrated laser intensity [%]", "Average adc [a.u]", "Incident photons / mm_sq"])
-
-        #     for x in self.calibrated_data:
-        #         writer.writerow(x)
 
         print(f'Calibrated intensities written to {calibrated_intensities_file}')
 

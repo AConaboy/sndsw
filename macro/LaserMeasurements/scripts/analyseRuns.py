@@ -336,7 +336,7 @@ def offset_determination():
     qdccalib.WriteOutOffsets()
     
     # Write out offsets
-    offsets_filename = f'{lds.afswork}Results/Offsets/qdcoffsets_{lds.titledict[lds.mode]}.csv'
+    offsets_filename = f'{lds.sndswpath}Results/Offsets/qdcoffsets_{lds.titledict[lds.mode]}.csv'
     offsets_df = pd.DataFrame(qdccalib.linear_params, columns=['SiPM number', 'Linear fit'])
     offsets_df.to_csv(offsets_filename, index=False)    
 

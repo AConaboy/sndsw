@@ -63,6 +63,8 @@ parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experim
 parser.add_argument('--mode', dest='mode', type=str, default='showerprofiles')
 parser.add_argument('-C', '--HTCondor', dest='HTCondor', action='store_true')
 parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
+parser.add_argument('--numuStudy', dest='numuStudy', action='store_true', default=True)
+# options.numuStudy=True
 
 # Investigate small SiPMs
 parser.add_argument('--SmallSiPMcheck', dest='SmallSiPMcheck', action='store_true')
@@ -115,6 +117,7 @@ class Numusignaleventtiming(object):
 
         else:
             self.MakeSignalPartitions()
+        options.numuStudy=True
 
     def MakeSignalPartitions(self):
         numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
@@ -153,7 +156,6 @@ class Numusignaleventtiming(object):
 
         if options.Task=='TimeWalk':
             options.mode='showerprofiles'
-            options.numuStudy=True
             self.monitorTasks['TimeWalk'] = TimeWalk.TimeWalk(options, self.M) 
               
         self.tw = self.monitorTasks['TimeWalk']
@@ -167,6 +169,8 @@ class Numusignaleventtiming(object):
 
         for runNr in runs:
             self.InvestigateEvent(runNr)
+        self.tw.sp.WriteOutRecordedTimes()
+        self.MakeAngularPlots()
         
     def InvestigateEvent(self, runNr):
         evt_number=self.GetSignalEventNumber(runNr)
