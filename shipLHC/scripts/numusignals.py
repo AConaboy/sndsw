@@ -72,6 +72,7 @@ parser.add_argument('--SmallSiPMcheck', dest='SmallSiPMcheck', action='store_tru
 parser.add_argument('--dycut', dest='dycut', action='store_true')
 # Run showerprofiles.ShowerDirection without considering the exact bar that the DS track extrapolates to
 parser.add_argument('--notDSbar', dest='notDSbar', action='store_true')
+parser.add_argument('--SiPMmediantimeCut', dest='SiPMmediantimeCut', action='store_true')
 parser.add_argument('--SiPMtimeCut', dest='SiPMtimeCut', action='store_true')
 # Update geofile, takes longer
 parser.add_argument('--updateGeoFile', dest='updateGeoFile', action='store_true')
@@ -125,6 +126,7 @@ class Numusignaleventtiming(object):
             reader=csv.reader(f)
             nu_mu_data=[r for r in reader]
         self.nu_mu_events={int(x[0]):(int(x[1]),int(x[2])) for x in nu_mu_data}
+        # self.muAna.Get_numuevents()
 
         self.signalpartitions={}
         self.eventChain=ROOT.TChain("rawConv")
@@ -498,9 +500,11 @@ class Numusignaleventtiming(object):
         self.df=pd.DataFrame(self.data)
 
         filename='/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/barycentres'
-        if self.options.notDSbar==True: filename+='-notDSbar'
-        elif self.options.dycut==True: filename+='-dycut'
-        if self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
+        if self.options.notDSbar: filename+='-notDSbar'
+        elif self.options.dycut: filename+='-dycut'
+        
+        if self.options.SiPMmediantimeCut: filename+='-SiPMmediantimeCut'
+        if self.options.SiPMtimeCut: filename+='-SiPMtimeCut'
         self.df.to_csv(f'{filename}.csv')
         print(f'Data written to {filename}.csv')
 
@@ -528,7 +532,7 @@ class Numusignaleventtiming(object):
             elif len(histname.split('_')) == 2:
 
                 hist=self.tw.hists[histname]
-                key, whatever =histname.split('_')
+                key, whatever = histname.split('_')
                 
                 if not hasattr(outfile, key): outfile.mkdir(key)
                 tdir = outfile.Get(key)

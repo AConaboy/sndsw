@@ -47,6 +47,8 @@ class Analysis(object):
 		if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype
 		else: self.fileext='csv'
 
+		if options.numuStudy: self.Get_numuevents()
+
 		self.sigmatds0=0.263, 9.5E-5
 
 	def SetTask(self, task):
@@ -575,6 +577,13 @@ class Analysis(object):
 			if fSiPM == SiPM:
 				return val
 		return
+		
+	def Get_numuevents(self):
+		numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
+		with open(numusignalevent_filepath, 'r') as f:
+			reader=csv.reader(f)
+			nu_mu_data=[r for r in reader]
+		self.nu_mu_events={int(x[0]):(int(x[1]),int(x[2])) for x in nu_mu_data}
 
 	def OneHitPerSystem(self, hits, systems, Nfired=False):
 		verbose=self.verbose
@@ -1016,24 +1025,37 @@ class Analysis(object):
 		sorted_d={k:v for k,v in sorted_tuples}
 		self.timeresolutionvalues=sorted_d
 
-	def GetPolyParams(self, runNr, fixed_ch, state='uncorrected', n=5):
-		iteration=0 if state=='uncorrected' else 1
-		if not os.path.exists(f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv'): return 
-		with open(f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv', 'r') as f:
-			reader=csv.reader(f)
-			alldata=[r for r in reader]
-			if len(alldata)==0:return
-			data=alldata[iteration]
+	def GetPolyParams(self, runNr, fixed_ch, state='uncorrected', n=5, mode='json'):
+		fname=f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.{mode}'
+		if not os.path.exists(fname): 
+			return 
 		
-		if n==4:		
-			params=[float(i) for i in data[1:11]]
-			limits=[float(i) for i in data[11:13]]
-			# if len(data)==15: tds0mean=[float(i) for i in data[13:]]
-		elif n==5:
-			params=[float(i) for i in data[1:13]]
-			limits=[float(i) for i in data[13:15]]
-			# tds0mean=[float(i) for i in data[15:]]
-		return params,limits
+		if mode=='csv':
+			iteration=0 if state=='uncorrected' else 1
+			with open(fname, 'r') as f:
+				reader=csv.reader(f)
+				alldata=[r for r in reader]
+				if len(alldata)==0:return
+				data=alldata[iteration]
+			
+			if n==4:		
+				params=[float(i) for i in data[1:11]]
+				limits=[float(i) for i in data[11:13]]
+				# if len(data)==15: tds0mean=[float(i) for i in data[13:]]
+			elif n==5:
+				params=[float(i) for i in data[1:13]]
+				limits=[float(i) for i in data[13:15]]
+				# tds0mean=[float(i) for i in data[15:]]
+			return params,limits
+		
+		elif mode=='json':	
+			with open(fname, 'r') as f:			
+				alldata = json.load(f)
+				data=alldata[state]
+			if n==5:
+				params=[float(i) for i in data[1:13]]
+				limits=[float(i) for i in data[13:15]]
+			return params, limits
 
 	def Gettds0relativetime(self, runNr, fixed_ch, mode='mean', state='uncorrected', n=5):
 		
@@ -1555,7 +1577,7 @@ class Analysis(object):
 		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
 
 		d={}
-		for s in (1,2):
+		for s in (2,): # Only make dict for US
 			for p in range(self.systemAndPlanes[s]):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
@@ -1572,12 +1594,13 @@ class Analysis(object):
 		self.twparameters=d
 
 	def WriteTWParamDict(self):
-		if not hasattr(self, "twparameters"): self.MakeTWCorrectionDict(self.runNr)
+		if not hasattr(self, "twparameters"): self.MakeTWCorrectionDict(self.timealignment)
 
 		twparamsdir = f'{self.path}/Polyparams/run{self.runNr}/'
 		twparamsfilename=twparamsdir+f'twparams.json'	
 		with open(twparamsfilename, 'w') as jf: 
 			json.dump(self.twparameters, jf)
+		print(f'TW param dict written to {twparamsfilename}')
 
 	### Make dictionary of the alignment parameter determined as the truncated y-mean of tw-corr (tds0 - tSiPM)
 	def MakeAlignmentParameterDict(self, alignment):
@@ -1590,7 +1613,7 @@ class Analysis(object):
 		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
 
 		d={}
-		for s in (1,2):
+		for s in (2,): # Just US
 			for p in range(self.systemAndPlanes[s]):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
@@ -1608,6 +1631,7 @@ class Analysis(object):
 		alignmentparamsfilename=alignmentparamsdir+f'alignmentparams.json'	
 		with open(alignmentparamsfilename, 'w') as jf: 
 			json.dump(self.alignmentparameters, jf)
+		print(f'Alignment param dict written to {alignmentparamsfilename}')
 
 	def MakeTimingCovarianceDict(self, runNr):
 		filename=f'{self.path}TimingCovariance/run{self.runNr}/timingcovariance.json'

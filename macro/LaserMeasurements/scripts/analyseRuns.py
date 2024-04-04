@@ -13,6 +13,7 @@ from SmallSiPMDelay import SmallSiPMDelays
 from AnalysisFunctions import Analysis as LaserAna
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--numuStudy', dest='numuStudy', action='store_true')
 parser.add_argument('--SiPM', dest='SiPM',type=int, default=20)
 parser.add_argument('--bar', dest='bar',type=int, default=-1)
 parser.add_argument('--PCB', dest='PCB',type=str, default='US')
