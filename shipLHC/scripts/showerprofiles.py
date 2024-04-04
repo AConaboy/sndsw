@@ -260,9 +260,9 @@ class ShowerProfiles(object):
         qdcs = hit.GetAllSignals()
 
         # nSiPMs criteria on hits. Should replace with a histogram check
-        if len(qdcs) < 11: 
-            print(f'Fewer than 11 SiPMs firing!\nrun number: {runNr}, detID: {runNr}')
-            return
+        # if len(qdcs) < 11: 
+        #     print(f'Fewer than 11 SiPMs firing!\nrun number: {runNr}, detID: {runNr}')
+        #     return
 
         qdc_sides = {'left':[], 'right':[]}
         
@@ -282,10 +282,11 @@ class ShowerProfiles(object):
             SiPM, correctedtime = i
 
             # Experiment with cutting on aligned time
-            if self.options.SiPMtimeCut and np.abs(median_time - correctedtime)>1: continue
+            if self.options.SiPMmediantimeCut and np.abs(median_time - correctedtime)>1: continue
+            elif self.options.SiPMtimeCut and np.abs(correctedtime)>3: continue
             
-            if SiPM<8: aligned_times['right'][SiPM] = correctedtime
-            else: aligned_times['left'][SiPM] = correctedtime
+            if SiPM<8: aligned_times['left'][SiPM] = correctedtime
+            else: aligned_times['right'][SiPM] = correctedtime
 
         if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
         averages={side:sum(aligned_times[side].values()) / len(aligned_times[side]) for side in aligned_times}
@@ -328,7 +329,7 @@ class ShowerProfiles(object):
                         data=self.RecordData(hit, barycentres=((-999,-999), (-999,-999)), Ex=(xEx, yEx) )
                         if not self.runId in self.data: self.data[self.runId]={}
                         if not detID in self.data[self.runId]: self.data[self.runId][detID]={}
-                        self.data[self.runId][detID][self.tw.M.EventNumber]=data                        
+                        self.data[self.runId][detID][self.tw.M.EventNumber]=data
                 continue
 
             # Both return -999 if fucked
@@ -383,20 +384,31 @@ class ShowerProfiles(object):
                 self.hists[deltaxmuonbarycentre].Fill(deltax)
     
     def GetYBarycentre(self, qdcs):
+
+        A,B = ROOT.TVector3(), ROOT.TVector3()
         
+        s,p,b = self.muAna.parseDetID(list(qdcs.keys())[0])
+        self.MuFilter.GetPosition(int(f'2{p}000'), A, B)
+        y_baseline = 0.5*(A.y()+B.y()) - self.MuFilter.GetConfParF('MuFilter/UpstreamBarY')/2
+
         barQDCs = {k:0 for k in qdcs}
         for detID in qdcs:
             barQDCs[detID] = sum( [sum(innerlist) for innerlist in qdcs[detID].values()] )
 
         sumQDC = sum([i for i in barQDCs.values()])
 
-        A,B = ROOT.TVector3(), ROOT.TVector3()
         weighted_y_positions = []
         for key in qdcs:
             self.MuFilter.GetPosition(key, A, B)
-            weighted_y_positions.append( barQDCs[key]/sumQDC * 1/2 * (A.y() +B.y()) )
+            avg_y = 1/2 * (A.y() + B.y())
+            frac_QDC = barQDCs[key]/sumQDC
 
-        if not len(weighted_y_positions)==0: return sum(weighted_y_positions)/len(weighted_y_positions), 3
+            # avg_rel_y = avg_y - y_baseline
+            # weighted_y_positions.append( barQDCs[key]/sumQDC *  avg_rel_y)
+            weighted_y_positions.append( frac_QDC * avg_y)
+
+        # if not len(weighted_y_positions)==0: return sum(weighted_y_positions)/len(weighted_y_positions), 3
+        if not len(weighted_y_positions)==0: return sum(weighted_y_positions), 3
         else: return -999, -999
         
     def GetXBarycentres(self, qdcs, times, Nfiredbars):
@@ -410,12 +422,33 @@ class ShowerProfiles(object):
         for detID in times:
             s,p,b = self.muAna.parseDetID(detID)
 
+            if self.muAna.GetExtrapolatedBarDetID(p) == detID: trackInBar = True
+            else: trackInBar=False
+
+            # Extrapolate DS track to this plane
+            zEx = self.zPos['MuFilter'][20+p]
+            lam = (zEx-self.tw.pos.z())/self.tw.mom.z()
+            yEx = self.tw.pos.y() + lam*self.tw.mom.y()
+            xEx = self.tw.pos.x() + lam*self.tw.mom.x()
+
             averages = times[detID]       
             if len(averages) == 0: return -999,-999
 
             average_left_cscint, average_right_cscint = self.muAna.GetBarAveragecscint(self.runNr, detID, 'corrected')
 
-            if detID == self.muAna.GetExtrapolatedBarDetID(p): 
+            x_barycentre = 0.5*(average_left_cscint[0]+average_right_cscint[0]) * 0.5 * (averages['right'] + averages['left'])
+
+            # Approximate uncertainty right now as:  [ (dcscint/cscint)**2 + 1/2*(150ps/(tL+tR)**2 )]**(1/2)
+            rel_cscint_uncetainty_sq = 1/4 *( (average_left_cscint[1]/average_left_cscint[0])**2 + (average_right_cscint[1]/average_right_cscint[0])**2 )
+            rel_tL_tR_uncetainty_sq = 1/np.sqrt(2) * 0.150 **2
+
+            x_barycentre_uncertainty_sq = x_barycentre**2 * (rel_cscint_uncetainty_sq + rel_tL_tR_uncetainty_sq)
+            x_barycentre_uncertainty = np.sqrt(x_barycentre_uncertainty_sq)
+
+            # Store barycentre determined by each bar
+            x[detID] = [x_barycentre, x_barycentre_uncertainty]
+
+            if trackInBar and abs(x_barycentre-xEx) < 5: 
                 xEx, yEy, zEx = self.muAna.GetExtrapolatedPosition(p)
                 self.MuFilter.GetPosition(detID, self.A, self.B) # A is left, B is right
                 shower_side = 'right' if abs(self.A.x() - xEx) > abs(self.B.x() - xEx) else 'left'
@@ -424,28 +457,15 @@ class ShowerProfiles(object):
                 x_barycentre = x_shower + Nfiredbars/2*6 # 6 cm is from MuFilter.GetConfParF('MuFilter/UpstreamBarY')
                 x_barycentre_uncertainty = 3
                 x[detID] = [x_barycentre, x_barycentre_uncertainty]
-            
-            else:
-                x_barycentre = 0.5*(average_left_cscint[0]+average_right_cscint[0]) * 0.5 * (averages['right'] + averages['left'])
 
-                # Approximate uncertainty right now as:  [ (dcscint/cscint)**2 + 1/2*(150ps/(tL+tR)**2 )]**(1/2)
-                # rel_cscint_uncetainty_sq = 1/4 *( (average_left_cscint[1]/average_left_cscint[0])**2 + (average_right_cscint[1]/average_right_cscint[0])**2 ) / (average_left_cscint[0] + average_right_cscint[0])
-                rel_cscint_uncetainty_sq = 1/4 *( (average_left_cscint[1]/average_left_cscint[0])**2 + (average_right_cscint[1]/average_right_cscint[0])**2 )
-                
-                rel_tL_tR_uncetainty_sq = 1/np.sqrt(2) * 0.150 **2
-
-                x_barycentre_uncertainty_sq = x_barycentre**2 * (rel_cscint_uncetainty_sq + rel_tL_tR_uncetainty_sq)
-                x_barycentre_uncertainty = np.sqrt(x_barycentre_uncertainty_sq)
-
-                x[detID] = [x_barycentre, x_barycentre_uncertainty]
-
-        mean_value = sum(item[0] for item in x.values()) / len(x)
-        mean_uncertainty = sum(item[1] for item in x.values()) / len(x)
-        # return mean_value, mean_uncertainty
+        # mean_value = sum(item[0] for item in x.values()) / len(x)
+        # mean_uncertainty = sum(item[1] for item in x.values()) / len(x)
         return x
         
     def RecordData(self, hit, barycentres, Ex):
         detID = hit.GetDetectorID()
+        interactionWall = self.GetInteractionWall(self.runId)
+
         qdcs = [(SiPM, qdc) for SiPM,qdc in hit.GetAllSignals()]
         rawtimes = [(SiPM, cc*self.TDC2ns) for SiPM,cc in hit.GetAllTimes()]
         twctimes = self.muAna.GetCorrectedTimes(hit)
@@ -478,31 +498,27 @@ class ShowerProfiles(object):
                         xEx, yEx = Ex
                         data[SiPM]['xEx'] = xEx
                         data[SiPM]['yEx'] = yEx
+                        data[SiPM]['Interaction wall'] = interactionWall
 
         return data
 
+    def GetInteractionWall(self, runNr):
+        interactionwall = self.muAna.nu_mu_events[runNr][1]
+        return interactionwall
+
     def WriteOutRecordedTimes(self):
         import pickle
-        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits-timing.data'
-        with open(filename, 'wb') as f:
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits'
+
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
+        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
+
+        with open(f'{filename}.data', 'wb') as f:
             pickle.dump(self.data, f)
-        print(f'File saved to {filename}')
+        print(f'File saved to {filename}.data')
 
-    # def GetAlignedTimes(self, detID, correctedtimes, qdcs):
-    #     times={'left':{}, 'right':{}}
-    #     for i in correctedtimes: 
-    #         SiPM, correctedtime = i
-    #         # fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
-    #         fixed_ch=f'{detID}_{SiPM}'
-
-    #         if not fixed_ch in self.muAna.alignmentparameters: continue
-    #         d=self.muAna.alignmentparameters[fixed_ch]
-
-    #         qdc=self.muAna.GetChannelVal(SiPM, qdcs)
-    #         side=self.muAna.GetSide(f'{detID}_{SiPM}')
-    #         times[side][SiPM]=self.tw.reft - (correctedtime - d[0])
-    #     return times
-        
     def WriteOutHistograms(self):
 
         outfilename=f'{self.outpath}splitfiles/run{self.runNr}/ShowerProfiles/ShowerProfiles_{self.options.nStart}.root'
