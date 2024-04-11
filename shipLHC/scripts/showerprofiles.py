@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ROOT, csv, os
+import ROOT, csv, os, pickle
 import numpy as np
 
 class ShowerProfiles(object):
@@ -51,6 +51,7 @@ class ShowerProfiles(object):
         if tw.numuStudy: 
             self.numuStudy=True
             self.barycentres={}
+            self.clusters={}
             self.data={}
         
     def Loadnumuevents(self):
@@ -210,6 +211,21 @@ class ShowerProfiles(object):
             if td < mean-2*stddev or td > mean+2*stddev: return False
             else: return True
 
+    def ExtractScifiData(self, hits):
+        
+        self.scifidata[self.runId] = {}
+        for hit in hits:
+            detID = hit.GetDetectorID()
+            
+    def ScifiClusterInfo(self, clusters):
+        self.runId = self.tw.M.eventTree.EventHeader.GetRunId()
+        self.clusters[self.runId] = {}
+        for idx, cl in enumerate(clusters):
+            first=cl.GetFirst()
+            cl.GetPosition(self.A, self.B)
+            avg_x, avg_y = 0.5*(self.A.x()+self.B.x()), 0.5*(self.A.y()+self.B.y())
+            self.clusters[self.runId][idx]=[first, avg_x, avg_y]
+
     def ShowerDirection(self, hits):
         
         self.all_times={i:{} for i in range(5)}
@@ -221,7 +237,7 @@ class ShowerProfiles(object):
             if not int(self.runId) in self.barycentres: self.barycentres[self.runId] = {}
 
         """
-        1. Plot shower baricentre in y (x) by using a QDC weighting, aligned timing
+        1. Plot shower barycentre in y (x) by using a QDC weighting, aligned timing
         2. First consider all hits 
         3. For each event, plot the baricentre in x and y at each plane
         """
@@ -263,7 +279,7 @@ class ShowerProfiles(object):
         # if len(qdcs) < 11: 
         #     print(f'Fewer than 11 SiPMs firing!\nrun number: {runNr}, detID: {runNr}')
         #     return
-
+        
         qdc_sides = {'left':[], 'right':[]}
         
         for idx in qdcs: 
@@ -318,7 +334,7 @@ class ShowerProfiles(object):
             yEx = self.tw.pos.y() + lam*self.tw.mom.y()
             xEx = self.tw.pos.x() + lam*self.tw.mom.x()
 
-            # Maintain dictionary stucture
+            # Maintain dictionary stucture when plane is empty
             if any([len(data) == 0 for data in (times, qdcs)]): 
                 if self.numuStudy: 
                     self.barycentres[self.runId][int(f'{plane}0000')] = [[(-999,-999), (-999,-999)],[xEx, yEx]]
@@ -507,7 +523,7 @@ class ShowerProfiles(object):
         return interactionwall
 
     def WriteOutRecordedTimes(self):
-        import pickle
+        
         filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits'
 
         if self.options.notDSbar==True: filename+='-notDSbar'
@@ -518,6 +534,19 @@ class ShowerProfiles(object):
         with open(f'{filename}.data', 'wb') as f:
             pickle.dump(self.data, f)
         print(f'File saved to {filename}.data')
+
+    def SaveClusters(self):
+
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/clusterInfo'
+
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
+        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
+
+        with open(f'{filename}.data', 'wb') as f:
+            pickle.dump(self.clusters, f)
+        print(f'File saved to {filename}.data')                
 
     def WriteOutHistograms(self):
 
