@@ -168,6 +168,7 @@ class TimeWalk(ROOT.FairTask):
         for i,track in enumerate(Reco_MuonTracks):
             if any([not track.getFitStatus().isFitConverged(), track.getFitStatus().getNdf()==0]): continue
             if track.GetUniqueID()==1: 
+                if self.options.numuStudy: print(f'Scifi track in numu event')
                 inVeto=True
                 tracks[1].append(Reco_MuonTracks[i])
             if track.GetUniqueID()==3: 
@@ -229,8 +230,11 @@ class TimeWalk(ROOT.FairTask):
             return
         
         if self.options.mode=='showerprofiles':
-            # self.sp.FillHists(hits)
+            print(f'')
+            clusters = self.M.clusScifi
+            self.sp.ScifiClusterInfo(clusters)
             self.sp.ShowerDirection(hits)
+
             return
 
         if self.options.mode == 'tds0-studies':            

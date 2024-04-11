@@ -172,6 +172,7 @@ class Numusignaleventtiming(object):
         for runNr in runs:
             self.InvestigateEvent(runNr)
         self.tw.sp.WriteOutRecordedTimes()
+        self.tw.sp.SaveClusters()
         self.MakeAngularPlots()
         
     def InvestigateEvent(self, runNr):
@@ -497,7 +498,7 @@ class Numusignaleventtiming(object):
             self.data['yEx'].append(yExs) # DS track extrapolated to plane
             self.data['interaction wall'].append(interactionwall)
 
-        self.df=pd.DataFrame(self.data)
+        self.barycentres_df=pd.DataFrame(self.data)
 
         filename='/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/barycentres'
         if self.options.notDSbar: filename+='-notDSbar'
@@ -505,7 +506,7 @@ class Numusignaleventtiming(object):
         
         if self.options.SiPMmediantimeCut: filename+='-SiPMmediantimeCut'
         if self.options.SiPMtimeCut: filename+='-SiPMtimeCut'
-        self.df.to_csv(f'{filename}.csv')
+        self.barycentres_df.to_csv(f'{filename}.csv')
         print(f'Data written to {filename}.csv')
 
     def WriteOutSignalHists(self):
