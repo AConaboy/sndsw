@@ -21,6 +21,7 @@ class TimeWalk(ROOT.FairTask):
                     'showerprofiles':'corrected', 
                     'numusignalevents':'corrected',
                     'tds0-studies':'uncorrected',
+                    'qdcparam':'corrected',
                     '2muon':'corrected'}
         
         self.state=statedict[options.mode]
@@ -116,16 +117,22 @@ class TimeWalk(ROOT.FairTask):
         
         self.muAna.AlignmentRun=self.AlignmentRun
 
-        if options.mode in ('selectioncriteria', 'systemalignment', 'showerprofiles', 'numusignalevents'):
+        if options.mode in ('selectioncriteria', 'systemalignment', 
+        'showerprofiles', 'numusignalevents','qdcparam'):
             
             if options.mode == 'systemalignment':
                 from systemalignment import SystemAlignment
                 self.sa = SystemAlignment(options, self)
+            
             elif options.mode == 'showerprofiles':
                 from showerprofiles import ShowerProfiles
                 if options.numuStudy: self.numuStudy=True
                 self.sp = ShowerProfiles(options, self)
                 self.barycentredata={}
+
+            elif options.mode=='qdcparam':
+                from QDCparameterisation import QDCparameterisation
+                self.qp = QDCparameterisation(options, self)
 
             elif options.mode == 'selectioncriteria':
                 from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
@@ -277,6 +284,9 @@ class TimeWalk(ROOT.FairTask):
             # Apply slope cut, res of code block is for passing muons
             if not self.passslopecut:continue
             
+            if self.options.mode=='qdcparam' and s==2:
+                self.qp.Execute(hit)
+
             for channel in channels_t:
                 SiPM,clock=channel
                 qdc=self.muAna.GetChannelVal(SiPM, channels_qdc)
