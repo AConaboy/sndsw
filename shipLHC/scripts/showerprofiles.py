@@ -52,6 +52,7 @@ class ShowerProfiles(object):
             self.numuStudy=True
             self.barycentres={}
             self.clusters={}
+            self.scifidata={}
             self.data={}
         
     def Loadnumuevents(self):
@@ -212,11 +213,18 @@ class ShowerProfiles(object):
             else: return True
 
     def ExtractScifiData(self, hits):
-        
+        self.runId = self.tw.M.eventTree.EventHeader.GetRunId()
         self.scifidata[self.runId] = {}
-        for hit in hits:
+        for idx, hit in enumerate(hits):
             detID = hit.GetDetectorID()
             
+            self.tw.M.Scifi.GetSiPMPosition(detID, self.A,self.B)
+            if hit.isVertical(): pos = 0.5*(self.A[0] + self.B[0])
+            else: pos = 0.5*(self.A[1] + self.B[1])
+
+            signal, ctime = hit.GetSignal(), self.tw.M.Scifi.GetCorrectedTime(detID, hit.GetTime(), 0)
+            self.scifidata[self.runId][idx]=[detID, pos, signal, ctime]
+
     def ScifiClusterInfo(self, clusters):
         self.runId = self.tw.M.eventTree.EventHeader.GetRunId()
         self.clusters[self.runId] = {}
@@ -314,12 +322,6 @@ class ShowerProfiles(object):
         
         self.all_times[p][detID] = averages
         self.all_qdcs[p][detID] = qdc_sides
-
-        # if self.options.numuStudy:
-        #     data=self.RecordData(hit)
-        #     if not runNr in self.data: self.data[runNr]={}
-        #     if not detID in self.data[runNr]: self.data[runNr][detID]={}
-        #     self.data[runNr][hit.GetDetectorID()][self.tw.M.EventNumber]=data
 
     def FillBarycentrePlots(self, hits):
 
@@ -487,6 +489,10 @@ class ShowerProfiles(object):
         twctimes = self.muAna.GetCorrectedTimes(hit)
         atimes =self.muAna.GetCorrectedTimes(hit, mode='aligned')
 
+        # Redetermine trackrelated?? 
+        if self.tw.yresidual3(detID): trackrelated = True
+        else: trackrelated=False        
+
         data={}
         for idx, lst in enumerate([qdcs, rawtimes, twctimes, atimes]): 
             for SiPM, t in lst:
@@ -500,7 +506,7 @@ class ShowerProfiles(object):
                     data[SiPM]['reft']=self.tw.reft
                     if f'{detID}_{SiPM}' in self.muAna.alignmentparameters:
                         data[SiPM]['d'] = self.muAna.alignmentparameters[f'{detID}_{SiPM}']
-                        data[SiPM]['trackrelated'] = self.trackrelated
+                        data[SiPM]['trackrelated'] = trackrelated
                         data[SiPM]['cscint'] = self.muAna.cscintvalues[f'{detID}_{SiPM}']
                         
                         # Writing out determined barycentres
@@ -546,6 +552,19 @@ class ShowerProfiles(object):
 
         with open(f'{filename}.data', 'wb') as f:
             pickle.dump(self.clusters, f)
+        print(f'File saved to {filename}.data')                
+
+    def SaveScifiHits(self):
+
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/ScifiHits'
+
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
+        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
+
+        with open(f'{filename}.data', 'wb') as f:
+            pickle.dump(self.scifidata, f)
         print(f'File saved to {filename}.data')                
 
     def WriteOutHistograms(self):

@@ -231,8 +231,10 @@ class TimeWalk(ROOT.FairTask):
         
         if self.options.mode=='showerprofiles':
             print(f'')
-            clusters = self.M.clusScifi
-            self.sp.ScifiClusterInfo(clusters)
+            # clusters = self.M.clusScifi
+            # self.sp.ScifiClusterInfo(clusters)
+            # scifi_hits = self.M.eventTree.Digi_ScifiHits
+            self.sp.ExtractScifiData(scifi_hits)
             self.sp.ShowerDirection(hits)
 
             return
