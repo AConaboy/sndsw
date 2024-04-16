@@ -15,6 +15,7 @@ from math import floor
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns 
+import SndlhcGeo
 sns.set_style("whitegrid")
 
 PDG_conv = {11: "e-", -11: "e+", 2212: "p", 211: "pi+", -211: "pi-", 1000060120: "C", 321: "K+", -321: "K-", 1000020040: "Ca", 13: "mu-", -13: "mu+"}
@@ -289,8 +290,102 @@ def main():
     #f.write(str(B_ids_unw) + "\t" + str(B_ids))
     #f.close()
 
+def make_tchain():
+    parser = argparse.ArgumentParser()
+    #parser.add_argument(
+    #    'inputfile',
+    #    help='''Simulation results to use as input. '''
+    #    '''Supports retrieving files from EOS via the XRootD protocol.''')
+    parser.add_argument(
+        '-o',
+        '--outputfile',
+        default='flux_map.root',
+        help='''File to write the flux maps to. '''
+        '''Will be recreated if it already exists.''')
+    # parser.add_argument(
+    # '-P',
+    # '--Pcut',
+    # default= 0.0,
+    # help='''set momentum cut''')
+    # parser.add_argument(
+    # '-E',
+    # '--Eloss',
+    # default= 0.0,
+    # help= '''set Eloss cut''')
+    parser.add_argument(
+        '--nStart',
+        dest="nStart",
+        type = int,
+        default=0)
+    
+    parser.add_argument(
+        '--nEvents',
+        dest="nEvents",
+        type = int,
+        default=1)
+    
+    parser.add_argument(
+        '--Energy',
+        dest="Energy",
+        type = int,
+        default=100)  
 
-if __name__ == '__main__':
-    r.gErrorIgnoreLevel = r.kWarning
-    r.gROOT.SetBatch(True)
-    main()
+    parser.add_argument(
+        '--Merged',
+        dest="merged",
+        type = bool,
+        default=True)  
+    parser.add_argument(
+        "--genie",
+        dest="genie",
+        type=bool,
+        default=False)
+
+    args = parser.parse_args()
+    f = r.TFile.Open(args.outputfile, 'recreate')
+    h = {}
+    f.cd()
+    ch = r.TChain('cbmsim')
+    eos = "root://eosuser.cern.ch/"
+    energy = args.Energy
+    genie = args.genie
+    if not genie:
+        if not args.merged:
+            if energy != 300:
+                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi+/"
+                fileName = "sndLHC.PG_211-TGeant4.root"
+            else:
+                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi-/"
+                fileName = "sndLHC.PG_-211-TGeant4.root"
+            # filename = "sndLHC.PG_-211-TGeant4.root"
+            path = filepath
+            basePath = sorted(Path(path).glob(f'**/{fileName}'))
+            print("{} files to read in {}".format(len(basePath), path))
+        else:
+            if energy != 300:
+                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi+/"
+                fileName = "merge.root"
+            else:
+                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi-/"
+                filepath = "/eos/user/e/ekhaliko/Documents/SND_Data/test_300GeV_n100k_aug2023_pi-_new"
+                fileName = "merge.root"        
+            path = filepath
+            basePath = sorted(Path(path).glob(f'{fileName}'))
+            print("{} files to read in {}".format(len(basePath), path))
+    else:
+        #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volMuFilter_20fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
+        basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
+    for base in basePath:
+        # print(base)
+        ch.Add(str(base))    
+
+    snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V0_2022.root")
+    scifi, mufilter = snd_geo.modules['Scifi'], snd_geo.modules['MuFilter']
+
+    return ch, scifi, mufilter
+    
+
+# if __name__ == '__main__':
+#     r.gErrorIgnoreLevel = r.kWarning
+#     r.gROOT.SetBatch(True)
+#     main()
