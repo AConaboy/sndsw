@@ -230,7 +230,8 @@ def main():
             basePath = sorted(Path(path).glob(f'{fileName}'))
             print("{} files to read in {}".format(len(basePath), path))
     else:
-        basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volMuFilter_20fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
+        #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volMuFilter_20fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
+        basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
     for base in basePath:
         # print(base)
         ch.Add(str(base))
