@@ -100,8 +100,9 @@ def extract_us_signal(ch, N):
         us_points["Eventnumber"].append(N)
     return us_points
 
-def extract_scifi_signal(ch):
+def extract_scifi_signal(ch, N):
     signal_sum = 0
+    scifi_points = {"Eventnumber": [], "detectorID": [], "pdg_code": [], "Energy_loss": []}
     for hit in ch.ScifiPoint:   
         station = int(hit.GetDetectorID()/1000000)
         if station == 0:
@@ -114,7 +115,11 @@ def extract_scifi_signal(ch):
         if time > 25 or time < 0:
             continue
         signal_sum += hit.GetEnergyLoss() 
-    return signal_sum        
+        scifi_points["detectorID"].append(hit.GetDetectorID())
+        scifi_points["pdg_code"].append(hit.PdgCode())
+        scifi_points["Eventnumber"].append(N)
+        scifi_points["Energy_loss"].append(hit.GetEnergyLoss())
+    return scifi_points      
 
 def signal_relation(signal_data_init, energy):
     fig, ax = plt.subplots(2, 2, figsize = (8,8), dpi = 200)
@@ -247,6 +252,7 @@ def main():
         if N % 1000 == 0:
             print(f"Event {N}")
         us_signal = extract_us_signal(ch, N)
+        scifi_signal = extract_scifi_signal(ch, N)
         if not len(data_general):
             for key in us_signal:
                 data_general[key] = us_signal[key]
@@ -255,7 +261,7 @@ def main():
         for key in us_signal:
             data_general[key] += us_signal[key]
 
-            #scifi_signal = extract_scifi_signal(ch)
+            #scifi_signal = extract_scifi_signal(ch, N)
             #print(us_signal)
         
     # print(wall_info)
@@ -263,8 +269,10 @@ def main():
     # vis_info_parts(wall_info)
 
     #print(signal_data)
-    data_general = pd.DataFrame(data_general)
-    data_general.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/us_output.csv")
+    #data_general = pd.DataFrame(data_general)
+    #data_general.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/us_output.csv")
+    data_scifi = pd.DataFrame(scifi_signal)
+    data_scifi.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/data_scifi.csv")
     #print(signal_data.shape)
     #signal_relation(signal_data, energy)
     #reco_resol(signal_data, energy)
