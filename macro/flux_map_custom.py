@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 from __future__ import division
-import argparse
+import argparse,os,sys
 import numpy as np
 import ROOT as r
 # Fix https://root-forum.cern.ch/t/pyroot-hijacks-help/15207 :
@@ -19,6 +19,68 @@ import SndlhcGeo
 sns.set_style("whitegrid")
 
 PDG_conv = {11: "e-", -11: "e+", 2212: "p", 211: "pi+", -211: "pi-", 1000060120: "C", 321: "K+", -321: "K-", 1000020040: "Ca", 13: "mu-", -13: "mu+"}
+
+parser = argparse.ArgumentParser()
+# parser.add_argument('inputfile',help='Simulation results to use as input. Supports retrieving files from EOS via the XRootD protocol.', required=False)
+parser.add_argument('-o','--outputfile',default='flux_map.root',help='File to write the flux maps to. Will be recreated if it already exists.')
+parser.add_argument('-P','--Pcut',default= 0.0,help='set momentum cut')
+parser.add_argument('-E','--Eloss',default= 0.0,help= 'set Eloss cut')
+parser.add_argument('--nStart',dest="nStart",type = int,default=0)
+parser.add_argument('--nEvents', dest="nEvents",type = int,default=10)
+parser.add_argument('--Energy',dest="Energy",type = int,default=100)  
+parser.add_argument('--Merged',dest="merged",type = bool,default=True)  
+parser.add_argument("--genie",dest="genie",type=bool,default=False)
+
+parser.add_argument('-C', "--HTCondor", dest="HTCondor",action='store_true')
+
+# Set eos outpath
+eos_paths = {'tismith':'/eos/user/t/tismith/SWAN_projects/genie_ana_output/' , 'aconsnd':'/eos/user/a/aconsnd/SWAN_projects/Simulation/data/'} # can add Eduard
+found=False
+for key in eos_paths: 
+    if os.getcwd().find(key)!=-1:
+        eospath=eos_paths[key]
+        found=True
+        break
+if not found:
+    print('who is the user?')
+    sys.exit()
+
+args = parser.parse_args()
+
+def GetData(event, N):
+    us_signal = extract_us_signal(ch, N)
+    scifi_signal = extract_scifi_signal(ch, N)
+    return us_signal, scifi_signal
+
+def EventLoop():
+    us_data_general = {}
+    scifi_data_general = {}
+    for N in range(args.nStart, args.nStart + args.nEvents):
+        
+        #ch.GetEvent(N)
+        event = ch.GetEntry(N)
+        if N % 1000 == 0:
+            print(f"Event {N}")
+        
+        # Get data for us and scifi
+        us_signal, scifi_signal = GetData(event, N)
+
+        # Store US data for event N in overall dictionary
+        if not len(us_data_general):
+            for key in us_signal:
+                us_data_general[key] = us_signal[key]
+                #print(key, len(data_general[key]))
+        for key in us_signal:
+            us_data_general[key] += us_signal[key]
+
+        # Store Scifi data for event N in overall dictionary
+        if not len(scifi_data_general):
+            for key in scifi_signal:
+                scifi_data_general[key] = scifi_signal[key]
+                #print(key, len(data_general[key]))
+        for key in scifi_signal:
+            scifi_data_general[key] += scifi_signal[key]   
+    return us_data_general, scifi_data_general             
 
 def vis_info(wall_info):
     fig, ax = plt.subplots(3, 4, figsize = (16, 12), dpi = 150)
@@ -66,8 +128,6 @@ def isVertical(detid):
 def read_files(chain, eos, filepath, filename, file_num):
     for i in range(1, file_num + 1):
         chain.Add(eos + filepath + "/" + str(i) + "/" + filename)
-
-
 
 def extract_us_signal(ch, N):
     signal_sum = 0
@@ -153,100 +213,12 @@ def reco_resol(Data, energy):
     ax.set_xlabel("Energy [GeV]")
     ax.set_title(f"Pion energy {energy} GeV")
     fig.savefig(f"reco_{energy}.pdf")
+
 def main():
-    parser = argparse.ArgumentParser()
-    #parser.add_argument(
-    #    'inputfile',
-    #    help='''Simulation results to use as input. '''
-    #    '''Supports retrieving files from EOS via the XRootD protocol.''')
-    parser.add_argument(
-        '-o',
-        '--outputfile',
-        default='flux_map.root',
-        help='''File to write the flux maps to. '''
-        '''Will be recreated if it already exists.''')
-    # parser.add_argument(
-    # '-P',
-    # '--Pcut',
-    # default= 0.0,
-    # help='''set momentum cut''')
-    # parser.add_argument(
-    # '-E',
-    # '--Eloss',
-    # default= 0.0,
-    # help= '''set Eloss cut''')
-    parser.add_argument(
-        '--nStart',
-        dest="nStart",
-        type = int,
-        default=0)
-    
-    parser.add_argument(
-        '--nEvents',
-        dest="nEvents",
-        type = int,
-        default=1)
-    
-    parser.add_argument(
-        '--Energy',
-        dest="Energy",
-        type = int,
-        default=100)  
 
-    parser.add_argument(
-        '--Merged',
-        dest="merged",
-        type = bool,
-        default=True)  
-    parser.add_argument(
-        "--genie",
-        dest="genie",
-        type=bool,
-        default=False)
-
-    args = parser.parse_args()
-    f = r.TFile.Open(args.outputfile, 'recreate')
-    h = {}
-    f.cd()
-    ch = r.TChain('cbmsim')
-    eos = "root://eosuser.cern.ch/"
-    energy = args.Energy
-    genie = args.genie
-    if not genie:
-        if not args.merged:
-            if energy != 300:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi+/"
-                fileName = "sndLHC.PG_211-TGeant4.root"
-            else:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi-/"
-                fileName = "sndLHC.PG_-211-TGeant4.root"
-            # filename = "sndLHC.PG_-211-TGeant4.root"
-            path = filepath
-            basePath = sorted(Path(path).glob(f'**/{fileName}'))
-            print("{} files to read in {}".format(len(basePath), path))
-        else:
-            if energy != 300:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi+/"
-                fileName = "merge.root"
-            else:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi-/"
-                filepath = "/eos/user/e/ekhaliko/Documents/SND_Data/test_300GeV_n100k_aug2023_pi-_new"
-                fileName = "merge.root"        
-            path = filepath
-            basePath = sorted(Path(path).glob(f'{fileName}'))
-            print("{} files to read in {}".format(len(basePath), path))
-    else:
-        #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volMuFilter_20fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
-        basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
-    for base in basePath:
-        # print(base)
-        ch.Add(str(base))
-    # Define histograms
-
-    # hist_list = {l: r.TH1I("plane" + f"_{l}", "plane" + f"_{l}; {label};", 200, bin_min, bin_max)}
-    #ch.Add(args.inputfile)
     print(ch.GetListOfBranches())
-    data_general = {}
+    us_data_general = {}
+    scifi_data_general = {}
     for N in range(args.nStart, args.nStart + args.nEvents):
         #ch.GetEvent(N)
         event = ch.GetEntry(N)
@@ -254,13 +226,22 @@ def main():
             print(f"Event {N}")
         us_signal = extract_us_signal(ch, N)
         scifi_signal = extract_scifi_signal(ch, N)
-        if not len(data_general):
+        
+        # Store US data for event N in overall dictionary
+        if not len(us_data_general):
             for key in us_signal:
-                data_general[key] = us_signal[key]
+                us_data_general[key] = us_signal[key]
                 #print(key, len(data_general[key]))
-
         for key in us_signal:
-            data_general[key] += us_signal[key]
+            us_data_general[key] += us_signal[key]
+
+        # Store Scifi data for event N in overall dictionary
+        if not len(scifi_data_general):
+            for key in scifi_signal:
+                scifi_data_general[key] = scifi_signal[key]
+                #print(key, len(data_general[key]))
+        for key in scifi_signal:
+            scifi_data_general[key] += scifi_signal[key]            
 
             #scifi_signal = extract_scifi_signal(ch, N)
             #print(us_signal)
@@ -272,8 +253,15 @@ def main():
     #print(signal_data)
     #data_general = pd.DataFrame(data_general)
     #data_general.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/us_output.csv")
-    data_scifi = pd.DataFrame(scifi_signal)
-    data_scifi.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/data_scifi.csv")
+    if args.testing:
+        scifi_df = pd.DataFrame(scifi_data_general)
+        return scifi_df
+        
+        # scifi_df.to_csv()
+        # scifi_data_general
+    else:
+        data_scifi = pd.DataFrame(scifi_signal)
+        data_scifi.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/data_scifi.csv")
     #print(signal_data.shape)
     #signal_relation(signal_data, energy)
     #reco_resol(signal_data, energy)
@@ -290,58 +278,8 @@ def main():
     #f.write(str(B_ids_unw) + "\t" + str(B_ids))
     #f.close()
 
-def make_tchain():
-    parser = argparse.ArgumentParser()
-    #parser.add_argument(
-    #    'inputfile',
-    #    help='''Simulation results to use as input. '''
-    #    '''Supports retrieving files from EOS via the XRootD protocol.''')
-    parser.add_argument(
-        '-o',
-        '--outputfile',
-        default='flux_map.root',
-        help='''File to write the flux maps to. '''
-        '''Will be recreated if it already exists.''')
-    # parser.add_argument(
-    # '-P',
-    # '--Pcut',
-    # default= 0.0,
-    # help='''set momentum cut''')
-    # parser.add_argument(
-    # '-E',
-    # '--Eloss',
-    # default= 0.0,
-    # help= '''set Eloss cut''')
-    parser.add_argument(
-        '--nStart',
-        dest="nStart",
-        type = int,
-        default=0)
-    
-    parser.add_argument(
-        '--nEvents',
-        dest="nEvents",
-        type = int,
-        default=1)
-    
-    parser.add_argument(
-        '--Energy',
-        dest="Energy",
-        type = int,
-        default=100)  
+def MakeTChain():
 
-    parser.add_argument(
-        '--Merged',
-        dest="merged",
-        type = bool,
-        default=True)  
-    parser.add_argument(
-        "--genie",
-        dest="genie",
-        type=bool,
-        default=False)
-
-    args = parser.parse_args()
     f = r.TFile.Open(args.outputfile, 'recreate')
     h = {}
     f.cd()
@@ -383,9 +321,18 @@ def make_tchain():
     scifi, mufilter = snd_geo.modules['Scifi'], snd_geo.modules['MuFilter']
 
     return ch, scifi, mufilter
-    
 
-# if __name__ == '__main__':
-#     r.gErrorIgnoreLevel = r.kWarning
-#     r.gROOT.SetBatch(True)
-#     main()
+def SaveData(us_data, scifi_data):
+    scifi_df = pd.DataFrame(scifi_data)
+    us_df = pd.DataFrame(us_data)
+
+    scifi_df.to_csv(f"{eospath}data_scifi.csv")
+    print(f'Scifi csv written to: {eospath}data_scifi.csv')
+    us_df.to_csv(f"{eospath}data_us.csv")
+    print(f'HCAL csv written to: {eospath}data_us.csv')
+
+if args.HTCondor:
+    ch, scifi, mufilter = MakeTChain()
+    us_data, scifi_data = EventLoop()
+    SaveData(us_data, scifi_data)
+
