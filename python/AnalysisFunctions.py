@@ -580,11 +580,17 @@ class Analysis(object):
 		
 	def Get_numuevents(self):
 		numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
+		self.nu_mu_events = {}
+		
 		with open(numusignalevent_filepath, 'r') as f:
 			reader=csv.reader(f)
-			nu_mu_data=[r for r in reader]
-		self.nu_mu_events={int(x[0]):[int(x[1]), int(x[2])] + [float(i) for i in x[3:]] for x in nu_mu_data[1:]}
+			# next(reader) # skip first row with the headers
 
+			for idx,x in enumerate(reader):
+				if idx==0: continue
+
+				self.nu_mu_events[int(x[0])] = [int(x[1]), int(x[2])] + [float(i) for i in x[3:]]
+	
 	def OneHitPerSystem(self, hits, systems, Nfired=False):
 		verbose=self.verbose
 

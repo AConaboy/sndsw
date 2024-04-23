@@ -49,6 +49,8 @@ parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select wh
 parser.add_argument("--AlignmentRun", dest="AlignmentRun", help="AlignmentRun", type=int)
 parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, default='physics')
 parser.add_argument('--state', dest='state', type=str, default='uncorrected')
+parser.add_argument('--scifiClusters', dest='scifiClusters', action='store_true', help='Make scifi clusters without QDC weighting')
+parser.add_argument('--scifiClustersQDC', dest='scifiClustersQDC', action='store_true', help='Make scifi clusters with QDC weighting')
 
 # Cuts
 parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', action='store_true')
@@ -122,11 +124,12 @@ class Numusignaleventtiming(object):
 
     def MakeSignalPartitions(self):
         numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
+        self.nu_mu_events={}
         with open(numusignalevent_filepath, 'r') as f:
             reader=csv.reader(f)
-            nu_mu_data=[r for r in reader]
-        self.nu_mu_events={int(x[0]):(int(x[1]),int(x[2])) for x in nu_mu_data}
-        # self.muAna.Get_numuevents()
+            for idx,x in enumerate(reader):
+                if idx==0: continue
+                self.nu_mu_events[int(x[0])] = [int(x[1]), int(x[2])] + [float(i) for i in x[3:]]        
 
         self.signalpartitions={}
         self.eventChain=ROOT.TChain("rawConv")
@@ -460,8 +463,10 @@ class Numusignaleventtiming(object):
 
         zPositions = [self.M.zPos['MuFilter'][20+i] for i in range(5)]
 
+        # self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
+        # 'dx':[], 'ybarycentre':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
         self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
-        'dx':[], 'ybarycentre':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
+        'dx':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
         
         """
         sp.barycentres = {
@@ -492,7 +497,7 @@ class Numusignaleventtiming(object):
             self.data['planes'].append(planes)
             self.data['xbarycentre'].append(xbarycentres)
             self.data['dx'].append(dxs) # uncertainty on xbarycentre
-            self.data['ybarycentre'].append(ybarycentres)
+            # self.data['ybarycentre'].append(ybarycentres)
             self.data['dy'].append(dys) # uncertainty on xbarycentre
             self.data['xEx'].append(xExs) # DS track extrapolated to plane 
             self.data['yEx'].append(yExs) # DS track extrapolated to plane

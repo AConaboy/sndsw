@@ -333,7 +333,7 @@ class Tracking(ROOT.FairTask):
               trackCandidates.append(hitlist)
         return trackCandidates
 
- def scifiCluster(self):
+ def scifiCluster(self, withQDC=False):
        clusters = []
        self.DetID2Key.clear()
        hitDict = {}
@@ -361,7 +361,7 @@ class Tracking(ROOT.FairTask):
                         N = len(tmp)
                         hitvector.clear()
                         for aHit in tmp: hitvector.push_back( self.event.Digi_ScifiHits[hitDict[aHit]])
-                        aCluster = ROOT.sndCluster(first,N,hitvector,self.scifiDet,False)
+                        aCluster = ROOT.sndCluster(first, N, hitvector, self.scifiDet, withQDC)
                         clusters.append(aCluster)
                         if c!=hitList[last]:
                              ncl+=1

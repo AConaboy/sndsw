@@ -9,7 +9,7 @@ sndCluster::sndCluster()
 }
 
 // -----   Standard constructor   ------------------------------------------
-sndCluster::sndCluster(Int_t first, Int_t N,std::vector<sndScifiHit*> hitlist,Scifi* ScifiDet, Bool_t withQDC)
+sndCluster::sndCluster(Int_t first, Int_t N, std::vector<sndScifiHit*> hitlist, Scifi* ScifiDet, Bool_t withQDC)
   :TObject(),
 	fType(0),
 	fTime(999),
