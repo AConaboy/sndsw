@@ -583,7 +583,7 @@ class Analysis(object):
 		with open(numusignalevent_filepath, 'r') as f:
 			reader=csv.reader(f)
 			nu_mu_data=[r for r in reader]
-		self.nu_mu_events={int(x[0]):(int(x[1]),int(x[2])) for x in nu_mu_data}
+		self.nu_mu_events={int(x[0]):[int(x[1]), int(x[2])] + [float(i) for i in x[3:]] for x in nu_mu_data[1:]}
 
 	def OneHitPerSystem(self, hits, systems, Nfired=False):
 		verbose=self.verbose
@@ -1753,6 +1753,17 @@ class Analysis(object):
 				detID = int(f'2{plane}00{bar}')
 				MuFilter.GetPosition(detID, self.A, self.B)
 				d[detID] = [self.A.x(), self.B.x(), self.A.y(), self.B.y()]
+		for plane in range(4):
+			if plane!=3:bars=range(120)
+			else: bars=range(60,120)
+			for bar in bars:
+				bar=str(bar).zfill(3)
+				detID=int(f'3{plane}{bar}')
+				MuFilter.GetPosition(detID, self.A, self.B)
+				d[detID] = [self.A.x(), self.B.x(), self.A.y(), self.B.y()]				
 
+		for f in (f'{self.path}BarPositions.json', f'/eos/user/a/aconsnd/SWAN_projects/numuInvestigation/data/BarPositions.json', f'/eos/user/a/aconsnd/SWAN_projects/Simulation/data/BarPositions.json'):
+			with open(f, 'w') as jf:
+				json.dump(d, jf)
+		print(f'Bar positions written to three locations')
 		return d
-
