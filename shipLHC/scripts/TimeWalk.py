@@ -230,9 +230,11 @@ class TimeWalk(ROOT.FairTask):
             return
         
         if self.options.mode=='showerprofiles':
-            print(f'')
-            # clusters = self.M.clusScifi
-            # self.sp.ScifiClusterInfo(clusters)
+            # Make Scifi clusters with the positions weighted by QDC
+            self.M.FairTasks['simpleTracking'].scifiCluster(withQDC=self.options.scifiClustersQDC)
+            clusters = self.M.clusScifi
+            self.sp.ScifiClusterInfo(clusters)
+
             # scifi_hits = self.M.eventTree.Digi_ScifiHits
             self.sp.ExtractScifiData(scifi_hits)
             self.sp.ShowerDirection(hits)
