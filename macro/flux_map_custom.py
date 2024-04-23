@@ -146,6 +146,7 @@ def reco_resol(Data, energy):
     ax.set_xlabel("Energy [GeV]")
     ax.set_title(f"Pion energy {energy} GeV")
     fig.savefig(f"reco_{energy}.pdf")
+<<<<<<< Updated upstream
 def main():
     parser = argparse.ArgumentParser()
     #parser.add_argument(
@@ -196,6 +197,10 @@ def main():
         dest="genie",
         type=bool,
         default=False)
+=======
+
+def MakeTChain():
+>>>>>>> Stashed changes
 
     args = parser.parse_args()
     f = r.TFile.Open(args.outputfile, 'recreate')
