@@ -55,7 +55,12 @@ def GetData(event, N):
 def EventLoop():
     us_data_general = {}
     scifi_data_general = {}
-    for N in range(args.nStart, args.nStart + args.nEvents):
+
+    if args.nEvents==-1:
+        start, end = 0, ch.GetEntries() 
+    else: start, end = args.nStart, args.nStart + args.nEvents
+    # for N in range(args.nStart, args.nStart + args.nEvents):
+    for N in range( start, end ):
         
         #ch.GetEvent(N)
         event = ch.GetEntry(N)
@@ -135,11 +140,8 @@ def extract_us_signal(ch, N):
     us_points = {"Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
     for hit in ch.MuFilterPoint:   
 
-        station = int(hit.GetDetectorID()/1000000)
-        # if station == 0:
-        #     print(station)
         P = np.sqrt(hit.GetPx()**2 + hit.GetPy()**2 + hit.GetPz()**2)
-        #E = np.sqrt(hit.GetPx()**2 + hit.GetPy()**2 + hit.GetPz()**2 + ch.MCTrack[hit.GetTrackID()].GetMass()**2)
+
         pdg = hit.PdgCode()
         if pdg in [22, 111, 113, 2112]:
             continue
@@ -213,70 +215,6 @@ def reco_resol(Data, energy):
     ax.set_xlabel("Energy [GeV]")
     ax.set_title(f"Pion energy {energy} GeV")
     fig.savefig(f"reco_{energy}.pdf")
-
-def main():
-
-    print(ch.GetListOfBranches())
-    us_data_general = {}
-    scifi_data_general = {}
-    for N in range(args.nStart, args.nStart + args.nEvents):
-        #ch.GetEvent(N)
-        event = ch.GetEntry(N)
-        if N % 1000 == 0:
-            print(f"Event {N}")
-        us_signal = extract_us_signal(ch, N)
-        scifi_signal = extract_scifi_signal(ch, N)
-        
-        # Store US data for event N in overall dictionary
-        if not len(us_data_general):
-            for key in us_signal:
-                us_data_general[key] = us_signal[key]
-                #print(key, len(data_general[key]))
-        for key in us_signal:
-            us_data_general[key] += us_signal[key]
-
-        # Store Scifi data for event N in overall dictionary
-        if not len(scifi_data_general):
-            for key in scifi_signal:
-                scifi_data_general[key] = scifi_signal[key]
-                #print(key, len(data_general[key]))
-        for key in scifi_signal:
-            scifi_data_general[key] += scifi_signal[key]            
-
-            #scifi_signal = extract_scifi_signal(ch, N)
-            #print(us_signal)
-        
-    # print(wall_info)
-    # vis_info(wall_info)
-    # vis_info_parts(wall_info)
-
-    #print(signal_data)
-    #data_general = pd.DataFrame(data_general)
-    #data_general.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/us_output.csv")
-    if args.testing:
-        scifi_df = pd.DataFrame(scifi_data_general)
-        return scifi_df
-        
-        # scifi_df.to_csv()
-        # scifi_data_general
-    else:
-        data_scifi = pd.DataFrame(scifi_signal)
-        data_scifi.to_csv(f"/eos/user/t/tismith/SWAN_projects/genie_ana_output/data_scifi.csv")
-    #print(signal_data.shape)
-    #signal_relation(signal_data, energy)
-    #reco_resol(signal_data, energy)
-    # Data_X = pd.DataFrame(N_plane_ZX_part)
-    # Data_Y = pd.DataFrame(N_plane_ZY_part)
-    # print(Data_X, Data_Y)
-    # Data_X.to_csv("output_X.csv")
-    # Data_Y.to_csv("output_Y.csv")
-
-
-    f.Close()
-    #np.savetxt('test_out', np.array(Eloss_total), fmt='%f') 
-    #f = open(args.norm + "/flux", "w")
-    #f.write(str(B_ids_unw) + "\t" + str(B_ids))
-    #f.close()
 
 def MakeTChain():
 
