@@ -234,8 +234,8 @@ class QDCcalibration(object):
 			# current, qdcs, errors = self.GetQDCvIntensity()
 
 			# Plot the first scatter plot with error bars (blue dots)
-			if self.M.SiPMsize=='large': axes[0].errorbar(self.current, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
-			elif self.M.SiPMsize=='small': axes[1].errorbar(self.current, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
+			if self.M.SiPMsize=='large': axes[0].errorbar(self.current.array, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
+			elif self.M.SiPMsize=='small': axes[1].errorbar(self.current.array, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
 
 		for i in range(2): axes[i].legend()
 
@@ -267,7 +267,7 @@ class QDCcalibration(object):
 				elif runtype==1:	label = f"1-bar illuminated"
 				else:				label = f"{runtype}-bars illuminated"
 				
-				ax.errorbar(self.current, self.qdcs, yerr=self.errors, linestyle='-', color=self.colours[idx], label=label)
+				ax.errorbar(self.current.array, self.qdcs, yerr=self.errors, linestyle='-', color=self.colours[idx], label=label)
 			ax.legend()	
 
 		if style=='subplots':
@@ -284,7 +284,7 @@ class QDCcalibration(object):
 				axes[idx//2, idx%2].set_xlabel(laser_mode)
 				axes[idx//2, idx%2].set_ylabel('QDC [a.u]')
 				axes[idx//2, idx%2].grid(which='major', axis='both', linestyle='--')
-				axes[idx//2, idx%2].errorbar(self.current, self.qdcs, yerr=self.errors, fmt='o', color=self.colours[idx], label=f'SiPM {self.M.SiPM}')
+				axes[idx//2, idx%2].errorbar(self.current.array, self.qdcs, yerr=self.errors, fmt='o', color=self.colours[idx], label=f'SiPM {self.M.SiPM}')
 
 		# Create directories if not existing already
 		d=f'{self.M.sndswpath}analysis-plots/qdc_calibration/illuminations/'
