@@ -36,14 +36,12 @@ class ShowerProfiles(object):
         self.freq=160.316E6
         self.TDC2ns=1E9/self.freq
 
-        self.xrefs=tw.xrefs
         self.sides=('left', 'right')
 
         self.hists=tw.hists
         
         self.sigmatds0=0.263 # ns 
-        self.highQDCthreshold=60
-
+        
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
         
         if options.signalpartitions: self.Loadnumuevents()
