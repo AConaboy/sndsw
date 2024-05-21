@@ -49,8 +49,6 @@ parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select wh
 parser.add_argument("--AlignmentRun", dest="AlignmentRun", help="AlignmentRun", type=int)
 parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, default='physics')
 parser.add_argument('--state', dest='state', type=str, default='uncorrected')
-parser.add_argument('--scifiClusters', dest='scifiClusters', action='store_true', help='Make scifi clusters without QDC weighting')
-parser.add_argument('--scifiClustersQDC', dest='scifiClustersQDC', action='store_true', help='Make scifi clusters with QDC weighting')
 
 # Cuts
 parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', action='store_true')
@@ -74,7 +72,6 @@ parser.add_argument('--SmallSiPMcheck', dest='SmallSiPMcheck', action='store_tru
 parser.add_argument('--dycut', dest='dycut', action='store_true')
 # Run showerprofiles.ShowerDirection without considering the exact bar that the DS track extrapolates to
 parser.add_argument('--notDSbar', dest='notDSbar', action='store_true')
-parser.add_argument('--SiPMmediantimeCut', dest='SiPMmediantimeCut', action='store_true')
 parser.add_argument('--SiPMtimeCut', dest='SiPMtimeCut', action='store_true')
 # Update geofile, takes longer
 parser.add_argument('--updateGeoFile', dest='updateGeoFile', action='store_true')
@@ -124,12 +121,10 @@ class Numusignaleventtiming(object):
 
     def MakeSignalPartitions(self):
         numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
-        self.nu_mu_events={}
         with open(numusignalevent_filepath, 'r') as f:
             reader=csv.reader(f)
-            for idx,x in enumerate(reader):
-                if idx==0: continue
-                self.nu_mu_events[int(x[0])] = [int(x[1]), int(x[2])] + [float(i) for i in x[3:]]        
+            nu_mu_data=[r for r in reader]
+        self.nu_mu_events={int(x[0]):(int(x[1]),int(x[2])) for x in nu_mu_data}
 
         self.signalpartitions={}
         self.eventChain=ROOT.TChain("rawConv")
@@ -175,7 +170,6 @@ class Numusignaleventtiming(object):
         for runNr in runs:
             self.InvestigateEvent(runNr)
         self.tw.sp.WriteOutRecordedTimes()
-        self.tw.sp.SaveClusters()
         self.MakeAngularPlots()
         
     def InvestigateEvent(self, runNr):
@@ -463,10 +457,8 @@ class Numusignaleventtiming(object):
 
         zPositions = [self.M.zPos['MuFilter'][20+i] for i in range(5)]
 
-        # self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
-        # 'dx':[], 'ybarycentre':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
         self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
-        'dx':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
+        'dx':[], 'ybarycentre':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
         
         """
         sp.barycentres = {
@@ -497,21 +489,19 @@ class Numusignaleventtiming(object):
             self.data['planes'].append(planes)
             self.data['xbarycentre'].append(xbarycentres)
             self.data['dx'].append(dxs) # uncertainty on xbarycentre
-            # self.data['ybarycentre'].append(ybarycentres)
+            self.data['ybarycentre'].append(ybarycentres)
             self.data['dy'].append(dys) # uncertainty on xbarycentre
             self.data['xEx'].append(xExs) # DS track extrapolated to plane 
             self.data['yEx'].append(yExs) # DS track extrapolated to plane
             self.data['interaction wall'].append(interactionwall)
 
-        self.barycentres_df=pd.DataFrame(self.data)
+        self.df=pd.DataFrame(self.data)
 
         filename='/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/barycentres'
-        if self.options.notDSbar: filename+='-notDSbar'
-        elif self.options.dycut: filename+='-dycut'
-        
-        if self.options.SiPMmediantimeCut: filename+='-SiPMmediantimeCut'
-        if self.options.SiPMtimeCut: filename+='-SiPMtimeCut'
-        self.barycentres_df.to_csv(f'{filename}.csv')
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
+        self.df.to_csv(f'{filename}.csv')
         print(f'Data written to {filename}.csv')
 
     def WriteOutSignalHists(self):
@@ -538,7 +528,7 @@ class Numusignaleventtiming(object):
             elif len(histname.split('_')) == 2:
 
                 hist=self.tw.hists[histname]
-                key, whatever = histname.split('_')
+                key, whatever =histname.split('_')
                 
                 if not hasattr(outfile, key): outfile.mkdir(key)
                 tdir = outfile.Get(key)

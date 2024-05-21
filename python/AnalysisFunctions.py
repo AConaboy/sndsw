@@ -13,7 +13,7 @@ class Analysis(object):
 		if not hasattr(options, "LaserMeasurements"):
 			if not hasattr(options, 'runNumber'): options.runNumber=options.runs[0]
 			self.runNr = str(options.runNumber).zfill(6)
-			self.TWCorrectionRun = str(5408).zfill(6)
+			self.TWCorrectionRun = str(options.TWCorrectionRun).zfill(6)
 			self.freq=160.316E6
 			self.TDC2ns=1E9/self.freq
 			self.timealignment=self.GetTimeAlignmentType(self.runNr)
@@ -46,8 +46,6 @@ class Analysis(object):
 		
 		if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype
 		else: self.fileext='csv'
-
-		if options.numuStudy: self.Get_numuevents()
 
 		self.sigmatds0=0.263, 9.5E-5
 
@@ -191,23 +189,13 @@ class Analysis(object):
 		res=str(self.subsystemNames[s])+', plane '+str(p+1)+', bar '+str(b+1)
 		return res
 
-	def GetScifiAverageTime(self, scifi, scifihits):
-
-		stations = {i.GetDetectorID():i for i in scifihits}
-		times=[]	
-
-		for hit in scifihits:
-			detID = hit.GetDetectorID()
-			t = scifi.GetCorrectedTime(detID, hit.GetTime(), 0)
-			times.append(t)
-		if len(times)==0: return False 
-		else: return sum(times) / len(times)
-
-	def GetScifiTrackAverageTime(self, scifi, scifihits):
+	def GetScifiAverageTime(self, scifihits):
 
 		stations = {i.GetDetectorID():i for i in scifihits}
 		times=[]
 
+		total={i:0 for i in range(4)}
+		counter={i:0 for i in range(4)}
 		track = self.task.track
 		nM = track.getNumPointsWithMeasurement()
 
@@ -221,7 +209,7 @@ class Analysis(object):
 				print(stations)
 				print(f'Event {self.task.M.EventNumber}')
 			trackHit = stations[detID]
-			time = scifi.GetCorrectedTime(detID, trackHit.GetTime(), 0)
+			time = trackHit.GetTime()*self.TDC2ns
 			times.append(time)
 		
 		if len(times)==0: return 
@@ -580,8 +568,6 @@ class Analysis(object):
 				medians[x] = values[x][int( 0.5*(len(values[x])+1))]
 		return medians
 
-	def GetTotalQDC(self, signals):
-		return sum( [i[1] for i in signals if not self.IsSmallSiPMchannel(i[0])] )
 
 	def GetChannelVal(self, SiPM, chs):
 		for entry in chs:
@@ -589,20 +575,7 @@ class Analysis(object):
 			if fSiPM == SiPM:
 				return val
 		return
-		
-	def Get_numuevents(self):
-		numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
-		self.nu_mu_events = {}
-		
-		with open(numusignalevent_filepath, 'r') as f:
-			reader=csv.reader(f)
-			# next(reader) # skip first row with the headers
 
-			for idx,x in enumerate(reader):
-				if idx==0: continue
-
-				self.nu_mu_events[int(x[0])] = [int(x[1]), int(x[2])] + [float(i) for i in x[3:]]
-	
 	def OneHitPerSystem(self, hits, systems, Nfired=False):
 		verbose=self.verbose
 
@@ -874,7 +847,10 @@ class Analysis(object):
 		return doca
 
 	def GetExtrapolatedBarDetID(self, plane):
-		xEx, yEx, zEx = self.GetExtrapolatedPosition(plane)
+		zEx = self.zPos['MuFilter'][20+plane]
+		lam = (zEx-self.task.pos.z())/self.task.mom.z()
+		yEx = self.task.pos.y() + lam*self.task.mom.y()
+		xEx = self.task.pos.x() + lam*self.task.mom.x()
 		detIDEx = self.task.nav.FindNode(xEx, yEx, zEx).GetName()
 		if not detIDEx.split('_')[0] == 'volMuUpstreamBar': 
 			print('Does not extrapolate to US bar')
@@ -888,6 +864,13 @@ class Analysis(object):
 		xEx = self.task.pos.x() + lam*self.task.mom.x()
 		
 		return (xEx, yEx, zEx)
+
+	def GetdtCalc(self, xpred, L, cs):
+		left, right=list(filter(lambda x : x[0]<8, cs)), list(filter(lambda x : x[0]>7, cs))
+		NL, NR=len(left), len(right)
+		if NL == 0 or NR == 0: return 
+		sumOfInverses=lambda x : sum( [1/i[1] for i in x] )
+		return xpred/NL*sumOfInverses(left) - (L-xpred)/NR*sumOfInverses(right)
 
 	def Getcscint(self, runNr, fixed_ch, state):
 
@@ -1033,37 +1016,24 @@ class Analysis(object):
 		sorted_d={k:v for k,v in sorted_tuples}
 		self.timeresolutionvalues=sorted_d
 
-	def GetPolyParams(self, runNr, fixed_ch, state='uncorrected', n=5, mode='json'):
-		fname=f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.{mode}'
-		if not os.path.exists(fname): 
-			return 
+	def GetPolyParams(self, runNr, fixed_ch, state='uncorrected', n=5):
+		iteration=0 if state=='uncorrected' else 1
+		if not os.path.exists(f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv'): return 
+		with open(f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.csv', 'r') as f:
+			reader=csv.reader(f)
+			alldata=[r for r in reader]
+			if len(alldata)==0:return
+			data=alldata[iteration]
 		
-		if mode=='csv':
-			iteration=0 if state=='uncorrected' else 1
-			with open(fname, 'r') as f:
-				reader=csv.reader(f)
-				alldata=[r for r in reader]
-				if len(alldata)==0:return
-				data=alldata[iteration]
-			
-			if n==4:		
-				params=[float(i) for i in data[1:11]]
-				limits=[float(i) for i in data[11:13]]
-				# if len(data)==15: tds0mean=[float(i) for i in data[13:]]
-			elif n==5:
-				params=[float(i) for i in data[1:13]]
-				limits=[float(i) for i in data[13:15]]
-				# tds0mean=[float(i) for i in data[15:]]
-			return params,limits
-		
-		elif mode=='json':	
-			with open(fname, 'r') as f:			
-				alldata = json.load(f)
-				data=alldata[state]
-			if n==5:
-				params=[float(i) for i in data[1:13]]
-				limits=[float(i) for i in data[13:15]]
-			return params, limits
+		if n==4:		
+			params=[float(i) for i in data[1:11]]
+			limits=[float(i) for i in data[11:13]]
+			# if len(data)==15: tds0mean=[float(i) for i in data[13:]]
+		elif n==5:
+			params=[float(i) for i in data[1:13]]
+			limits=[float(i) for i in data[13:15]]
+			# tds0mean=[float(i) for i in data[15:]]
+		return params,limits
 
 	def Gettds0relativetime(self, runNr, fixed_ch, mode='mean', state='uncorrected', n=5):
 		
@@ -1112,14 +1082,7 @@ class Analysis(object):
 
 			if state not in d: return 
 
-			return d[state][0], d[state][1]		
-
-	def GetBarsideTimeresolution(self, runNr, state):
-		
-		fname = f'{self.path}Results/run{runNr}/run{runNr}_barside-timeresolutions-{state}.json'
-		with open(fname, 'r') as f:
-			d=json.load(f)
-		return d
+			return d[state][0], d[state][1]			
 
 	def FitForMPV(self, runNr, fixed_ch, state):
 		fname=f'{self.path}rootfiles/run{runNr}/timewalk_{fixed_ch}.root'
@@ -1236,6 +1199,17 @@ class Analysis(object):
 			data=alldata[0]
 			return data
 
+	def GetXcalculated(self, dt, L, cs, wanted=None):
+
+		left, right=list(filter(lambda x : x[0]<8, cs)), list(filter(lambda x : x[0]>7, cs))
+		NL, NR=len(left), len(right)
+		if NL==0 or NR == 0: return -999.
+		sumOfInverses=lambda x : sum( [1/i[1] for i in x] )
+		A, B = 1/NL*sumOfInverses(left), 1/NR*sumOfInverses(right)
+		xcalc = (dt+L*B)/(A+B)
+
+		return xcalc
+
 	def GetMPV(self, runNr, fixed_ch, iteration):
 		fname=f'{self.path}MPVs/run{runNr}/MPV_{fixed_ch}.csv'
 		if not os.path.exists(fname): return -999.
@@ -1246,34 +1220,42 @@ class Analysis(object):
 			res=data[iteration-1]
 		return float(res[0])
 
+	def GetToFcorrection(self, SiPM, pred, cs, xref):
+		c_SiPM=float(cs[0])
+		ToFcorrection=abs((pred-xref)/c_SiPM)
+		return ToFcorrection
+
 	"""
 	Important note: the Analysis.correct_ToF function corrects 
-	the SiPM time to x=L/2 in the physics FoR. That is not equal to the bar centre!!!! 
+	the SiPM time to the centre of the bar! 
 	"""
 
-	def correct_ToF(self, fixed_ch, clock, xEx):
+	def correct_ToF(self, fixed_ch, clock, pred):
 		detID=int(fixed_ch.split('_')[0])
 		s,p,b=self.parseDetID(detID)
-		SiPM=int(fixed_ch.split('_')[-1])
-
-		# Correct to the centre of the bar in the physics FoR
-		self.task.MuFilter.GetPosition(detID, self.A, self.B)	
-		xref = 0.5 * (self.A.x() + self.B.x())
+		SiPM=int(fixed_ch.split('_')[-1])		
+		xref=self.xrefs[s]
 		cs=self.cscintvalues[fixed_ch]
 
 		# fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
 		time=clock*self.TDC2ns
 		c_SiPM=float(cs[0])
-		ToFcorrection=(xEx-xref)/c_SiPM
-
-		if SiPM<8: corrected_t = time + ToFcorrection
-		else: corrected_t = time - ToFcorrection
-
+		ToFcorrection=abs((pred-xref)/c_SiPM)
+		# Does not work for DS! 
+		if SiPM<8:
+			if pred >= xref: corrected_t = time - ToFcorrection
+			else: corrected_t = time + ToFcorrection
+		else: 
+			if pred >= xref: corrected_t = time + ToFcorrection
+			else: corrected_t = time - ToFcorrection
 		return (SiPM, corrected_t)
 
-	def GetCorrectedTimes(self, hit, x=0, mode='unaligned'):
-
+	def GetCorrectedTimes(self, hit,x=0, mode='unaligned'):
 		detID=hit.GetDetectorID()
+
+		if self.options.numuStudy:
+			runID = self.task.M.eventTree.EventHeader.GetRunId()
+			# print('****'*10, f'\nRunId: {runID}\nTime alignment of run: {self.GetTimeAlignmentType(runID)}\nStored alignment parameters of type:{self.timealignment}\n', '****'*10)
 
 		alignedtimes=[]
 		clocks, qdcs=hit.GetAllTimes(), hit.GetAllSignals()
@@ -1309,6 +1291,9 @@ class Analysis(object):
 		if x==0:
 			ToFcorrectedtime=time
 		else: 
+			SiPM=int(fixed_ch.split('_')[-1])
+			cscint=self.cscintvalues[fixed_ch]
+			xref=self.xrefs[int(fixed_ch[0])]
 			ToFcorrectedtime=self.correct_ToF(fixed_ch, clock, x)[1]
 
 		#### TW corrected time then ToF & TW corrected time
@@ -1570,7 +1555,7 @@ class Analysis(object):
 		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
 
 		d={}
-		for s in (2,): # Only make dict for US
+		for s in (1,2):
 			for p in range(self.systemAndPlanes[s]):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
@@ -1587,13 +1572,12 @@ class Analysis(object):
 		self.twparameters=d
 
 	def WriteTWParamDict(self):
-		if not hasattr(self, "twparameters"): self.MakeTWCorrectionDict(self.timealignment)
+		if not hasattr(self, "twparameters"): self.MakeTWCorrectionDict(self.runNr)
 
 		twparamsdir = f'{self.path}/Polyparams/run{self.runNr}/'
 		twparamsfilename=twparamsdir+f'twparams.json'	
 		with open(twparamsfilename, 'w') as jf: 
 			json.dump(self.twparameters, jf)
-		print(f'TW param dict written to {twparamsfilename}')
 
 	### Make dictionary of the alignment parameter determined as the truncated y-mean of tw-corr (tds0 - tSiPM)
 	def MakeAlignmentParameterDict(self, alignment):
@@ -1606,7 +1590,7 @@ class Analysis(object):
 		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
 
 		d={}
-		for s in (2,): # Just US
+		for s in (1,2):
 			for p in range(self.systemAndPlanes[s]):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
@@ -1624,7 +1608,6 @@ class Analysis(object):
 		alignmentparamsfilename=alignmentparamsdir+f'alignmentparams.json'	
 		with open(alignmentparamsfilename, 'w') as jf: 
 			json.dump(self.alignmentparameters, jf)
-		print(f'Alignment param dict written to {alignmentparamsfilename}')
 
 	def MakeTimingCovarianceDict(self, runNr):
 		filename=f'{self.path}TimingCovariance/run{self.runNr}/timingcovariance.json'
@@ -1746,17 +1729,6 @@ class Analysis(object):
 				detID = int(f'2{plane}00{bar}')
 				MuFilter.GetPosition(detID, self.A, self.B)
 				d[detID] = [self.A.x(), self.B.x(), self.A.y(), self.B.y()]
-		for plane in range(4):
-			if plane!=3:bars=range(120)
-			else: bars=range(60,120)
-			for bar in bars:
-				bar=str(bar).zfill(3)
-				detID=int(f'3{plane}{bar}')
-				MuFilter.GetPosition(detID, self.A, self.B)
-				d[detID] = [self.A.x(), self.B.x(), self.A.y(), self.B.y()]				
 
-		for f in (f'{self.path}BarPositions.json', f'/eos/user/a/aconsnd/SWAN_projects/numuInvestigation/data/BarPositions.json', f'/eos/user/a/aconsnd/SWAN_projects/Simulation/data/BarPositions.json'):
-			with open(f, 'w') as jf:
-				json.dump(d, jf)
-		print(f'Bar positions written to three locations')
 		return d
+
