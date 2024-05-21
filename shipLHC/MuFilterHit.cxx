@@ -1,5 +1,6 @@
 #include "MuFilterHit.h"
 #include "MuFilter.h"
+#include "ShipUnit.h"
 #include "TROOT.h"
 #include "FairRunSim.h"
 #include "TGeoNavigator.h"
@@ -7,10 +8,7 @@
 #include "TGeoBBox.h"
 #include <TRandom.h>
 #include <iomanip> 
-#include <iostream>
-#include <fstream>
 
-Double_t speedOfLight = TMath::C() *100./1000000000.0 ; // from m/sec to cm/ns
 // -----   Default constructor   -------------------------------------------
 MuFilterHit::MuFilterHit()
   : SndlhcHit()
@@ -37,81 +35,140 @@ MuFilterHit::MuFilterHit(Int_t detID,Int_t nP,Int_t nS)
    }
 }
 
-
 // -----   constructor from MuFilterPoint   ------------------------------------------
 MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
   : SndlhcHit()
 {
+     Int_t subsystem = floor(detID/10000);
      MuFilter* MuFilterDet = dynamic_cast<MuFilter*> (gROOT->GetListOfGlobals()->FindObject("MuFilter"));
      // get parameters from the MuFilter detector for simulating the digitized information
-     nSiPMs  = MuFilterDet->GetnSiPMs(detID);
-     if (floor(detID/10000)==3&&detID%1000>59) nSides = MuFilterDet->GetnSides(detID) - 1;
-     else nSides = MuFilterDet->GetnSides(detID);
-
-     Float_t timeResol = MuFilterDet->GetConfParF("MuFilter/timeResol");
-
+     nSiPMs = MuFilterDet->GetnSiPMs(detID);
+     nSides = MuFilterDet->GetnSides(detID);
+     
      Float_t attLength=0;
-     Float_t siPMcalibration=0;
-     Float_t siPMcalibrationS=0;
-     Float_t propspeed =0;
-     if (floor(detID/10000)==3) { 
-              if (nSides==2){attLength = MuFilterDet->GetConfParF("MuFilter/DsAttenuationLength");}
-              else                    {attLength = MuFilterDet->GetConfParF("MuFilter/DsTAttenuationLength");}
-              siPMcalibration = MuFilterDet->GetConfParF("MuFilter/DsSiPMcalibration");
-              propspeed = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+     Float_t SiPMcalibration=0;
+     Float_t SiPMcalibrationS=0;
+     Float_t timeresol_left, timeresol_right;
+     Float_t signalspeed_left, signalspeed_right;
+    // using PropSpeed = std::variant<float, std::map<std::string, float>>;
+    // PropSpeed propspeed;
+
+    // using TimeResolution = std::variant<float, std::map<std::string, float>>;
+    // TimeResolution timeResol;
+
+    //  Float_t DSpropspeed =0;
+     if (subsystem==3) { 
+              if (nSides==2){ attLength = MuFilterDet->GetConfParF("MuFilter/DsAttenuationLength"); }
+              else { attLength = MuFilterDet->GetConfParF("MuFilter/DsTAttenuationLength"); }
+              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/DsSiPMcalibration");
+              
+              signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+              signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+
+              timeresol_left = MuFilterDet->GetConfParF("MuFilter/timeResol");
+              timeresol_right = MuFilterDet->GetConfParF("MuFilter/timeResol");
      }
-     else { 
+     else if (subsystem==2) {
               attLength = MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength");
-              siPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
-              siPMcalibrationS = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibrationS");
-              propspeed = MuFilterDet->GetConfParF("MuFilter/VandUpPropSpeed");
+              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
+              SiPMcalibrationS = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibrationS");
+              
+              timeresol_left = MuFilterDet->GetBarSideTimeResolution(detID, "left");
+              timeresol_right = MuFilterDet->GetBarSideTimeResolution(detID, "right");
+
+              signalspeed_left = MuFilterDet->GetBarSideSignalSpeed(detID, "left");
+              signalspeed_right = MuFilterDet->GetBarSideSignalSpeed(detID, "right");
+
+     }
+     else { // if detID in veto
+              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
+              if (subsystem==1 && nSides==1){ attLength = 2*MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength"); }
+              else { attLength = 2*MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength"); }
+
+              signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+              signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+              
+              timeresol_left = MuFilterDet->GetConfParF("MuFilter/timeResol");
+              timeresol_right = MuFilterDet->GetConfParF("MuFilter/timeResol");
      }
 
      for (unsigned int j=0; j<16; ++j){
         signals[j] = -1;
-        times[j]    =-1;
+        times[j] =-1;
      }
      LOG(DEBUG) << "detid "<<detID<< " size "<<nSiPMs<< "  side "<<nSides;
 
      fDetectorID  = detID;
-     Float_t signalLeft    = 0;
+     Float_t signalLeft = 0;
      Float_t signalRight = 0;
      Float_t earliestToAL = 1E20;
      Float_t earliestToAR = 1E20;
+     TVector3 vLeft,vRight;
      for(auto p = std::begin(V); p!= std::end(V); ++p) {
 
-        Double_t signal = (*p)->GetEnergyLoss();
-     
-      // Find distances from MCPoint centre to ends of bar 
-        TVector3 vLeft,vRight;
+        Float_t signal = (*p)->GetEnergyLoss();
+
+        // Find distances from MCPoint centre to ends of bar 
         TVector3 impact((*p)->GetX(),(*p)->GetY() ,(*p)->GetZ() );
         MuFilterDet->GetPosition(fDetectorID,vLeft, vRight);
-        Double_t distance_Left    =  (vLeft-impact).Mag();
-        Double_t distance_Right =  (vRight-impact).Mag();
+        Float_t distance_Left    =  (vLeft-impact).Mag();
+        Float_t distance_Right =  (vRight-impact).Mag();
         signalLeft+=signal*TMath::Exp(-distance_Left/attLength);
         signalRight+=signal*TMath::Exp(-distance_Right/attLength);
 
-      // for the timing, find earliest particle and smear with time resolution
-        Double_t ptime    = (*p)->GetTime();
-        Double_t t_Left    = ptime + distance_Left/propspeed;
-        Double_t t_Right = ptime + distance_Right/propspeed;
-        if ( t_Left <earliestToAL){earliestToAL = t_Left ;}
-        if ( t_Right <earliestToAR){earliestToAR = t_Right ;}
+        // for the timing, find earliest particle and smear with time resolution
+        Float_t ptime = (*p)->GetTime();
+        Float_t t_Left, t_Right;
+
+        //  
+        if (subsystem==3) {
+          signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+          signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+          // t_Left = ptime + distance_Left/signalspeed_left;
+          // t_Right = ptime + distance_Right/signalspeed_right;
+        }
+        else if (subsystem==1) {
+          signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+          signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+          // t_Left = ptime + distance_Left/signalspeed_left;
+          // t_Right = ptime + distance_Right/signalspeed_right;
+        }        
+        else { // If detID in upstream
+          signalspeed_left = MuFilterDet->GetBarSideSignalSpeed(detID, "left");
+          signalspeed_right = MuFilterDet->GetBarSideSignalSpeed(detID, "right");
+          // t_Left = ptime + distance_Left/signalspeed_left;
+          // t_Right = ptime + distance_Right/signalspeed_right;
+        }
+        t_Left = ptime + distance_Left/signalspeed_left;
+        t_Right = ptime + distance_Right/signalspeed_right;        
+        if ( t_Left < earliestToAL){earliestToAL = t_Left ;}
+        if ( t_Right < earliestToAR){earliestToAR = t_Right ;}
      } 
+
      // shortSiPM = {3,6,11,14,19,22,27,30,35,38,43,46,51,54,59,62,67,70,75,78}; - counting from 1!
      // In the SndlhcHit class the 'signals' array starts from 0.
-     for (unsigned int j=0; j<nSiPMs; ++j){
-        if (j==2 or j==5){
-           signals[j] = signalLeft/float(nSiPMs) * siPMcalibrationS;   // most simplest model, divide signal individually. Small SiPMS special
-           times[j] = gRandom->Gaus(earliestToAL, timeResol);
-        }else{
-           signals[j] = signalLeft/float(nSiPMs) * siPMcalibration;   // most simplest model, divide signal individually. 
+     Float_t timeResol; 
+     TString side;
+     for (unsigned int j=0; j<nSiPMs*nSides; ++j){
+        
+        if ( (subsystem!=3 and j<8) || (subsystem==3 and j==0) ) { side="left"; timeResol=timeresol_left;}
+        else if ( (subsystem!=3 and j>=8) || (subsystem==3 and j==1) ) { side="right"; timeResol=timeresol_right;}
+        else { return; }
+
+        if ( subsystem==2 && (j%8==2 or j%8==5)) 
+          {  // only US has small SiPMs
+            signals[j] = signalLeft/float(nSiPMs) * SiPMcalibrationS;   // most simplest model, divide signal individually. Small SiPMS special
+            times[j] = gRandom->Gaus(earliestToAL, timeResol);
+          }
+
+        else{
+           signals[j] = signalLeft/float(nSiPMs) * SiPMcalibration;   // most simplest model, divide signal individually. 
            times[j] = gRandom->Gaus(earliestToAL, timeResol);
         }
-        if (nSides>1){ 
-            signals[j+nSiPMs] = signalRight/float(nSiPMs) * siPMcalibration;   // most simplest model, divide signal individually.
-            times[j+nSiPMs] = gRandom->Gaus(earliestToAR, timeResol);
-        }
+        // if (nSides>1){ 
+        //     signals[j+nSiPMs] = signalRight/float(nSiPMs) * SiPMcalibration;   // most simplest model, divide signal individually.
+        //     times[j+nSiPMs] = gRandom->Gaus(earliestToAR, timeResol);
+        // }
      }
      flag = true;
      for (Int_t i=0;i<16;i++){fMasked[i]=kFALSE;}
@@ -135,7 +192,10 @@ Float_t MuFilterHit::GetEnergy()
 }
 
 bool MuFilterHit::isVertical(){
-  if  (floor(fDetectorID/10000)==3&&fDetectorID%1000>59) {return kTRUE;}
+  if  ( (floor(fDetectorID/10000)==3&&fDetectorID%1000>59) ||
+         (floor(fDetectorID/10000)==1&&int(fDetectorID/1000)%10==2) ) {  
+      return kTRUE;
+  }
   else{return kFALSE;}
 }
 
@@ -163,106 +223,28 @@ std::map<Int_t,Float_t> MuFilterHit::GetAllSignals(Bool_t mask,Bool_t positive)
 }
 
 // -----   Public method Get List of time measurements   -------------------------------------------
-std::map<Int_t,Float_t> MuFilterHit::GetAllTimes(Bool_t mask)
+std::map<Int_t,Float_t> MuFilterHit::GetAllTimes(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 {
-  std::map<Int_t,Float_t> allTimes;
-  for (unsigned int s=0; s<nSides; ++s){
-    for (unsigned int j=0; j<nSiPMs; ++j){
-     unsigned int channel = j+s*nSiPMs;
-     if (signals[channel]> 0){
-       if (!fMasked[channel] || !mask)
-        {
-        allTimes[channel] = times[channel];
-        }
-      }
-    }
-  }
-  return allTimes;
-}
-
-// Parse line of csv file using a provided delimiter, del. 
-std::vector<Float_t> adv_tokenizer(std::string s, char del, std::string state ="uncorrected")
-{
-  std::vector<Float_t> res;
-  std::stringstream ss(s);
-  std::string word;
-  while (!ss.eof()) {
-    std::getline(ss, word, del);
-    if (word==state) {continue;}
-    res.push_back(std::stof(word));
-  }
-  res.pop_back();res.pop_back();
-  return res;
-}
-
-// Fetch time walk parameters for a given channel and given run number. Run number dependence *hopefully* not necessary.
-// the 'state' argument allows for a second iteration of the time walk correction to be implemented however it probably isn't necessary.
-std::vector<Float_t> MuFilterHit::GetTWParams(std::string runNr, Int_t channel, std::string state /*="uncorrected"*/)
-{
-    std::string detID=std::to_string(fDetectorID);
-    
-    // variables for reading csv
-    std::vector<Float_t> params;
-    std::ifstream fin;
-    std::string fname, line, word, temp;
-            
-    fname="/eos/experiment/sndlhc/users/aconsnd/TWparameters/run"+runNr+"/polyparams4_"+detID+"_"+std::to_string(channel)+".csv";
-    fin.open(fname);
-    fin >> line;
-    fin.close();
-
-    if (line=="") {return params;} // If no params available, return vector of zeros.
-    std::vector<Float_t> row=adv_tokenizer(line,','); // Delimiter is a comma, no space!
-    params=row;
-    return params;
-}
-
-// Calculate time walk correction with parameters in hand.
-Float_t MuFilterHit::TWCorrection(std::vector<Float_t> params, Float_t qdc)
-{
-  // Last 2 entries in the csv file are the limits over which the fit was performed. 
-  Int_t qdc_low, qdc_high;
-  qdc_high=params[params.size()-1];qdc_low=params[params.size()-2];
-  
-  std::vector<Float_t> cps;
-  for (int i=0; i<=10;++i)
-  {
-    if (i%2==0) // The entries in the csv file are: param[i], error_param[i]
-    {
-      cps.push_back(params[i]);
-    }
-    else {continue;}
-  }
-  Float_t x_offset=qdc-cps[0]; // Offset in x
-  Float_t correction=cps[3]*x_offset/(cps[0]+cps[1]*x_offset+cps[2]*x_offset*x_offset); 
-  // The final parameter in the function is a vertical offset required for fitting however this should not be applied in the fit.
-  return correction;
-}
-
-// -----   Public method Get List of TW corrected times IN NANOSECONDS  -------------------------------------------
-std::map<Int_t,Float_t> MuFilterHit::GetTWCorrectedTimes(Bool_t mask, std::string runNr)
-{
-  // std::string runNr;
-  std::map<Int_t,Float_t> allTimes;
-  for (unsigned int s=0; s<nSides; ++s){
-    for (unsigned int j=0; j<nSiPMs; ++j){
-     unsigned int channel = j+s*nSiPMs;
-      if (signals[channel]> 0){
-        if (!fMasked[channel] || !mask){
-          std::vector<Float_t> params = MuFilterHit::GetTWParams(runNr, channel); // Read parameters from the file
-          Float_t TWCorrection = MuFilterHit::TWCorrection(params, signals[channel]); // Determine correction using the fetched parameters
-          allTimes[channel] = times[channel]*6.25+TWCorrection; // Factor of 6.25 for clock cycles -> nanoseconds conversion.
-        }
-      }
-    }
-  }
-  return allTimes;
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
+          std::map<Int_t,Float_t> allTimes;
+          for (unsigned int s=0; s<nSides; ++s){
+              for (unsigned int j=0; j<nSiPMs; ++j){
+               unsigned int channel = j+s*nSiPMs;
+               if (signals[channel]> 0){
+                 if (!fMasked[channel] || !mask){
+                    allTimes[channel] = fTimesHelper[channel];
+                    }
+                }
+              }
+          }
+          return allTimes;
 }
 
 // -----   Public method Get time difference mean Left - mean Right   -----------------
-Float_t MuFilterHit::GetDeltaT(Bool_t mask)
+Float_t MuFilterHit::GetDeltaT(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 // based on mean TDC measured on Left and Right
 {
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
           Float_t mean[] = {0,0}; 
           Int_t count[] = {0,0}; 
           Float_t dT = -999.;
@@ -271,7 +253,7 @@ Float_t MuFilterHit::GetDeltaT(Bool_t mask)
                unsigned int channel = j+s*nSiPMs;
                if (signals[channel]> 0){
                  if (!fMasked[channel] || !mask){
-                    mean[s] += times[channel];
+                    mean[s] += fTimesHelper[channel];
                     count[s] += 1;
                     }
                 }
@@ -282,9 +264,10 @@ Float_t MuFilterHit::GetDeltaT(Bool_t mask)
           }
           return dT;
 }
-Float_t MuFilterHit::GetFastDeltaT(Bool_t mask)
+Float_t MuFilterHit::GetFastDeltaT(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 // based on fastest (earliest) TDC measured on Left and Right
 {
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
           Float_t first[] = {1E20,1E20}; 
           Float_t dT = -999.;
           for (unsigned int s=0; s<nSides; ++s){
@@ -292,7 +275,7 @@ Float_t MuFilterHit::GetFastDeltaT(Bool_t mask)
                unsigned int channel = j+s*nSiPMs;
                if (signals[channel]> 0){
                  if (!fMasked[channel] || !mask){
-                    if  (times[channel]<first[s]) {first[s] = times[channel];}
+                    if  (times[channel]<first[s]) {first[s] = fTimesHelper[channel];}
                     }
                 }
               }
@@ -305,8 +288,9 @@ Float_t MuFilterHit::GetFastDeltaT(Bool_t mask)
 
 
 // -----   Public method Get mean time  -----------------
-Float_t MuFilterHit::GetImpactT(Bool_t mask)
+Float_t MuFilterHit::GetImpactT(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 {
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
           Float_t mean[] = {0,0}; 
           Int_t count[] = {0,0}; 
           Float_t dT = -999.;
@@ -324,7 +308,7 @@ Float_t MuFilterHit::GetImpactT(Bool_t mask)
                unsigned int channel = j+s*nSiPMs;
                if (signals[channel]> 0){
                  if (!fMasked[channel] || !mask){
-                    mean[s] += times[channel];
+                    mean[s] += fTimesHelper[channel];
                     count[s] += 1;
                     }
                 }
@@ -394,6 +378,30 @@ void MuFilterHit::Print() const
      }
  }
 std::cout << std::endl;
+}
+
+// -----   Private method to opt for time corrections   -------------------------------------------
+void MuFilterHit::OptForTimeCorrections(Bool_t mask, Bool_t apply, Double_t SiPMDistance)
+{
+          // simply copy the times if no time corrections is required
+          if (apply == kFALSE) memcpy(fTimesHelper, times, sizeof(fTimesHelper));
+          else { // apply the time corrections
+            MuFilter* MuFilterDet = dynamic_cast<MuFilter*> (gROOT->GetListOfGlobals()->FindObject("MuFilter"));
+            for (unsigned int s=0; s<nSides; ++s){
+                for (unsigned int j=0; j<nSiPMs; ++j){
+                 unsigned int channel = j+s*nSiPMs;
+                 if (signals[channel]> 0){
+                   if (!fMasked[channel] || !mask){
+                     fTimesHelper[channel] = (MuFilterDet->GetCorrectedTime(fDetectorID,channel,
+                                                                    times[channel]*6.25,
+                                                                    SiPMDistance,
+                                                                    signals[channel])*6.25);
+                      }
+                 }
+                 else fTimesHelper[channel] = times[channel];
+                }
+            }
+          }
 }
 // -------------------------------------------------------------------------
 

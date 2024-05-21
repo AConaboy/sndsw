@@ -6,6 +6,7 @@
 #include "TObject.h"
 #include "TVector3.h"
 #include <map>
+#include <variant>
 
 class MuFilterHit : public SndlhcHit
 {
@@ -29,16 +30,12 @@ class MuFilterHit : public SndlhcHit
     Float_t SumOfSignals(char* opt,Bool_t mask=kTRUE);
     std::map<TString,Float_t> SumOfSignals(Bool_t mask=kTRUE);
     std::map<Int_t,Float_t> GetAllSignals(Bool_t mask=kTRUE,Bool_t positive=kTRUE);
-    std::map<Int_t,Float_t> GetAllTimes(Bool_t mask=kTRUE);
-    std::vector<Float_t> GetTWParams(std::string runNr, Int_t SiPM, std::string state="uncorrected");
-    Float_t TWCorrection(std::vector<Float_t> params, Float_t qdc);
-    std::map<Int_t,Float_t> GetTWCorrectedTimes(Bool_t mask=kTRUE, std::string runNr="005097"); // Currently one must provide a run number
-    // until we conclude that the correction coeficients are sufficiently stable.
-    // std::map<Int_t,Float_t> GetToFCorrectedTimes(Bool_t mask=kTRUE, std::string runNr="005097", Float_t x_ex);
-    
-    Float_t  GetDeltaT(Bool_t mask=kTRUE);
-    Float_t  GetFastDeltaT(Bool_t mask=kTRUE);
-    Float_t  GetImpactT(Bool_t mask=kTRUE);
+    std::map<Int_t,Float_t> GetAllTimes(Bool_t mask=kTRUE, 
+                                        Bool_t apply_t_corr=kFALSE, 
+                                        Double_t SipmDistance=0.);
+    Float_t  GetDeltaT(Bool_t mask=kTRUE, Bool_t apply_t_corr=kFALSE, Double_t SipmDistance=0.);
+    Float_t  GetFastDeltaT(Bool_t mask=kTRUE, Bool_t apply_t_corr=kFALSE, Double_t SipmDistance=0.);
+    Float_t  GetImpactT(Bool_t mask=kTRUE, Bool_t apply_t_corr=kFALSE, Double_t SipmDistance=0.);
     bool isValid() const {return flag;}
     bool isMasked(Int_t i) const {return fMasked[i];}
     void SetMasked(Int_t i) {fMasked[i]=kTRUE;}
@@ -46,16 +43,22 @@ class MuFilterHit : public SndlhcHit
     int GetPlane(){return int(fDetectorID/1000)%10;}
     bool isVertical();
     bool isShort(Int_t);
-    // TString MakeFixedChannel();
   private:
     /** Copy constructor **/
     MuFilterHit(const MuFilterHit& hit);
     MuFilterHit operator=(const MuFilterHit& hit);
+    /** Function to set the fTimesHelper array **/
+    void OptForTimeCorrections(Bool_t mask, Bool_t apply, Double_t SipmDistance);
 
     Float_t flag;   ///< flag
     Float_t fMasked[16];  /// masked signal
+    /* Helper container for time-corrected or raw times 
+       depending if time alignment is requested.
+       The unit is clock cycles same as for the SndlhcHit's
+       times[16] data member */
+    Float_t fTimesHelper[16];
 
-    ClassDef(MuFilterHit,5);
+    ClassDef(MuFilterHit,6);
     
 
 };
