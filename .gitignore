@@ -1,62 +1,7 @@
-# Executables
-*.exe
-*.out
-*.app
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.ko
-*.pyc
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-*.lib
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-
-# CMake
-CMakeCache.txt
-CMakeFiles
-Makefile
-cmake_install.cmake
-install_manifest.txt
-
-# backup files
-*.*~
-
-# build directory & data directory
-build/
-
-# VM stuff
-.vagrant/
-
-# OS X
-*.idea
-*.DS_Store
-
-# IPython notebooks
-*.ipynb_checkpoints
-
-# FairShip-specific files
-c++
-cc
-config.sh
-lcgenv.sh
-
-# Eclipse
-*.project
-*.pydevproject
-
-# CDB
-conditionsDatabase/**/.cache/
-
-macro/LaserMeasurements/analysis-plots/
-SiPM number,Linear fit
+macro/LaserMeasurements/Results/Offsets/qdcoffsets_1-bar.csv
+macro/LaserMeasurements/analysis-plots/qdc_calibration/
+macro/LaserMeasurements/analysis-plots/timewalk/illuminations/
+macro/LaserMeasurements/scripts/__pycache__/
+shipLHC/rawData/__pycache__/
+macro/LaserMeasurements/Results/Offsets/qdcoffsets_1-bar.csv
+shipLHC/scripts/__pycache__/
