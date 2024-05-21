@@ -32,20 +32,25 @@ class MuFilter : public FairDetector
 		/**      Create the detector geometry        */
 		void ConstructGeometry();
 
-    /** Getposition **/
-                 void GetPosition(Int_t id, TVector3& vLeft, TVector3& vRight); // or top and bottom
-                 void GetLocalPosition(Int_t id, TVector3& vLeft, TVector3& vRight);
-                 Float_t GetCorrectedTime(Int_t id, Int_t c, Double_t t, Double_t L);
-                 Int_t GetnSiPMs(Int_t detID);
-                 Int_t GetnSides(Int_t detID);
+   		/** Getposition **/
+		void GetPosition(Int_t id, TVector3& vLeft, TVector3& vRight); // or top and bottom
+		void GetLocalPosition(Int_t id, TVector3& vLeft, TVector3& vRight);
+		Float_t GetTimeWalk(Int_t id, Int_t c, Float_t qdc, TString tag);
+		Float_t GetCorrectedTime(Int_t id, Int_t c, Double_t t, Double_t L=0, Float_t QDC=-1.);
+		Int_t GetnSiPMs(Int_t detID);
+		Int_t GetnSides(Int_t detID);
+		Float_t GetBarSideTimeResolution(Int_t detID, TString side);
+		Float_t GetBarSideSignalSpeed(Int_t detID, TString side);
 
                 void InitEvent(SNDLHCEventHeader *e);
 		void SetConfPar(TString name, Float_t value){conf_floats[name]=value;}
 		void SetConfPar(TString name, Int_t value){conf_ints[name]=value;}
 		void SetConfPar(TString name, TString value){conf_strings[name]=value;}
+		void SetConfPar(TString name, std::vector<float> values){conf_vectors[name]=values;}
 		Float_t  GetConfParF(TString name){return conf_floats[name];} 
 		Int_t       GetConfParI(TString name){return conf_ints[name];}
 		TString  GetConfParS(TString name){return conf_strings[name];}
+		std::vector<Float_t> GetConfParVector(TString name){return conf_vectors[name];}
 
 		/**      Initialization of the detector is done here    */
 		virtual void Initialize();
@@ -101,6 +106,7 @@ class MuFilter : public FairDetector
 		std::map<TString,Float_t> conf_floats;
 		std::map<TString,Int_t> conf_ints;
 		std::map<TString,TString> conf_strings;
+		std::map<TString,std::vector<Float_t>> conf_vectors;
 		SNDLHCEventHeader *eventHeader;
 
                 // Vector to store runs covered in the geometry file.
