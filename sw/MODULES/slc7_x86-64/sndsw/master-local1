@@ -1,0 +1,45 @@
+#%Module1.0
+proc ModulesHelp { } {
+  global version
+  puts stderr "ALICE Modulefile for sndsw master-local1"
+}
+set version master-local1
+module-whatis "ALICE Modulefile for sndsw master-local1"
+# Dependencies
+module load BASE/1.0                                                            \
+                      \
+                      \
+                          \
+              \
+                      \
+            	\
+             \
+                      \
+            
+# Our environment
+setenv EOSSHIP root://eospublic.cern.ch/
+setenv SNDSW_ROOT $::env(BASEDIR)/sndsw/$version
+setenv FAIRSHIP $::env(SNDSW_ROOT)
+setenv FAIRSHIP_ROOT $::env(SNDSW_ROOT)
+setenv SNDSW_HASH e83c84eef318acf520d96bfc637a90937574aedb
+setenv FAIRSHIP_HASH $::env(SNDSW_HASH)
+setenv VMCWORKDIR $::env(SNDSW_ROOT)
+setenv GEOMPATH $::env(SNDSW_ROOT)/geometry
+setenv CONFIG_DIR $::env(SNDSW_ROOT)/gconfig
+setenv GALGCONF $::env(SNDSW_ROOT)/shipgen/genie_config
+prepend-path PATH $::env(SNDSW_ROOT)/bin
+prepend-path LD_LIBRARY_PATH $::env(SNDSW_ROOT)/lib
+setenv FAIRLIBDIR $::env(SNDSW_ROOT)/lib
+prepend-path ROOT_INCLUDE_PATH $::env(SNDSW_ROOT)/include
+append-path ROOT_INCLUDE_PATH $::env(GEANT4_ROOT)/include
+append-path ROOT_INCLUDE_PATH $::env(GEANT4_ROOT)/include/Geant4
+append-path ROOT_INCLUDE_PATH $::env(PYTHIA_ROOT)/include
+append-path ROOT_INCLUDE_PATH $::env(PYTHIA_ROOT)/include/Pythia8
+append-path ROOT_INCLUDE_PATH $::env(GEANT4_VMC_ROOT)/include
+append-path ROOT_INCLUDE_PATH $::env(GEANT4_VMC_ROOT)/include/geant4vmc
+prepend-path PYTHONPATH $::env(SNDSW_ROOT)/python
+append-path PYTHONPATH $::env(SNDSW_ROOT)/shipLHC/scripts
+append-path PYTHONPATH $::env(SNDSW_ROOT)/shipLHC/rawData
+# append-path PYTHONPATH $::env(XROOTD_ROOT)/lib/python3.8/site-packages
+
+
