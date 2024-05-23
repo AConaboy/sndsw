@@ -83,6 +83,10 @@ if options.numusignalevents:
     numu = numusignals(options)
     numu.InvestigateSignalEvents()
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> cf0e3201a (Updating files for use with simulation)
 if options.Task=='TimeWalk':
     if not options.mode:
         print('=='*20+f'\nNo mode given for time walk task. Give mode as zeroth, tof or tw.\n'+'=='*20)

@@ -86,10 +86,39 @@ class Monitoring():
 
       self.h = {}   # histogram storage
 
+<<<<<<< HEAD
       self.runNr   = str(options.runNumber).zfill(6)
       self.FairTasks = {}
       for x in FairTasks:   #  keeps extended methods if from python class
          self.FairTasks[x.GetName()] = x
+=======
+        self.runNr   = str(options.runNumber).zfill(6)
+# presenter file
+<<<<<<< HEAD
+        if hasattr(self, "saveTo") and options.saveTo!="":
+          name = options.saveTo+'run'+self.runNr+'_'+str(options.nStart//1000000)+'.root'
+        else:
+           name = 'run'+self.runNr+'.root'
+        if options.interactive: name = 'I-'+name
+        self.presenterFile = ROOT.TFile(name,'recreate')
+        for role in ['','shifter', 'expert']:
+          self.presenterFile.mkdir('scifi/'+role)
+          self.presenterFile.mkdir('mufilter/'+role)
+          self.presenterFile.mkdir('daq/'+role)
+          if options.interactive: self.presenterFile.mkdir('eventdisplay/'+role)
+=======
+      #   name = 'run'+self.runNr+'.root'
+      #   if options.interactive: name = 'I-'+name
+      #   self.presenterFile = ROOT.TFile(name,'recreate')
+      #   self.presenterFile.mkdir('scifi')
+      #   self.presenterFile.mkdir('mufilter')
+      #   self.presenterFile.mkdir('daq')
+      #   self.presenterFile.mkdir('eventdisplay')
+>>>>>>> 3a2ccf43 (Updating files for use with simulation)
+        self.FairTasks = {}
+        for x in FairTasks:   #  keeps extended methods if from python class
+                 self.FairTasks[x.GetName()] = x
+>>>>>>> cf0e3201a (Updating files for use with simulation)
 
       # setup input
       if self.simulation:
@@ -194,6 +223,7 @@ class Monitoring():
       if len(partitions)>0 or self.simulation:  self.eventTree = ioman.GetInChain()
       else:  self.eventTree = ioman.GetInTree()
 
+<<<<<<< HEAD
       # fitted tracks
       if "simpleTracking" in self.FairTasks:
          self.trackTask = self.FairTasks["simpleTracking"]
@@ -224,6 +254,48 @@ class Monitoring():
                if options.runNumber in FSdict: self.fsdict = FSdict[options.runNumber]
             except:
                print('continue without knowing filling scheme',options.server+options.path)
+=======
+        # define the number of bunches in the LHC
+        if eventChain.EventHeader.GetAccMode()==12: # ion runs
+          self.Nbunches = 1782
+          self.div = 8
+        else: # proton runs
+          self.Nbunches = 3564
+          self.div = 4
+        
+        # get filling scheme, only necessary if not encoded in EventHeader, before 2022 reprocessing
+        self.hasBunchInfo = False
+        self.fsdict = False
+        if hasattr(eventChain.EventHeader,"GetBunchType"):
+           if not eventChain.EventHeader.GetBunchType()<0:
+                self.hasBunchInfo = True
+                print('take bunch info from event header')
+        if not self.hasBunchInfo:
+         try:
+           fg  = ROOT.TFile.Open(options.server+options.path+'FSdict.root')
+           pkl = Unpickler(fg)
+           FSdict = pkl.load('FSdict')
+           fg.Close()
+           if options.runNumber in FSdict: self.fsdict = FSdict[options.runNumber]
+         except:
+           print('continue without knowing filling scheme',options.server+options.path)
+<<<<<<< HEAD
+         if self.fsdict: 
+           print('extract bunch info from filling scheme')
+        if self.fsdict or self.hasBunchInfo: 
+          for x in ['B1only','B2noB1','noBeam']:
+            for role in ['shifter', 'expert']:
+             self.presenterFile.mkdir('mufilter/'+role+'/'+x)
+             self.presenterFile.mkdir('scifi/'+role+'/'+x)
+=======
+         # if self.fsdict: 
+         #   print('extract bunch info from filling scheme')
+      #   if self.fsdict or self.hasBunchInfo: 
+      #     for x in ['B1only','B2noB1','noBeam']:
+      #        self.presenterFile.mkdir('mufilter/'+x)
+      #        self.presenterFile.mkdir('scifi/'+x)
+>>>>>>> 3a2ccf43 (Updating files for use with simulation)
+>>>>>>> cf0e3201a (Updating files for use with simulation)
 
    def GetEntries(self):
        if  self.options.online:

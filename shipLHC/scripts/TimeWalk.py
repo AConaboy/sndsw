@@ -306,6 +306,10 @@ class TimeWalk(ROOT.FairTask):
                 if self.options.XT: self.sa.XTHists(hit)
                 self.sa.FillBarHists(hit)
                 # self.sa.ScifiCorrectedTimes(hit)
+<<<<<<< HEAD
+=======
+
+>>>>>>> cf0e3201a (Updating files for use with simulation)
                 continue
 
             # Only investigate track related hits
