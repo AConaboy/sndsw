@@ -28,7 +28,7 @@ parser.add_argument("-M", "--online", dest="online", help="online mode",default=
 parser.add_argument("--batch", dest="batch", help="batch mode",default=False,action='store_true')
 parser.add_argument("--server", dest="server", help="xrootd server",default=os.environ["EOSSHIP"])
 parser.add_argument("-r", "--runNumber", dest="runNumber", help="run number", type=int,default=-1)
-parser.add_argument('-p', '--path', dest='path', help='path', type=str, default='/eos/experiment/sndlhc/convertedData/physics/')
+parser.add_argument('-p', '--path', dest='path', help='path', type=str)
 parser.add_argument("-P", "--partition", dest="partition", help="partition of data", type=int,required=False,default=-1)
 parser.add_argument("-d", "--debug", dest="debug", help="debug", type=int, default=False)
 parser.add_argument("-cpp", "--convRawCPP", action='store_true', dest="FairTask_convRaw", help="convert raw data using ConvRawData FairTask", default=False)
@@ -66,6 +66,8 @@ parser.add_argument('-C', '--HTCondor', dest='HTCondor', help='int (0/1), is on 
 parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
 parser.add_argument('--signalpartitions', dest='signalpartitions', required=False)
 parser.add_argument('--numuStudy', dest='numuStudy', action='store_true')
+parser.add_argument('--simulation', dest='simulation', action='store_true')
+
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -132,12 +134,12 @@ def currentRun():
         break
     return curRun,curPart,start
 
-if options.runNumber < 0:
-    print("run number required for non-auto mode")
-    os._exit(1)
+# if options.runNumber < 0:
+#     print("run number required for non-auto mode")
+#     os._exit(1)
 # works only for runs on EOS
 # if not options.numusignalevents:
-if not options.server.find('eos')<0:
+if not options.server.find('eos')<0 and not options.simulation:
     if options.path.find('2023')!=-1:
         rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2023/'
     elif options.path.find('2022')!=-1:
@@ -156,7 +158,7 @@ if not options.server.find('eos')<0:
        exec("date = "+jsonStr.decode())
        options.startTime = date['start_time'].replace('Z','')
        if 'stop_time' in date:
-           options.startTime += " - "+ date['stop_time'].replace('Z','')      
+           options.startTime += " - "+ date['stop_time'].replace('Z','')
 
 # prepare tasks:
 FairTasks = []
@@ -171,6 +173,9 @@ else:
     trackTask.SetName('simpleTracking')
     FairTasks.append(trackTask)
 
+M = Monitor.Monitoring(options,FairTasks)
+monitorTasks = {}
+
 if options.nEvents < 0 :   options.nEvents = M.GetEntries()
 if options.postScale==0 and options.nEvents>5E7: options.postScale = 100
 if options.postScale==0 and options.nEvents>5E6: options.postScale = 10
@@ -180,8 +185,6 @@ if options.numusignalevents:
     numu = numusignals(options)
     numu.InvestigateSignalEvents()
 
-M = Monitor.Monitoring(options,FairTasks)
-monitorTasks = {}
 
 if options.Task=='TimeWalk':
     if not options.mode:
@@ -189,7 +192,6 @@ if options.Task=='TimeWalk':
         pyExit()
     if options.numusignalevents: options.mode='numusignalevents'
     monitorTasks['TimeWalk'] = TimeWalk.TimeWalk(options, M) 
-c=0
 
 # else:
 if not options.auto:   # default online/offline mode
@@ -204,13 +206,8 @@ if not options.auto:   # default online/offline mode
             print('='*len(progstr)+'\n')
             print(progstr, '\n')
 
-# assume for the moment file does not contain fitted tracks
-        if M.Reco_MuonTracks.GetEntries()==0: 
-            c+=1
-            continue
         for m in monitorTasks:
             monitorTasks[m].ExecuteEvent(M.eventTree)
-    print(f'{c}/{options.nEvents} with no tracks')
     if 'SelectionCriteria' in monitorTasks:
         if not options.debug: 
             monitorTasks['SelectionCriteria'].WriteOutHistograms()

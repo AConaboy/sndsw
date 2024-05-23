@@ -15,6 +15,7 @@ class SndlhcDigi:
 
         outdir=os.getcwd()
         outfile=outdir+"/"+fout
+        print(outfile)
         self.fn = ROOT.TFile(fout,'update')
         self.sTree = self.fn.cbmsim
 

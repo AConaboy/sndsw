@@ -75,14 +75,16 @@ class Monitoring():
 
         path     = options.path
         self.myclient = None
-        if path.find('eos')>0:
-             path  = options.server+options.path
+
         if options.online:
              path = path.replace("raw_data","convertedData").replace("data/","")
              self.myclient = client.FileSystem(options.server)
 # setup geometry
-        if (options.geoFile).find('../')<0: self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
-        else:                                         self.snd_geo = SndlhcGeo.GeoInterface(options.geoFile[3:])
+        if options.simulation: self.snd_geo = SndlhcGeo.GeoInterface(options.geoFile)
+        else: 
+            if path.find('eos')>0:
+               path  = options.server+options.path         
+            self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
         self.MuFilter = self.snd_geo.modules['MuFilter']
         self.Scifi       = self.snd_geo.modules['Scifi']
 
@@ -107,13 +109,13 @@ class Monitoring():
 
         self.runNr   = str(options.runNumber).zfill(6)
 # presenter file
-        name = 'run'+self.runNr+'.root'
-        if options.interactive: name = 'I-'+name
-        self.presenterFile = ROOT.TFile(name,'recreate')
-        self.presenterFile.mkdir('scifi')
-        self.presenterFile.mkdir('mufilter')
-        self.presenterFile.mkdir('daq')
-        self.presenterFile.mkdir('eventdisplay')
+      #   name = 'run'+self.runNr+'.root'
+      #   if options.interactive: name = 'I-'+name
+      #   self.presenterFile = ROOT.TFile(name,'recreate')
+      #   self.presenterFile.mkdir('scifi')
+      #   self.presenterFile.mkdir('mufilter')
+      #   self.presenterFile.mkdir('daq')
+      #   self.presenterFile.mkdir('eventdisplay')
         self.FairTasks = {}
         for x in FairTasks:   #  keeps extended methods if from python class
                  self.FairTasks[x.GetName()] = x
@@ -252,12 +254,12 @@ class Monitoring():
            if options.runNumber in FSdict: self.fsdict = FSdict[options.runNumber]
          except:
            print('continue without knowing filling scheme',options.server+options.path)
-         if self.fsdict: 
-           print('extract bunch info from filling scheme')
-        if self.fsdict or self.hasBunchInfo: 
-          for x in ['B1only','B2noB1','noBeam']:
-             self.presenterFile.mkdir('mufilter/'+x)
-             self.presenterFile.mkdir('scifi/'+x)
+         # if self.fsdict: 
+         #   print('extract bunch info from filling scheme')
+      #   if self.fsdict or self.hasBunchInfo: 
+      #     for x in ['B1only','B2noB1','noBeam']:
+      #        self.presenterFile.mkdir('mufilter/'+x)
+      #        self.presenterFile.mkdir('scifi/'+x)
 
    def GetEntries(self):
        if  self.options.online:

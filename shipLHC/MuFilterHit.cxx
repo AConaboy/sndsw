@@ -120,24 +120,17 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
         Float_t ptime = (*p)->GetTime();
         Float_t t_Left, t_Right;
 
-        //  
         if (subsystem==3) {
           signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
           signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
-          // t_Left = ptime + distance_Left/signalspeed_left;
-          // t_Right = ptime + distance_Right/signalspeed_right;
         }
         else if (subsystem==1) {
           signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
           signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
-          // t_Left = ptime + distance_Left/signalspeed_left;
-          // t_Right = ptime + distance_Right/signalspeed_right;
         }        
         else { // If detID in upstream
           signalspeed_left = MuFilterDet->GetBarSideSignalSpeed(detID, "left");
           signalspeed_right = MuFilterDet->GetBarSideSignalSpeed(detID, "right");
-          // t_Left = ptime + distance_Left/signalspeed_left;
-          // t_Right = ptime + distance_Right/signalspeed_right;
         }
         t_Left = ptime + distance_Left/signalspeed_left;
         t_Right = ptime + distance_Right/signalspeed_right;        

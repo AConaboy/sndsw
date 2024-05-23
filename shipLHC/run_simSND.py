@@ -117,8 +117,8 @@ else:
                                    useNagoyaEmulsions = options.useNagoyaEmulsions,
                                    year=options.year)
 
-if simEngine == "PG": tag = simEngine + "_"+str(options.pID)+"-"+mcEngine
-else: tag = simEngine+"-"+mcEngine
+if simEngine == "PG": tag = simEngine + "_"+str(options.pID)+"-"+mcEngine+"-"+str(options.firstEvent)
+else: tag = simEngine+"-"+mcEngine+"-"+str(options.firstEvent)
 
 if not os.path.exists(options.outputDir):
   os.makedirs(options.outputDir)
@@ -224,7 +224,8 @@ if simEngine == "Ntuple":
    Ntuplegen.SetZ(snd_geo.Floor.z)
    Ntuplegen.Init(inputFile,options.firstEvent)
    primGen.AddGenerator(Ntuplegen)
-   options.nEvents = min(options.nEvents,Ntuplegen.GetNevents())
+   if options.nEvents == -1: options.nEvents = Ntuplegen.GetNevents()
+   else: options.nEvents = min(options.nEvents,Ntuplegen.GetNevents())
 
 if simEngine == "MuonBack":
 # reading muon tracks from FLUKA
@@ -360,7 +361,7 @@ rtdb.printParamContexts()
 getattr(rtdb,"print")()
 # ------------------------------------------------------------------------
 geoFile = "%s/geofile_full.%s.root" % (options.outputDir, tag)
-run.CreateGeometryFile(geoFile)
+if options.firstEvent==0: run.CreateGeometryFile(geoFile)
 # save detector parameters dictionary in geofile
 import saveBasicParameters
 saveBasicParameters.execute(geoFile,snd_geo)

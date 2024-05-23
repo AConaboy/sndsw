@@ -14,8 +14,7 @@ class Analysis(object):
 			if not hasattr(options, 'runNumber'): options.runNumber=options.runs[0]
 			self.runNr = str(options.runNumber).zfill(6)
 			self.TWCorrectionRun = str(5408).zfill(6)
-			self.freq=160.316E6
-			self.TDC2ns=1E9/self.freq
+
 			self.timealignment=self.GetTimeAlignmentType(self.runNr)
 			self.state=options.state
 			if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype

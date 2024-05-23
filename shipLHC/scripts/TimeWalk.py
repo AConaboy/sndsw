@@ -13,106 +13,143 @@ for i in ('x', 'y', 'z','t'): ROOT.gStyle.SetTitleSize(0.04, i)
 class TimeWalk(ROOT.FairTask):
 
     def __init__(self, options, monitor):
+
+        if options.simulation:        
+            self.muAna = Analysis(options)
+            self.M=monitor 
+            self.mode=options.mode
+
+            self.options=options
+
+            run=ROOT.FairRunAna.Instance()
+            self.trackTask=run.GetTask('simpleTracking')
+
+            ioman=ROOT.FairRootManager.Instance()
+            self.OT=ioman.GetSink().GetOutTree()
+            
+            lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
+            self.MuFilter=lsOfGlobals.FindObject('MuFilter')
+            self.Scifi=lsOfGlobals.FindObject('Scifi')
+            self.nav=ROOT.gGeoManager.GetCurrentNavigator()
+            self.runNr = str(options.runNumber).zfill(6)
+            self.afswork=options.afswork
+            self.afsuser=options.afsuser
+            self.EventNumber=-1
+            self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
+            self.nchs={1:224, 2:800}
+
+            self.systemAndPlanes = {1:2,2:5,3:7}
+            self.systemAndBars={1:7,2:10,3:60}
+            self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
+            self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
+            self.zPos=self.M.zPos
+            self.muAna.zPos=self.zPos   
+            self.timealignment='sim'     
+
+            self.simEngine = self.GetSimEngine()
+
+            if self.mode == 'systemalignment':
+                from systemalignment import SystemAlignment
+                self.sa = SystemAlignment(options, self)
         
-        statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
-                    'TW':'corrected', 'res':'corrected', 
-                    'selectioncriteria':'corrected',
-                    'systemalignment':'corrected',
-                    'reconstructmuonposition':'corrected',
-                    'showerprofiles':'corrected', 
-                    'numusignalevents':'corrected',
-                    'tds0-studies':'uncorrected',
-                    '2muon':'corrected'}
-        
-        self.state=statedict[options.mode]
+        elif options.simulation:
+            statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
+                        'TW':'corrected', 'res':'corrected', 
+                        'selectioncriteria':'corrected',
+                        'systemalignment':'corrected',
+                        'reconstructmuonposition':'corrected',
+                        'showerprofiles':'corrected', 
+                        'numusignalevents':'corrected',
+                        'tds0-studies':'uncorrected',
+                        '2muon':'corrected'}
+            
+            self.state=statedict[options.mode]
 
-        self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
-        self.locA, self.locB =ROOT.TVector3(), ROOT.TVector3()
-        
-        self.muAna=Analysis(options)
-        self.M=monitor
-        self.options=options
-        if self.options.path.find('commissioning/TI18')>0:
-            self.outpath=options.afswork+'-commissioning/'
-            self.path='TI18'
-        elif self.options.path.find('physics/202')>0: 
-            self.outpath=options.afswork+'-physics2022/'
-            self.path='TI18'            
-        elif self.options.path.find('testbeam_June2023_H8')>0: 
-            self.outpath=options.afswork+'-H8/'
-            self.path='H8'
+            self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
+            self.locA, self.locB =ROOT.TVector3(), ROOT.TVector3()
+            
+            self.muAna=Analysis(options)
+            self.M=monitor
+            self.options=options
+            if self.options.path.find('commissioning/TI18')>0:
+                self.outpath=options.afswork+'-commissioning/'
+                self.path='TI18'
+            elif self.options.path.find('physics/202')>0: 
+                self.outpath=options.afswork+'-physics2022/'
+                self.path='TI18'            
+            elif self.options.path.find('testbeam_June2023_H8')>0: 
+                self.outpath=options.afswork+'-H8/'
+                self.path='H8'
 
-        run=ROOT.FairRunAna.Instance()
-        self.trackTask=run.GetTask('simpleTracking')
+            run=ROOT.FairRunAna.Instance()
+            self.trackTask=run.GetTask('simpleTracking')
 
-        ioman=ROOT.FairRootManager.Instance()
-        self.OT=ioman.GetSink().GetOutTree()
-        
-        lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
-        self.MuFilter=lsOfGlobals.FindObject('MuFilter')
-        self.Scifi=lsOfGlobals.FindObject('Scifi')
-        self.nav=ROOT.gGeoManager.GetCurrentNavigator()
-        self.runNr = str(options.runNumber).zfill(6)
-        self.afswork=options.afswork
-        self.afsuser=options.afsuser
-        self.EventNumber=-1
-        self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
-        self.nchs={1:224, 2:800}
+            ioman=ROOT.FairRootManager.Instance()
+            self.OT=ioman.GetSink().GetOutTree()
+            
+            lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
+            self.MuFilter=lsOfGlobals.FindObject('MuFilter')
+            self.Scifi=lsOfGlobals.FindObject('Scifi')
+            self.nav=ROOT.gGeoManager.GetCurrentNavigator()
+            self.runNr = str(options.runNumber).zfill(6)
+            self.afswork=options.afswork
+            self.afsuser=options.afsuser
+            self.EventNumber=-1
+            self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
+            self.nchs={1:224, 2:800}
 
-        self.systemAndPlanes = {1:2,2:5,3:7}
-        self.systemAndBars={1:7,2:10,3:60}
-        self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
-        self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
-        self.zPos=self.M.zPos
-        self.muAna.zPos=self.zPos
+            self.systemAndPlanes = {1:2,2:5,3:7}
+            self.systemAndBars={1:7,2:10,3:60}
+            self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
+            self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
+            self.zPos=self.M.zPos
+            self.muAna.zPos=self.zPos
 
-        self.referencesystem=options.referencesystem
-        self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)
-        self.mode=options.mode
+            self.referencesystem=options.referencesystem
+            self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)
+            self.mode=options.mode
 
-        self.freq=160.316E6
-        self.TDC2ns=1E9/self.freq
+            self.freq=160.316E6
+            self.TDC2ns=1E9/self.freq
 
-        self.largeSiPMmap={0:0 ,1:1 ,3:2 ,4:3 ,6:4 ,7:5}
-        self.verticalBarDict={0:1, 1:3, 2:5, 3:6}
-        
-        if options.debug: self.trackevents=[]
-        
-        # self.correctionfunction=lambda ps, qdc: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
-        self.getaverage=lambda d, key, i:sum( [(d[key][i]) for k in range(2) ])/len(d)        
+            self.largeSiPMmap={0:0 ,1:1 ,3:2 ,4:3 ,6:4 ,7:5}
+            self.verticalBarDict={0:1, 1:3, 2:5, 3:6}
+            
+            if options.debug: self.trackevents=[]
+            
+            # self.correctionfunction=lambda ps, qdc: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
+            self.getaverage=lambda d, key, i:sum( [(d[key][i]) for k in range(2) ])/len(d)        
 
-        self.hists=self.M.h
+            self.hists=self.M.h
 
-        # if options.mode in ('TW', 'res'):
-        if not options.CorrectionType: self.CorrectionType=4
-        else: self.CorrectionType=options.CorrectionType
+            # if options.mode in ('TW', 'res'):
+            if not options.CorrectionType: self.CorrectionType=4
+            else: self.CorrectionType=options.CorrectionType
 
-        self.correctionparams=lambda ps : [y for x,y in enumerate(ps) if x%2==0]
-        
-        if options.CorrectionType==1: self.correctionfunction = lambda ps, qdc : 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
-        elif options.CorrectionType==4: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) )
-        elif options.CorrectionType==5: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
+            self.correctionparams=lambda ps : [y for x,y in enumerate(ps) if x%2==0]
+            
+            if options.CorrectionType==1: self.correctionfunction = lambda ps, qdc : 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
+            elif options.CorrectionType==4: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) )
+            elif options.CorrectionType==5: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
 
-        if self.path=='H8': 
+            if self.path=='H8': 
 
-            self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
+                self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
 
-            from testbeam_analysis import Testbeam_Analysis
-            self.tb_analysis = testbeam_analysis(options, self)
-            return
+                from testbeam_analysis import Testbeam_Analysis
+                self.tb_analysis = testbeam_analysis(options, self)
+                return
 
-        #### Time walk correction run is independent of time alignment settings. 
-        self.TWCorrectionRun=str(5408).zfill(6)
+            #### Time walk correction run is independent of time alignment settings. 
+            self.TWCorrectionRun=str(5408).zfill(6)
 
-        ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
-        if options.AlignmentRun==None or self.muAna.GetTimeAlignmentType(runNr=options.AlignmentRun) != self.timealignment:
-            if self.timealignment=='old': self.AlignmentRun=str(5097).zfill(6)
-            elif self.timealignment=='new': self.AlignmentRun=str(5408).zfill(6)
-            elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
-        
-        self.muAna.AlignmentRun=self.AlignmentRun
-
-        if self.mode in ('selectioncriteria', 'systemalignment', 'showerprofiles', 'numusignalevents', 'reconstructmuonposition'):
+            ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
+            if options.AlignmentRun==None or self.muAna.GetTimeAlignmentType(runNr=options.AlignmentRun) != self.timealignment:
+                if self.timealignment=='old': self.AlignmentRun=str(5097).zfill(6)
+                elif self.timealignment=='new': self.AlignmentRun=str(5408).zfill(6)
+                elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
+            
+            self.muAna.AlignmentRun=self.AlignmentRun
             
             if self.mode == 'systemalignment':
                 from systemalignment import SystemAlignment
@@ -131,29 +168,25 @@ class TimeWalk(ROOT.FairTask):
             elif self.mode == 'selectioncriteria':
                 from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
                 self.sc = SelectionCriteria(options, self)
-            
-            elif self.mode == 'dimuon':
-                from dimuon import Dimuon
-                self.dimuon = Dimuon(options, self)
 
-        self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
-        ### Incase selection criteria distributions not made for the TWCorrectionRun
-        if not self.cutdists:
-            self.TWCorrectionRun=str(5408).zfill(6)
-            self.muAna.TWCorrectionRun=self.TWCorrectionRun
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
-        if 'timingdiscriminant' in self.cutdists:
-            tdmin = self.cutdists['timingdiscriminant'].GetMean() - 3*self.cutdists['timingdiscriminant'].GetStdDev()
-            tdmax = self.cutdists['timingdiscriminant'].GetMean() + 3*self.cutdists['timingdiscriminant'].GetStdDev()
-            # print(f'td-min, td-max: {tdmin}, {tdmax}')
+            ### Incase selection criteria distributions not made for the TWCorrectionRun
+            if not self.cutdists:
+                self.TWCorrectionRun=str(5408).zfill(6)
+                self.muAna.TWCorrectionRun=self.TWCorrectionRun
+                self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
+            if 'timingdiscriminant' in self.cutdists:
+                tdmin = self.cutdists['timingdiscriminant'].GetMean() - 3*self.cutdists['timingdiscriminant'].GetStdDev()
+                tdmax = self.cutdists['timingdiscriminant'].GetMean() + 3*self.cutdists['timingdiscriminant'].GetStdDev()
+                # print(f'td-min, td-max: {tdmin}, {tdmax}')
 
-        self.muAna.MakeAlignmentParameterDict(self.timealignment)
-        self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
-        self.muAna.MakeTWCorrectionDict(self.timealignment)
-        self.referencesystem=options.referencesystem
+            self.muAna.MakeAlignmentParameterDict(self.timealignment)
+            self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
+            self.muAna.MakeTWCorrectionDict(self.timealignment)
+            self.referencesystem=options.referencesystem
 
-        with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
-            self.histformatting=json.load(x)            
+            with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
+                self.histformatting=json.load(x)            
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -220,7 +253,7 @@ class TimeWalk(ROOT.FairTask):
 
         elif self.referencesystem==1:
             self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
-            if not self.reft:return
+            if not self.reft:   return
             if not 'reft' in self.hists:
                 self.hists['reft']=ROOT.TH1F('reft','Average time of SiPMs in Scifi track;Time [ns];Counts', 200, 0, 50)
             self.hists['reft'].Fill(self.reft)            
@@ -234,7 +267,7 @@ class TimeWalk(ROOT.FairTask):
             self.data
             return
         
-        if self.mode=='showerprofiles':
+        elif self.mode=='showerprofiles':
             # Make Scifi clusters with the positions weighted by QDC
             self.M.FairTasks['simpleTracking'].scifiCluster(withQDC=self.options.scifiClustersQDC)
             clusters = self.M.clusScifi
@@ -246,11 +279,11 @@ class TimeWalk(ROOT.FairTask):
 
             return
 
-        if self.mode == 'tds0-studies':            
+        elif self.mode == 'tds0-studies':            
             self.tds0_studies(hits)
             return
         
-        if self.mode == 'reconstructmuonposition':
+        elif self.mode == 'reconstructmuonposition':
             # self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
             self.sa.ReconstructMuonPosition(hits)
             return
@@ -285,7 +318,7 @@ class TimeWalk(ROOT.FairTask):
                 self.sa.FillSiPMHists(hit)
                 if self.options.XT: self.sa.XTHists(hit)
                 self.sa.FillBarHists(hit)
-                self.sa.ScifiCorrectedTimes(hit)
+                # self.sa.ScifiCorrectedTimes(hit)
 
                 continue
 
