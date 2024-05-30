@@ -2,7 +2,6 @@ import ROOT
 import os
 import shipunit as u
 import SciFiMapping
-from array import array
 
 stop  = ROOT.TVector3()
 start = ROOT.TVector3()
@@ -13,9 +12,9 @@ class SndlhcDigi:
 
         self.iEvent = 0
 
-        outdir=os.getcwd()
-        outfile=outdir+"/"+fout
-        print(outfile)
+        # outdir=os.getcwd()
+        # outfile=outdir+"/"+fout
+        # print(outfile)
         self.fn = ROOT.TFile(fout,'update')
         self.sTree = self.fn.cbmsim
 
@@ -54,7 +53,7 @@ class SndlhcDigi:
 
         self.header.SetRunId( self.sTree.MCEventHeader.GetRunID() )
         self.header.SetEventNumber( self.sTree.MCEventHeader.GetEventID() )  # counts from 1
-        self.header.SetBunchType(101);
+        self.header.SetBunchType(101)
         self.eventHeader.Fill()
         self.digiScifi.Clear('C')
         self.digiScifi2MCPoints.Clear('C')

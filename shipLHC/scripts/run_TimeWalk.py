@@ -2,13 +2,7 @@
 import ROOT,os,sys,subprocess,atexit,time
 from XRootD import client
 from XRootD.client.flags import DirListFlags, OpenFlags, MkDirFlags, QueryCode
-import Monitor
-import Scifi_monitoring
-import Mufi_monitoring
-import DAQ_monitoring
-import EventDisplay_Task
-import SndlhcMuonReco
-import TimeWalk, SelectionCriteria, SystemAlignment
+import Monitor, SndlhcMuonReco, TimeWalk
 
 def pyExit():
     print("Make suicide until solution found for freezing")
@@ -67,7 +61,7 @@ parser.add_argument('--numusignalevents', dest='numusignalevents', action='store
 parser.add_argument('--signalpartitions', dest='signalpartitions', required=False)
 parser.add_argument('--numuStudy', dest='numuStudy', action='store_true')
 parser.add_argument('--simulation', dest='simulation', action='store_true')
-
+parser.add_argument('--simEngine', dest='simEngine', type=str)
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -87,12 +81,6 @@ parser.add_argument("--interactive", dest="interactive", action='store_true',def
 parser.add_argument("--postScale", dest="postScale",help="post scale events, 1..10..100", default=-1,type=int)
 
 options = parser.parse_args()
-options.slowStream = True
-if options.cosmics: options.slowStream = False
-options.startTime = ""
-options.dashboard = "/mnt/raid1/data_online/currently_processed_file.txt"
-options.monitorTag = ''
-if (options.auto and not options.interactive) or options.batch: ROOT.gROOT.SetBatch(True)
 
 # if no geofile given, use defaults according to run number
 
@@ -112,31 +100,6 @@ if not options.geoFile:
         options.geoFile =  "geofile_sndlhc_TI18_V1_2023.root"
 # to be extended for future new alignments.
 
-def currentRun():
-    with client.File() as f:
-        f.open(options.server+options.dashboard)
-        status, L = f.read()
-        Lcrun = L.decode().split('\n')
-    f.close()
-    curRun,curPart,start ="","",""
-    for l in Lcrun:
-        if not l.find('FINISHED')<0:
-            print("DAQ not running. Don't know which file to open.")
-            print(Lcrun)
-            break
-        if not l.find('.root') < 0:
-            tmp = l.split('/')
-            curRun = tmp[len(tmp)-2]
-            curPart = tmp[len(tmp)-1]
-            start = Lcrun[1]
-            options.monitorTag = ''
-        if len(Lcrun)>3: options.monitorTag = 'monitoring_'
-        break
-    return curRun,curPart,start
-
-# if options.runNumber < 0:
-#     print("run number required for non-auto mode")
-#     os._exit(1)
 # works only for runs on EOS
 # if not options.numusignalevents:
 if not options.server.find('eos')<0 and not options.simulation:

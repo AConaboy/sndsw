@@ -50,11 +50,6 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
      Float_t SiPMcalibrationS=0;
      Float_t timeresol_left, timeresol_right;
      Float_t signalspeed_left, signalspeed_right;
-    // using PropSpeed = std::variant<float, std::map<std::string, float>>;
-    // PropSpeed propspeed;
-
-    // using TimeResolution = std::variant<float, std::map<std::string, float>>;
-    // TimeResolution timeResol;
 
     //  Float_t DSpropspeed =0;
      if (subsystem==3) { 
@@ -81,9 +76,9 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
 
      }
      else { // if detID in veto
-              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
               if (subsystem==1 && nSides==1){ attLength = 2*MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength"); }
               else { attLength = 2*MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength"); }
+              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
 
               signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
               signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
@@ -103,14 +98,22 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
      Float_t signalRight = 0;
      Float_t earliestToAL = 1E20;
      Float_t earliestToAR = 1E20;
+     Float_t dxL;
+     Float_t dxR;     
      TVector3 vLeft,vRight;
+
+     // Load bar positions
+     MuFilterDet->GetPosition(fDetectorID,vLeft, vRight);
+     auto x_ref = 0.5*( vLeft[0] + vRight[0] );
+
      for(auto p = std::begin(V); p!= std::end(V); ++p) {
 
         Float_t signal = (*p)->GetEnergyLoss();
+        if (signal < 0.001) {continue;} // Hard coding 1 MeV energy cut :sweat_smiling: 
 
         // Find distances from MCPoint centre to ends of bar 
         TVector3 impact((*p)->GetX(),(*p)->GetY() ,(*p)->GetZ() );
-        MuFilterDet->GetPosition(fDetectorID,vLeft, vRight);
+
         Float_t distance_Left    =  (vLeft-impact).Mag();
         Float_t distance_Right =  (vRight-impact).Mag();
         signalLeft+=signal*TMath::Exp(-distance_Left/attLength);
@@ -132,37 +135,42 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
           signalspeed_left = MuFilterDet->GetBarSideSignalSpeed(detID, "left");
           signalspeed_right = MuFilterDet->GetBarSideSignalSpeed(detID, "right");
         }
-        t_Left = ptime + distance_Left/signalspeed_left;
-        t_Right = ptime + distance_Right/signalspeed_right;        
-        if ( t_Left < earliestToAL){earliestToAL = t_Left ;}
-        if ( t_Right < earliestToAR){earliestToAR = t_Right ;}
+        t_Left = distance_Left/signalspeed_left;
+        t_Right = distance_Right/signalspeed_right;        
+        if ( t_Left < earliestToAL){
+          earliestToAL = t_Left;
+          dxL = distance_Left - x_ref;
+          }
+        if ( t_Right < earliestToAR){
+          earliestToAR = t_Right;
+          dxR = x_ref - distance_Right;
+          }
      } 
 
      // shortSiPM = {3,6,11,14,19,22,27,30,35,38,43,46,51,54,59,62,67,70,75,78}; - counting from 1!
      // In the SndlhcHit class the 'signals' array starts from 0.
-     Float_t timeResol; 
+     Float_t timeResol, aligned_time, SiPMcalibrationConstant, signal; 
      TString side;
      for (unsigned int j=0; j<nSiPMs*nSides; ++j){
         
-        if ( (subsystem!=3 and j<8) || (subsystem==3 and j==0) ) { side="left"; timeResol=timeresol_left;}
-        else if ( (subsystem!=3 and j>=8) || (subsystem==3 and j==1) ) { side="right"; timeResol=timeresol_right;}
-        else { return; }
+        if ( (subsystem==2) and (j%8==2 or j%8==5) ) { SiPMcalibrationConstant = SiPMcalibrationS;}
+        else { SiPMcalibrationConstant = SiPMcalibration; }
 
-        if ( subsystem==2 && (j%8==2 or j%8==5)) 
-          {  // only US has small SiPMs
-            signals[j] = signalLeft/float(nSiPMs) * SiPMcalibrationS;   // most simplest model, divide signal individually. Small SiPMS special
-            times[j] = gRandom->Gaus(earliestToAL, timeResol);
-          }
-
-        else{
-           signals[j] = signalLeft/float(nSiPMs) * SiPMcalibration;   // most simplest model, divide signal individually. 
-           times[j] = gRandom->Gaus(earliestToAL, timeResol);
+        if ( (subsystem!=3 and j<8) || (subsystem==3 and j==0) ) { // If left-side channel
+          side="left"; timeResol=timeresol_left;
+          aligned_time = dxL/signalspeed_left;
+          signal=signalLeft;
         }
-        // if (nSides>1){ 
-        //     signals[j+nSiPMs] = signalRight/float(nSiPMs) * SiPMcalibration;   // most simplest model, divide signal individually.
-        //     times[j+nSiPMs] = gRandom->Gaus(earliestToAR, timeResol);
-        // }
+        else {
+          side="right"; timeResol=timeresol_right;
+          aligned_time = dxR/signalspeed_right;          
+          signal=signalRight;
+        }    
+
+        signals[j] = signal/float(nSiPMs) * SiPMcalibrationConstant;   // most simplest model, divide signal individually. Small SiPMS special
+        times[j] = gRandom->Gaus(aligned_time, timeResol);
      }
+
      flag = true;
      for (Int_t i=0;i<16;i++){fMasked[i]=kFALSE;}
      LOG(DEBUG) << "signal created";

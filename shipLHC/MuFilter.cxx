@@ -51,28 +51,6 @@ using std::to_string;
 using std::string;
 using namespace ShipUnit;
 
-MuFilter::MuFilter()
-: FairDetector("MuonFilter", "",kTRUE),
-  fTrackID(-1),
-fVolumeID(-1),
-fPos(),
-fMom(),
-fTime(-1.),
-fLength(-1.),
-fELoss(-1),
-eventHeader(0),
-last_run_time(-1),
-last_run_pos(-1),
-last_time_alignment_tag(""),
-alignment_init(false),
-last_run_time(-1),
-last_run_pos(-1),
-last_time_alignment_tag(""),
-alignment_init(false),
-fMuFilterPointCollection(new TClonesArray("MuFilterPoint"))
-{
-}
-
 MuFilter::MuFilter(const char* name, Bool_t Active,const char* Title)
 : FairDetector(name, true, kMuFilter),
   fTrackID(-1),
@@ -83,10 +61,6 @@ fTime(-1.),
 fLength(-1.),
 fELoss(-1),
 eventHeader(0),
-last_run_time(-1),
-last_run_pos(-1),
-last_time_alignment_tag(""),
-alignment_init(false),
 last_run_time(-1),
 last_run_pos(-1),
 last_time_alignment_tag(""),
@@ -168,9 +142,6 @@ void MuFilter::ConstructGeometry()
 	edge_Veto[1] = TVector3( -conf_floats["MuFilter/Veto1Dx"],conf_floats["MuFilter/Veto1Dz"],conf_floats["MuFilter/Veto1Dy"]);
 	edge_Veto[2] = TVector3( -conf_floats["MuFilter/Veto2Dx"],conf_floats["MuFilter/Veto2Dz"],conf_floats["MuFilter/Veto2Dy"]);
 	edge_Veto[3] = TVector3( -conf_floats["MuFilter/Veto3Dx"],conf_floats["MuFilter/Veto3Dz"],conf_floats["MuFilter/Veto3Dy"]);
-	edge_Veto[1] = TVector3( -conf_floats["MuFilter/Veto1Dx"],conf_floats["MuFilter/Veto1Dz"],conf_floats["MuFilter/Veto1Dy"]);
-	edge_Veto[2] = TVector3( -conf_floats["MuFilter/Veto2Dx"],conf_floats["MuFilter/Veto2Dz"],conf_floats["MuFilter/Veto2Dy"]);
-	edge_Veto[3] = TVector3( -conf_floats["MuFilter/Veto3Dx"],conf_floats["MuFilter/Veto3Dz"],conf_floats["MuFilter/Veto3Dy"]);
 	std::map<int, TVector3 > edge_Iron;
 	std::map<int, TVector3 > edge_MuFilter;
 	for (int i=1;i<10;i++){
@@ -198,20 +169,14 @@ void MuFilter::ConstructGeometry()
 	Double_t fVeto3BarX     = conf_floats["MuFilter/Veto3BarX"]; // 3rd Veto plane Bar dimensions
 	Double_t fVeto3BarY     = conf_floats["MuFilter/Veto3BarY"];
 	Double_t fVeto3BarZ     = conf_floats["MuFilter/Veto3BarZ"];
-	Double_t fVeto3BarX     = conf_floats["MuFilter/Veto3BarX"]; // 3rd Veto plane Bar dimensions
-	Double_t fVeto3BarY     = conf_floats["MuFilter/Veto3BarY"];
-	Double_t fVeto3BarZ     = conf_floats["MuFilter/Veto3BarZ"];
 	Double_t fVetoBarGap     = conf_floats["MuFilter/VetoBarGap"];
 	Int_t fNVetoPlanes       = conf_ints["MuFilter/NVetoPlanes"];
 	Int_t fNVetoBars          = conf_ints["MuFilter/NVetoBars"];
 	Double_t fSupportBoxVW = conf_floats["MuFilter/SupportBoxVW"]; // SupportBox dimensions
 	// thickness of bottom part of Veto 3 SupportBox
 	Double_t fSupportBoxVB3 = conf_floats["MuFilter/SupportBoxVB3"];
-	// thickness of bottom part of Veto 3 SupportBox
-	Double_t fSupportBoxVB3 = conf_floats["MuFilter/SupportBoxVB3"];
 	// local position of bottom horizontal bar to survey edge
 	TVector3 LocBarVeto = TVector3(-conf_floats["MuFilter/VETOLocX"], conf_floats["MuFilter/VETOLocZ"],conf_floats["MuFilter/VETOLocY"]);
-	TVector3 LocBarVeto_v = TVector3(-conf_floats["MuFilter/VETOLocX3"], conf_floats["MuFilter/VETOLocZ3"],conf_floats["MuFilter/VETOLocY3"]);
 	TVector3 LocBarVeto_v = TVector3(-conf_floats["MuFilter/VETOLocX3"], conf_floats["MuFilter/VETOLocZ3"],conf_floats["MuFilter/VETOLocY3"]);
 
 	TVector3 VetoBox1 = TVector3(-conf_floats["MuFilter/VETOBoxX1"],conf_floats["MuFilter/VETOBoxZ1"],conf_floats["MuFilter/VETOBoxY1"]); // bottom front left
@@ -235,29 +200,13 @@ void MuFilter::ConstructGeometry()
 	TGeoVolume *subVeto3Box = new TGeoVolume("subVeto3Box", subVeto3BoxShape, Al);     
 	subVeto3Box->SetLineColor(kGray+1);
 
-	// support box for the 3rd veto plane
-	TVector3 VetoBox3 = TVector3(-conf_floats["MuFilter/VETOBoxX3"],conf_floats["MuFilter/VETOBoxZ3"],conf_floats["MuFilter/VETOBoxY3"]); // bottom front left
-	TVector3 VetoBox4 = TVector3(-conf_floats["MuFilter/VETOBoxX4"],conf_floats["MuFilter/VETOBoxZ4"],conf_floats["MuFilter/VETOBoxY4"]); // top back right
-	TVector3 Veto3BoxDim = TVector3( VetoBox3.X()-VetoBox4.X(), VetoBox4.Y()-VetoBox3.Y(), VetoBox4.Z()-VetoBox3.Z() ) ;
-	// support box
-	TGeoBBox  *supVeto3BoxInner  = new TGeoBBox("supVeto3BoxI",Veto3BoxDim.X()/2,Veto3BoxDim.Y()/2,Veto3BoxDim.Z()/2);
-	TGeoBBox  *supVeto3BoxOuter = new TGeoBBox("supVeto3BoxO",Veto3BoxDim.X()/2+fSupportBoxVW,Veto3BoxDim.Y()/2+fSupportBoxVB3,Veto3BoxDim.Z()/2+fSupportBoxVW);
-	TGeoCompositeShape *subVeto3BoxShape = new TGeoCompositeShape("subVeto3BoxShape", "supVeto3BoxO-supVeto3BoxI");
-	TGeoVolume *subVeto3Box = new TGeoVolume("subVeto3Box", subVeto3BoxShape, Al);     
-	subVeto3Box->SetLineColor(kGray+1);
-
 	//Veto bars
 	TGeoVolume *volVetoBar = gGeoManager->MakeBox("volVetoBar",Scint,fVetoBarX/2., fVetoBarY/2., fVetoBarZ/2.);
-	// 3rd plane
-	TGeoVolume *volVetoBar_ver = gGeoManager->MakeBox("volVetoBar_ver",Scint,fVeto3BarX/2., fVeto3BarY/2., fVeto3BarZ/2.);
 	// 3rd plane
 	TGeoVolume *volVetoBar_ver = gGeoManager->MakeBox("volVetoBar_ver",Scint,fVeto3BarX/2., fVeto3BarY/2., fVeto3BarZ/2.);
 
 	volVetoBar->SetLineColor(kRed-3);
 	AddSensitiveVolume(volVetoBar);
-
-	volVetoBar_ver->SetLineColor(kRed-3);
-	AddSensitiveVolume(volVetoBar_ver);
 
 	volVetoBar_ver->SetLineColor(kRed-3);
 	AddSensitiveVolume(volVetoBar_ver);
@@ -277,14 +226,6 @@ void MuFilter::ConstructGeometry()
 	     displacement = edge_Veto[iplane+1] + VetoBox1 + TVector3(-VetoBoxDim.X()/2,VetoBoxDim.Y()/2,VetoBoxDim.Z()/2);
 	     volVeto->AddNode(subVetoBox,iplane,
 		   new TGeoTranslation(displacement.X(),displacement.Y(),displacement.Z()));
-	  if (iplane < 2){
-	     displacement = edge_Veto[iplane+1] + LocBarVeto + TVector3(-fVetoBarX/2, 0, 0);
-	     volVeto->AddNode(volVetoPlane,iplane,
-				   new TGeoTranslation(displacement.X(),displacement.Y(),displacement.Z()));
-	     //  VETOBox1 = bottom front left
-	     displacement = edge_Veto[iplane+1] + VetoBox1 + TVector3(-VetoBoxDim.X()/2,VetoBoxDim.Y()/2,VetoBoxDim.Z()/2);
-	     volVeto->AddNode(subVetoBox,iplane,
-		   new TGeoTranslation(displacement.X(),displacement.Y(),displacement.Z()));
 
 	     displacement = TVector3(0, 0, 0);
 	     for (Int_t ibar = 0; ibar < fNVetoBars; ibar++){
@@ -309,31 +250,7 @@ void MuFilter::ConstructGeometry()
 				 new TGeoTranslation(displacement.X()-dx_bar,displacement.Y(),displacement.Z())); // detID of type 12xxx
 	     }
 	  }// Veto plane 3
-	     displacement = TVector3(0, 0, 0);
-	     for (Int_t ibar = 0; ibar < fNVetoBars; ibar++){
-	       Double_t dy_bar =  (fVetoBarY + fVetoBarGap)*ibar; 
-	       volVetoPlane->AddNode(volVetoBar, 1e+4+iplane*1e+3+ibar,
-				 new TGeoTranslation(displacement.X(),displacement.Y()+dy_bar,displacement.Z()));
-	     }
-	  } // Veto planes  1 & 2
-	  else { 
-	     displacement = edge_Veto[iplane+1] + LocBarVeto_v + TVector3(-fVeto3BarX/2, fVeto3BarY/2, 0);
-	     volVeto->AddNode(volVetoPlane,iplane,
-				   new TGeoTranslation(displacement.X(),displacement.Y(),displacement.Z()));
-	     //  VETOBox3 = bottom front left
-	     displacement = edge_Veto[iplane+1] + VetoBox3 + TVector3(-fVeto3BarX/2, 0, 0) + TVector3(-Veto3BoxDim.X()/2,Veto3BoxDim.Y()/2,Veto3BoxDim.Z()/2);
-	     volVeto->AddNode(subVeto3Box,iplane,
-		   new TGeoTranslation(displacement.X(),displacement.Y(),displacement.Z()));
-
-	     displacement = TVector3(0, 0, 0);
-	     for (Int_t ibar = 0; ibar < fNVetoBars; ibar++){
-	       Double_t dx_bar =  (fVeto3BarX + fVetoBarGap)*ibar;
-	       volVetoPlane->AddNode(volVetoBar_ver, 1e+4+iplane*1e+3+ibar,
-				 new TGeoTranslation(displacement.X()-dx_bar,displacement.Y(),displacement.Z())); // detID of type 12xxx
-	     }
-	  }// Veto plane 3
-	}
-	
+	}		
 		//adding to detector volume
 	top->AddNode(volVeto, 1,new TGeoTranslation(fVetoShiftX,fVetoShiftY,fVetoShiftZ)) ;
 
@@ -467,14 +384,8 @@ void MuFilter::ConstructGeometry()
 	int n_planes;
 	n_planes = fNDownstreamPlanes>1 ? fNDownstreamPlanes-1 : fNDownstreamPlanes;
 	
-
-	// In testbeam 2023 det. layout, there is an iron block in front of the single DS plane!
-	int n_planes;
-	n_planes = fNDownstreamPlanes>1 ? fNDownstreamPlanes-1 : fNDownstreamPlanes;
-	
 	for(Int_t l=0; l<fNDownstreamPlanes; l++)
 	{
-	if (l<n_planes){
 	if (l<n_planes){
 		displacement = edge_Iron[l+fNUpstreamPlanes+1] - TVector3(fFeBlockX/2,-fFeBlockY/2,-fFeBlockZ/2);
 		volMuFilter->AddNode(volFeBlock,l+fNUpstreamPlanes+fNVetoPlanes,
@@ -498,7 +409,6 @@ void MuFilter::ConstructGeometry()
 				new TGeoTranslation(displacement.X(),displacement.Y(),displacement.Z()));
 
 	//adding bars within each detector box
-	if (l!=n_planes) {
 	if (l!=n_planes) {
 		displacement = TVector3(0, 0,0);
 		for (Int_t ibar = 0; ibar < fNDownstreamBars; ibar++){
@@ -524,25 +434,6 @@ void MuFilter::ConstructGeometry()
 			}
 	}
 }
-
-void MuFilter::InitEvent(SNDLHCEventHeader *e){
-  // get mapping to eventHeader
-  eventHeader = e;
-
-  // Initialize
-  if (not alignment_init) {
-    alignment_init = true;
-    // Get available tags from the geometry file
-    std::string tag_string;
-    for (auto key : conf_floats){
-      tag_string = key.first.Data();
-      if (tag_string.find("MuFilter/DSTcorslopet_") != string::npos){
-	covered_runs_time_alignment.push_back(stoi(tag_string.substr(tag_string.find("t_")+2)));
-      }
-    }
-  }
-};
-
 
 void MuFilter::InitEvent(SNDLHCEventHeader *e){
   // get mapping to eventHeader
@@ -744,8 +635,9 @@ Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t ra
 Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 {
 	Int_t nSiPMs = GetnSiPMs(detID);
-	Int_t N;
-	Float_t signalspeeds;
+	Int_t N=0;
+	Float_t sum_signalspeeds, signalspeed;
+	TString fixed_ch;
 
 	Int_t start, end;
 	if (side=="left") {
@@ -756,6 +648,9 @@ Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 		start=8;
 		end=16;	
 	}
+	else { 
+		std::cout << "Invalid value for side passed to function" << std::endl;
+		return 0; }
 
 	for ( Int_t i=start;i<end;i++ ){
 		
@@ -763,19 +658,21 @@ Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 		if (i%8==2 || i%8==5){continue;}
 
 		// Get signal speed for SiPM i
-		TString fixed_ch = to_string(detID)+"_"+to_string(i);
-		Float_t signalspeed = conf_floats["MuFilter/US_signalspeed"+fixed_ch]; 
-		signalspeeds += signalspeed;
-		N++;
+		fixed_ch = to_string(detID)+"_"+to_string(i);
+		signalspeed = conf_floats["MuFilter/US_signalspeed_"+fixed_ch]; 
+		std::cout << fixed_ch << " : " << to_string(signalspeed) << std::endl;
+		sum_signalspeeds += signalspeed;
+		++N;
 	}
-	if (N==0) {return 0.0;}
-	else {return signalspeeds/N;}
+	if (N != 0) {return sum_signalspeeds/N;}
+	else {return 0.0;}
 }
 
 Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 {
-	Float_t sum_sigmat_sq, sum_covariance;
+	Float_t sum_sigmat_sq, sum_covariance, SiPM_resolution, xt;
 	Int_t N;
+	TString fixed_ch;
 
 	Int_t start, end;
 	if (side=="left") {
@@ -792,7 +689,7 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 		if (i%8==2 || i%8==5){continue;}
 
 		// Get SiPM time resolutions squared
-		TString fixed_ch = to_string(detID)+"_"+to_string(i);
+		fixed_ch = to_string(detID)+"_"+to_string(i);
 
 		// Check that SiPM constant is found
 		if (conf_floats.find(fixed_ch) != conf_floats.end()){
@@ -800,7 +697,9 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 			continue;
 		}
 
-		Float_t SiPM_resolution = conf_floats["MuFilter/US_timeresolution"+fixed_ch];
+		SiPM_resolution = conf_floats["MuFilter/US_timeresolution"+fixed_ch];
+		std::cout << fixed_ch << " : " << to_string(SiPM_resolution) << std::endl;
+
 		sum_sigmat_sq += std::pow(SiPM_resolution,2);
 
 		// Get covariance contributions
@@ -815,8 +714,7 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 				continue;
 			}
 
-			Float_t xt = conf_floats["MuFilter/US_timingxt_"+to_string(detID)+"_"+to_string(i)+"_"+to_string(j)];
-
+			xt = conf_floats["MuFilter/US_timingxt_"+to_string(detID)+"_"+to_string(i)+"_"+to_string(j)];
 			sum_covariance += 2*xt;
 		}
 		N++;
@@ -828,19 +726,13 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 		result = 1/std::pow(N,2) * ( sum_sigmat_sq + sum_covariance );
 		return result;
 	}
-
-	// Float_t result;
-	// result["left"] = std::sqrt(1/36 * ( sum_sigmat_sq["left"] + sum_covariance["left"]));
-	// result["right"] = std::sqrt(1/36 * ( sum_sigmat_sq["right"] + sum_covariance["right"]));
-	// return result;
 }
 
-void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
-{
+void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight){
 
-  int subsystem     = floor(fDetectorID/10000);
-  int plane             = floor(fDetectorID/1000) - 10*subsystem;
-  int bar_number   = fDetectorID%1000;
+  int subsystem = floor(fDetectorID/10000);
+  int plane = floor(fDetectorID/1000) - 10*subsystem;
+  int bar_number = fDetectorID%1000;
 
   TString path = "/cave_1/Detector_0/";
   TString barName;
@@ -851,7 +743,6 @@ void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
   case 1: 
       path+="volVeto_1/volVetoPlane_"+std::to_string(plane)+"_"+std::to_string(plane);
       // keeping the name of horizontal Veto planes for backward compatibility
-      // keeping the name of horizontal Veto planes for backward compatibility
       barName = "/volVetoBar_";
       // the third Veto plane is vertical
       if (plane>=2) barName+="ver_";
@@ -860,15 +751,10 @@ void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
   case 2: 
       path+="volMuFilter_1/volMuUpstreamDet_"+std::to_string(plane)+"_"
                 +std::to_string(plane+conf_ints["MuFilter/NVetoPlanes"]);
-      path+="volMuFilter_1/volMuUpstreamDet_"+std::to_string(plane)+"_"
-                +std::to_string(plane+conf_ints["MuFilter/NVetoPlanes"]);
       barName = "/volMuUpstreamBar_";
       shift = conf_floats["MuFilter/US"+std::to_string(plane+1)+"ShiftY"];
       break;
   case 3: 
-      path+="volMuFilter_1/volMuDownstreamDet_"+std::to_string(plane)+"_"
-                +std::to_string(plane+conf_ints["MuFilter/NVetoPlanes"]
-                                     +conf_ints["MuFilter/NUpstreamPlanes"]);
       path+="volMuFilter_1/volMuDownstreamDet_"+std::to_string(plane)+"_"
                 +std::to_string(plane+conf_ints["MuFilter/NVetoPlanes"]
                                      +conf_ints["MuFilter/NUpstreamPlanes"]);
@@ -893,8 +779,6 @@ void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
 
   if ( (subsystem == 3 and bar_number >59) or
        (subsystem == 1 and plane ==2) ){  // vertical bars
-  if ( (subsystem == 3 and bar_number >59) or
-       (subsystem == 1 and plane ==2) ){  // vertical bars
       Double_t top[3] = {shift,S->GetDY(), 0};
       Double_t bot[3] = {shift,-S->GetDY(),0};
       Double_t Gtop[3],Gbot[3];
@@ -912,35 +796,25 @@ void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
     }
 }
 
-   Int_t MuFilter::GetnSiPMs(Int_t detID){
-       int subsystem     = floor(detID/10000)-1;
-       if (subsystem==0){return conf_ints["MuFilter/VetonSiPMs"];}
-       if (subsystem==1){return conf_ints["MuFilter/UpstreamnSiPMs"];}
-       return conf_ints["MuFilter/DownstreamnSiPMs"];
+Int_t MuFilter::GetnSiPMs(Int_t detID){
+	int subsystem     = floor(detID/10000)-1;
+	if (subsystem==0){return conf_ints["MuFilter/VetonSiPMs"];}
+	if (subsystem==1){return conf_ints["MuFilter/UpstreamnSiPMs"];}
+	return conf_ints["MuFilter/DownstreamnSiPMs"];
+}
 
-   }
-   Int_t MuFilter::GetnSides(Int_t detID){
-       int subsystem     = floor(detID/10000)-1;
-       if (subsystem==0){
-         // vertical Veto 3 has the readout on the top only
-         if (detID>=12000) return conf_ints["MuFilter/VetonSides"]-1;
-         else {return conf_ints["MuFilter/VetonSides"];}
-       }
-       if (subsystem==0){
-         // vertical Veto 3 has the readout on the top only
-         if (detID>=12000) return conf_ints["MuFilter/VetonSides"]-1;
-         else {return conf_ints["MuFilter/VetonSides"];}
-       }
-       if (subsystem==1){return conf_ints["MuFilter/UpstreamnSides"];}
-       if (subsystem==2){
-          if (detID%1000>59) return conf_ints["MuFilter/DownstreamnSides"]-1;
-          else {return conf_ints["MuFilter/DownstreamnSides"];}
-       }
-       if (subsystem==2){
-          if (detID%1000>59) return conf_ints["MuFilter/DownstreamnSides"]-1;
-          else {return conf_ints["MuFilter/DownstreamnSides"];}
-       }
-  }
-
+Int_t MuFilter::GetnSides(Int_t detID){
+	int subsystem     = floor(detID/10000)-1;
+	if (subsystem==0){
+		// vertical Veto 3 has the readout on the top only
+		if (detID>=12000) return conf_ints["MuFilter/VetonSides"]-1;
+		else {return conf_ints["MuFilter/VetonSides"];}
+	}
+	else if (subsystem==1){return conf_ints["MuFilter/UpstreamnSides"];}
+	else {
+		if (detID%1000>59) return conf_ints["MuFilter/DownstreamnSides"]-1;
+		else {return conf_ints["MuFilter/DownstreamnSides"];}
+	}
+}
 
 ClassImp(MuFilter)

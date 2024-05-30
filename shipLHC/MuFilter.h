@@ -26,7 +26,6 @@ class MuFilter : public FairDetector
 {
 	public:
 		MuFilter(const char* name, Bool_t Active, const char* Title="MuonFilter");
-		MuFilter();
 		virtual ~MuFilter();
 
 		/**      Create the detector geometry        */
@@ -42,7 +41,7 @@ class MuFilter : public FairDetector
 		Float_t GetBarSideTimeResolution(Int_t detID, TString side);
 		Float_t GetBarSideSignalSpeed(Int_t detID, TString side);
 
-                void InitEvent(SNDLHCEventHeader *e);
+        void InitEvent(SNDLHCEventHeader *e);
 		void SetConfPar(TString name, Float_t value){conf_floats[name]=value;}
 		void SetConfPar(TString name, Int_t value){conf_ints[name]=value;}
 		void SetConfPar(TString name, TString value){conf_strings[name]=value;}
@@ -109,14 +108,15 @@ class MuFilter : public FairDetector
 		std::map<TString,std::vector<Float_t>> conf_vectors;
 		SNDLHCEventHeader *eventHeader;
 
-                // Vector to store runs covered in the geometry file.
-                std::vector<int> covered_runs_time_alignment;
-                TString last_time_alignment_tag;
-                int last_run_time, last_run_pos;
-                bool alignment_init;
+		// Vector to store runs covered in the geometry file.
+		std::vector<int> covered_runs_time_alignment;
+		TString last_time_alignment_tag;
+		int last_run_time, last_run_pos;
+		bool alignment_init;
+	
 	protected:
 
-			Int_t InitMedium(const char* name);
+		Int_t InitMedium(const char* name);
 };
 
 #endif

@@ -35,7 +35,6 @@ def configure(run,ship_geo,Gfield=''):
 
  MuFilter = ROOT.MuFilter("MuFilter",ROOT.kTRUE)
  for parName in ship_geo.MuFilter:
-    print(parName)
     parValue = eval('ship_geo.MuFilter.'+parName)
     MuFilter.SetConfPar("MuFilter/"+parName, parValue)
  detectorList.append(MuFilter)

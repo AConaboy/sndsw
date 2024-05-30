@@ -8,6 +8,7 @@ class Analysis(object):
 
 	def __init__(self, options):
 		self.options=options
+		self.simulation = options.simulation
 
 		# Adding flag for LaserMeasurements/ work to use some functions defined in here
 		if not hasattr(options, "LaserMeasurements"):
@@ -49,6 +50,15 @@ class Analysis(object):
 		if options.numuStudy: self.Get_numuevents()
 
 		self.sigmatds0=0.263, 9.5E-5
+		freq = 160.316E6
+		self.TDC2ns = 1E9/freq
+
+		if options.simulation: 
+			self.simEngine = self.GetSimEngine
+			
+	def GetSimEngine(self):
+		simEngine = self.options.geoFile.split('.')[1].split('-')[0]
+		return simEngine 
 
 	def SetTask(self, task):
 		self.task=task
@@ -929,8 +939,7 @@ class Analysis(object):
 
 		if state not in d: return 
 
-		return d[state][2], d[state][3]		
-
+		return d[state][2], d[state][3]
 
 	def GetBarAveragecscint(self, runNr, detID, state):
 
@@ -939,8 +948,13 @@ class Analysis(object):
 		for SiPM in self.systemAndSiPMs[subsystem]:
 			fixed_ch=self.MakeFixedCh((subsystem, plane, bar, SiPM))
 			side='left' if SiPM<8 else 'right'
-			if fixed_ch not in self.cscintvalues:continue
-			cscint=self.cscintvalues[fixed_ch]
+			if not self.simulation:
+				if fixed_ch not in self.cscintvalues:continue
+				cscint=self.cscintvalues[fixed_ch]
+			else: 
+				cscint = self.task.MuFilter.GetConfParF(f'MuFilter/US_signalspeed_{fixed_ch}')
+				if cscint==0:continue
+				cscint=(cscint,0) # at the moment, no uncertainty for signal speed in simulation
 			if not cscint: continue
 			cscintvalues[side].append(cscint)
 
@@ -1252,17 +1266,18 @@ class Analysis(object):
 
 	def correct_ToF(self, fixed_ch, clock, xEx):
 		detID=int(fixed_ch.split('_')[0])
-		s,p,b=self.parseDetID(detID)
 		SiPM=int(fixed_ch.split('_')[-1])
 
 		# Correct to the centre of the bar in the physics FoR
 		self.task.MuFilter.GetPosition(detID, self.A, self.B)	
 		xref = 0.5 * (self.A.x() + self.B.x())
-		cs=self.cscintvalues[fixed_ch]
+		if not self.simulation: 
+			cs = self.cscintvalues[fixed_ch]
+			c_SiPM = float(cs[0])
+		else: c_SiPM = self.task.MuFilter.GetConfParF(f'MuFilter/US_signalspeed_{fixed_ch}')
 
 		# fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
 		time=clock*self.TDC2ns
-		c_SiPM=float(cs[0])
 		ToFcorrection=(xEx-xref)/c_SiPM
 
 		if SiPM<8: corrected_t = time + ToFcorrection
@@ -1280,41 +1295,52 @@ class Analysis(object):
 			SiPM, clock=i 
 			fixed_ch=f'{detID}_{SiPM}'
 			qdc=self.GetChannelVal(SiPM, qdcs)
-			correctedtime=self.MuFilterCorrectedTime(fixed_ch, qdc, clock, x, mode)
+			correctedtime=self.MuFilterCorrectedTime(fixed_ch, qdc, clock, x)
 			if not correctedtime: continue
-			if mode=='aligned': 
+			if mode=='aligned' and not self.simulation: 
 				d = self.alignmentparameters[f'{detID}_{SiPM}']
 				correctedtime = self.task.reft - correctedtime - d[0] 
 			alignedtimes.append((SiPM, correctedtime))
 		return alignedtimes
 
-	def MuFilterCorrectedTime(self, fixed_ch, qdc, clock, x=0, mode='unaligned'):
+	def MuFilterCorrectedTime(self, fixed_ch, qdc, clock, x=0):
+		
 		time=clock*self.TDC2ns
-
-		if not fixed_ch in self.twparameters:
-			return
-
-		if not fixed_ch in self.alignmentparameters and mode=='unaligned':
-			return
-		
-		if fixed_ch not in self.cscintvalues and x!=0:
+		if not self.simulation:
+			if not fixed_ch in self.twparameters:
 				return
-		elif fixed_ch in self.cscintvalues and x!=0: 
-			cdata=self.cscintvalues[fixed_ch] 
 
-		twparams=self.twparameters[fixed_ch]
-		
-		#### Correct ToF if needed.
-		if x==0:
-			ToFcorrectedtime=time
+			if not fixed_ch in self.alignmentparameters:
+				return
+			if fixed_ch not in self.cscintvalues and x!=0:
+				return
+			elif fixed_ch in self.cscintvalues and x!=0: 
+				return
+
+			twparams=self.twparameters[fixed_ch]
+
+			#### Correct ToF if needed.
+			if x==0:
+				ToFcorrectedtime=time
+			else: 
+				ToFcorrectedtime=self.correct_ToF(fixed_ch, clock, x)[1]
+
+			#### TW corrected time then ToF & TW corrected time
+			twcorrection=self.correctionfunction(twparams, qdc)
+			ToFTWcorrectedtime=ToFcorrectedtime+twcorrection		
+
+			return ToFTWcorrectedtime
+
 		else: 
-			ToFcorrectedtime=self.correct_ToF(fixed_ch, clock, x)[1]
-
-		#### TW corrected time then ToF & TW corrected time
-		twcorrection=self.correctionfunction(twparams, qdc)
-		ToFTWcorrectedtime=ToFcorrectedtime+twcorrection
-		
-		return ToFTWcorrectedtime
+			#### Correct ToF if needed.
+			if x==0:
+				ToFcorrectedtime=time
+			else: 
+				# if not hasattr(self.task.MuFilter.)
+				if self.task.MuFilter.GetConfParF(f'MuFilter/US_signalspeed_{fixed_ch}')==0:
+					return
+				ToFcorrectedtime=self.correct_ToF(fixed_ch, clock, x)[1]
+			return ToFcorrectedtime
 
 	def GetTimingDiscriminant(self, hits):
 

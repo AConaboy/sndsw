@@ -7,6 +7,7 @@ class SystemAlignment(object):
        
         self.options=options
         self.tw=tw
+        self.simulation = tw.simulation
         # if self.tw.mode=='reconstructmuonposition': 
         self.USbarlength = self.tw.MuFilter.GetConfParF('MuFilter/UpstreamBarX')
         self.runNr = tw.runNr 
@@ -15,7 +16,8 @@ class SystemAlignment(object):
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
 
         self.afswork=tw.afswork
-        self.outpath=tw.outpath
+        if not self.simulation: self.outpath=tw.outpath
+        else: self.outpath = options.path
 
         self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
         self.nchs={1:224, 2:800}
@@ -507,7 +509,8 @@ class SystemAlignment(object):
                 self.hists[xrefthistname].Fill(time_i, self.tw.reft)
 
     def WriteOutReconstructionHistograms(self):
-        d = f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/'
+        if not self.simulation: d = f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/'
+        else: d = f'{self.outpath}SystemAlignment/'
         os.makedirs(d, exist_ok=True)
         outfilename=d+f'muonreconstruction_{self.options.nStart}.root'
 
@@ -534,7 +537,10 @@ class SystemAlignment(object):
 
     def WriteOutHistograms(self):
 
-        d = f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/'
+        if not self.simulation: d = f'{self.outpath}splitfiles/run{self.runNr}/SystemAlignment/'
+        else: d = f'{self.outpath}SystemAlignment/'
+
+
         os.makedirs(d, exist_ok=True)
         outfilename=d+f'SystemAlignment_{self.options.nStart}.root'
         

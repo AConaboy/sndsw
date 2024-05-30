@@ -23,7 +23,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument("-f", "--inputFile", dest="inputFile", help="single input file", required=True)
 parser.add_argument("-g", "--geoFile", dest="geoFile", help="geofile", required=True)
-parser.add_argument("-p", "--path",dest="path",  help="Output directory", required=False,  default=".")
+parser.add_argument("-p", "--path",dest="path",  help="Output directory", required=False)
 parser.add_argument("-n", "--nEvents", dest="nEvents",  type=int, help="number of events to process", default=100000)
 parser.add_argument("-ts", "--thresholdScifi", dest="ts", type=float, help="threshold energy for Scifi [p.e.]", default=3.5)
 parser.add_argument("-ss", "--saturationScifi", dest="ss", type=float, help="saturation energy for Scifi [p.e.]", default=104.)
@@ -31,7 +31,8 @@ parser.add_argument("-tML", "--thresholdMufiL", dest="tml", type=float, help="th
 parser.add_argument("-tMS", "--thresholdMufiS", dest="tms", type=float, help="threshold energy for Mufi small [p.e.]", default=0.0)
 parser.add_argument("-no-cls", "--noClusterScifi", action='store_true', help="do not make Scifi clusters")
 parser.add_argument("-cpp", "--digiCPP", action='store_true', dest="FairTask_digi", help="perform digitization using DigiTaskSND")
-parser.add_argument("-d", "--Debug", dest="debug", help="debug", default=False)
+parser.add_argument("-d", "--Debug", dest="debug", action="store_true")
+parser.add_argument('--simEngine', dest='simEngine', type=str)
 
 options = parser.parse_args()
 # rephrase the no-cluster flag
@@ -40,25 +41,36 @@ makeClusterScifi = not options.noClusterScifi
 timer = ROOT.TStopwatch()
 timer.Start()
 
-# Path is where my MC files are stored, directories separate the different generators/physics cases
-input_file = options.path+options.inputFile
-output_file = input_file.replace('.root','_dig.root')
+# # Path is where my MC files are stored, directories separate the different generators/physics cases
+input_file = options.inputFile
+# output_file = input_file.replace('.root','_digi.root')
 
-if not options.FairTask_digi:
-    os.system('cp '+input_file+' '+output_file)
+# If working with Daniele's data, output path must be changed
+if input_file.find('dancc/MuonDIS')!=-1:
+  f=input_file.split('/')[-1]
+  output_file = options.path+f
+
+# if options.inputFile.find('/eos')==0:
+#    if options.FairTask_digi:
+#       #  options.inputFile = os.environ['EOSSHIP']+options.inputFile
+#    else:   
+#        os.system('xrdcp '+os.environ['EOSSHIP']+options.inputFile+' '+output_file)
+# else:
+#     if not options.FairTask_digi:
+#        os.system('cp '+options.inputFile+' '+outFile)    
 
 # -----Create geometry----------------------------------------------
 import shipLHC_conf as sndDet_conf
 
 if options.geoFile.find('/eos')==0:
-       options.geoFile = os.environ['EOSSHIP']+options.geoFile
+  options.geoFile = os.environ['EOSSHIP']+options.geoFile
 import SndlhcGeo
-snd_geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
+snd_geo = SndlhcGeo.GeoInterface(options.geoFile)
 
 # set digitization parameters for MuFilter
-lsOfGlobals  = ROOT.gROOT.GetListOfGlobals()
-scifiDet     = lsOfGlobals.FindObject('Scifi')
-mufiDet      = lsOfGlobals.FindObject('MuFilter')
+lsOfGlobals = ROOT.gROOT.GetListOfGlobals()
+scifiDet = lsOfGlobals.FindObject('Scifi')
+mufiDet = lsOfGlobals.FindObject('MuFilter')
 mufiDet.SetConfPar("MuFilter/DsAttenuationLength",350 * u.cm)		#  values between 300 cm and 400cm observed for H6 testbeam
 mufiDet.SetConfPar("MuFilter/DsTAttenuationLength",700 * u.cm)		# top readout with mirror on bottom
 mufiDet.SetConfPar("MuFilter/VandUpAttenuationLength",999 * u.cm)	# no significante attenuation observed for H6 testbeam
@@ -72,9 +84,9 @@ scifiDet.SetConfPar("Scifi/nphe_max",options.ss) # saturation
 scifiDet.SetConfPar("Scifi/timeResol",150.*u.picosecond) # time resolution in ps
 # scifiDet.SetConfPar("MuFilter/timeResol",150.*u.picosecond) # time resolution in ps, first guess
 
-
 # Fair digitization task
 if options.FairTask_digi:
+  output_file = output_file.replace('.root','CPP.root')
   run = ROOT.FairRunAna()
   ioman = ROOT.FairRootManager.Instance()
   ioman.RegisterInputObject('Scifi', snd_geo.modules['Scifi'])
@@ -86,7 +98,7 @@ if options.FairTask_digi:
   fileSource = ROOT.FairFileSource(input_file)
   run.SetSource(fileSource)
   # Set output
-  outfile = ROOT.FairRootFileSink(output_file.replace('.root','CPP.root'))
+  outfile = ROOT.FairRootFileSink(output_file)
   run.SetSink(outfile)
 
   # Set number of events to process
@@ -108,7 +120,7 @@ else:
   import SndlhcDigi
   Sndlhc = SndlhcDigi.SndlhcDigi(output_file,makeClusterScifi)
 
-  nEvents   = min(Sndlhc.sTree.GetEntries(),options.nEvents)
+  nEvents = min(Sndlhc.sTree.GetEntries(),options.nEvents)
 # main loop
   for iEvent in range(firstEvent, nEvents):
     if iEvent % 50000 == 0 or options.debug:

@@ -14,45 +14,56 @@ class TimeWalk(ROOT.FairTask):
 
     def __init__(self, options, monitor):
 
-        if options.simulation:        
-            self.muAna = Analysis(options)
-            self.M=monitor 
-            self.mode=options.mode
+        self.M=monitor 
+        self.simulation = options.simulation
+        self.muAna = Analysis(options)
+        self.options=options
+        self.mode=options.mode
 
-            self.options=options
+        lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
+        self.MuFilter=lsOfGlobals.FindObject('MuFilter')
+        self.Scifi=lsOfGlobals.FindObject('Scifi')
+        self.nav=ROOT.gGeoManager.GetCurrentNavigator()
+        self.runNr = str(options.runNumber).zfill(6)
+        self.afswork=options.afswork
+        self.afsuser=options.afsuser
+        self.EventNumber=-1
+        self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
+        self.nchs={1:224, 2:800}
 
-            run=ROOT.FairRunAna.Instance()
-            self.trackTask=run.GetTask('simpleTracking')
+        self.systemAndPlanes = {1:2,2:5,3:7}
+        self.systemAndBars={1:7,2:10,3:60}
+        self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
+        self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
+        self.zPos=self.M.zPos
+        self.muAna.zPos=self.zPos      
+        self.A, self.B = ROOT.TVector3(), ROOT.TVector3()  
 
-            ioman=ROOT.FairRootManager.Instance()
-            self.OT=ioman.GetSink().GetOutTree()
-            
-            lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
-            self.MuFilter=lsOfGlobals.FindObject('MuFilter')
-            self.Scifi=lsOfGlobals.FindObject('Scifi')
-            self.nav=ROOT.gGeoManager.GetCurrentNavigator()
-            self.runNr = str(options.runNumber).zfill(6)
-            self.afswork=options.afswork
-            self.afsuser=options.afsuser
-            self.EventNumber=-1
-            self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
-            self.nchs={1:224, 2:800}
+        freq=160.316E6
+        self.TDC2ns=1E9/freq
 
-            self.systemAndPlanes = {1:2,2:5,3:7}
-            self.systemAndBars={1:7,2:10,3:60}
-            self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
-            self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
-            self.zPos=self.M.zPos
-            self.muAna.zPos=self.zPos   
-            self.timealignment='sim'     
+        self.largeSiPMmap={0:0 ,1:1 ,3:2 ,4:3 ,6:4 ,7:5}
+        self.verticalBarDict={0:1, 1:3, 2:5, 3:6}        
+     
+        self.hists=self.M.h
 
-            self.simEngine = self.GetSimEngine()
+        run=ROOT.FairRunAna.Instance()
+        self.trackTask=run.GetTask('simpleTracking')
 
-            if self.mode == 'systemalignment':
-                from systemalignment import SystemAlignment
-                self.sa = SystemAlignment(options, self)
+        ioman=ROOT.FairRootManager.Instance()
+        self.OT=ioman.GetSink().GetOutTree()
+
+        self.referencesystem=options.referencesystem                         
         
-        elif options.simulation:
+        if self.simulation:        
+  
+            self.timealignment='sim'     
+            self.simEngine = self.GetSimEngine()
+            self.cutdists=self.muAna.GetCutDistributions("005408", ('dy'))
+            self.outpath = options.path+self.simEngine+'/'
+            options.nStart = int(options.fname.split('-')[-1].split('_')[0])
+
+        elif not self.simulation:
             statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
                         'TW':'corrected', 'res':'corrected', 
                         'selectioncriteria':'corrected',
@@ -64,13 +75,7 @@ class TimeWalk(ROOT.FairTask):
                         '2muon':'corrected'}
             
             self.state=statedict[options.mode]
-
-            self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
-            self.locA, self.locB =ROOT.TVector3(), ROOT.TVector3()
             
-            self.muAna=Analysis(options)
-            self.M=monitor
-            self.options=options
             if self.options.path.find('commissioning/TI18')>0:
                 self.outpath=options.afswork+'-commissioning/'
                 self.path='TI18'
@@ -81,46 +86,12 @@ class TimeWalk(ROOT.FairTask):
                 self.outpath=options.afswork+'-H8/'
                 self.path='H8'
 
-            run=ROOT.FairRunAna.Instance()
-            self.trackTask=run.GetTask('simpleTracking')
-
-            ioman=ROOT.FairRootManager.Instance()
-            self.OT=ioman.GetSink().GetOutTree()
-            
-            lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
-            self.MuFilter=lsOfGlobals.FindObject('MuFilter')
-            self.Scifi=lsOfGlobals.FindObject('Scifi')
-            self.nav=ROOT.gGeoManager.GetCurrentNavigator()
-            self.runNr = str(options.runNumber).zfill(6)
-            self.afswork=options.afswork
-            self.afsuser=options.afsuser
-            self.EventNumber=-1
-            self.subsystemdict={1:'Veto', 2:'US', 3:'DS'}
-            self.nchs={1:224, 2:800}
-
-            self.systemAndPlanes = {1:2,2:5,3:7}
-            self.systemAndBars={1:7,2:10,3:60}
-            self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
-            self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
-            self.zPos=self.M.zPos
-            self.muAna.zPos=self.zPos
-
-            self.referencesystem=options.referencesystem
-            self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)
-            self.mode=options.mode
-
-            self.freq=160.316E6
-            self.TDC2ns=1E9/self.freq
-
-            self.largeSiPMmap={0:0 ,1:1 ,3:2 ,4:3 ,6:4 ,7:5}
-            self.verticalBarDict={0:1, 1:3, 2:5, 3:6}
+            self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)                
             
             if options.debug: self.trackevents=[]
             
             # self.correctionfunction=lambda ps, qdc: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
             self.getaverage=lambda d, key, i:sum( [(d[key][i]) for k in range(2) ])/len(d)        
-
-            self.hists=self.M.h
 
             # if options.mode in ('TW', 'res'):
             if not options.CorrectionType: self.CorrectionType=4
@@ -150,24 +121,6 @@ class TimeWalk(ROOT.FairTask):
                 elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
             
             self.muAna.AlignmentRun=self.AlignmentRun
-            
-            if self.mode == 'systemalignment':
-                from systemalignment import SystemAlignment
-                self.sa = SystemAlignment(options, self)
-            
-            if self.mode == 'reconstructmuonposition':
-                from systemalignment import SystemAlignment
-                self.sa = SystemAlignment(options, self)  
-            
-            elif self.mode == 'showerprofiles':
-                from showerprofiles import ShowerProfiles
-                if options.numuStudy: self.numuStudy=True
-                self.sp = ShowerProfiles(options, self)
-                self.barycentredata={}
-
-            elif self.mode == 'selectioncriteria':
-                from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
-                self.sc = SelectionCriteria(options, self)
 
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
             ### Incase selection criteria distributions not made for the TWCorrectionRun
@@ -183,10 +136,27 @@ class TimeWalk(ROOT.FairTask):
             self.muAna.MakeAlignmentParameterDict(self.timealignment)
             self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
             self.muAna.MakeTWCorrectionDict(self.timealignment)
-            self.referencesystem=options.referencesystem
 
-            with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
-                self.histformatting=json.load(x)            
+        if self.mode == 'systemalignment':
+            from systemalignment import SystemAlignment
+            self.sa = SystemAlignment(options, self)
+        
+        if self.mode == 'reconstructmuonposition':
+            from systemalignment import SystemAlignment
+            self.sa = SystemAlignment(options, self)  
+        
+        elif self.mode == 'showerprofiles':
+            from showerprofiles import ShowerProfiles
+            if options.numuStudy: self.numuStudy=True
+            self.sp = ShowerProfiles(options, self)
+            self.barycentredata={}
+
+        elif self.mode == 'selectioncriteria':
+            from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
+            self.sc = SelectionCriteria(options, self)   
+
+        with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
+            self.histformatting=json.load(x)                
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -246,10 +216,11 @@ class TimeWalk(ROOT.FairTask):
                 self.hists['reft']=ROOT.TH1F('reft','Average time of DS horizontal bars;DS horizontal average time [ns];Counts', 200, 0, 50)
             self.hists['reft'].Fill(self.reft)
 
-            ### Timing discriminant cut
-            self.td = self.muAna.GetTimingDiscriminant(hits) # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
-            if self.TimingDiscriminantCut(): self.passtdcut=True 
-            else: self.passtdcut=False
+            ### Timing discriminant cut only for real data
+            if not self.simulation:
+                self.td = self.muAna.GetTimingDiscriminant(hits) # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
+                if self.TimingDiscriminantCut(): self.passtdcut=True 
+                else: self.passtdcut=False
 
         elif self.referencesystem==1:
             self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
@@ -533,7 +504,11 @@ class TimeWalk(ROOT.FairTask):
         if not name in self.hists:
             title = f'{mode.replace("-", " ")} {d}; [ns];Counts'
             self.hists[name] = ROOT.TH1F(name, title, *bins)
-        self.hists[name].Fill(testing_value[f'delta{d}'])        
+        self.hists[name].Fill(testing_value[f'delta{d}'])  
+
+    def GetSimEngine(self):
+        simEngine = self.options.geoFile.split('.')[1].split('-')[0]
+        return simEngine              
 
     def WriteOutHistograms(self):
 
@@ -586,14 +561,14 @@ class TimeWalk(ROOT.FairTask):
     def yresidual3(self, detID):
         
         self.MuFilter.GetPosition(detID,self.A,self.B)
-        self.MuFilter.GetLocalPosition(detID, self.locA, self.locB)
 
         doca=self.muAna.Getyresidual(detID)
         s,p,b=self.muAna.parseDetID(detID)
         
         if s==3: return True
         key=10*s+p
-        
+        if key==12: return True # No hist for veto 3 yet
+
         dy_min, dy_max = self.dycut(self.cutdists[f'dy_{key}'])
         if doca>dy_max or doca<dy_min: return False
         else: return True

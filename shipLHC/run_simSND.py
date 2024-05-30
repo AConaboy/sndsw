@@ -97,8 +97,8 @@ if simEngine == "Nuage" and not inputFile:
 
 if (simEngine == "Ntuple") and defaultInputFile :
   print('input file required if simEngine = Ntuple or MuonBack. Examples:')
-  print ("crossing angle up:        /eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_up/version1/unit30_Nm.root  (unit30_Pm.root)")
-  print ("crossing angle down: /eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_down/muons_VCdown_IR1-LHC.root")
+  print("crossing angle up:        /eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_up/version1/unit30_Nm.root  (unit30_Pm.root)")
+  print("crossing angle down: /eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_down/muons_VCdown_IR1-LHC.root")
   sys.exit()
 
 print("SND@LHC setup for",simEngine,"to produce",options.nEvents,"events")
