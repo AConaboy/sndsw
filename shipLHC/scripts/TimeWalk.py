@@ -127,7 +127,6 @@ class TimeWalk(ROOT.FairTask):
                 if self.timealignment=='old': self.AlignmentRun=str(5097).zfill(6)
                 elif self.timealignment=='new': self.AlignmentRun=str(5408).zfill(6)
                 elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
-
             self.muAna.AlignmentRun=self.AlignmentRun
 
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
@@ -306,10 +305,6 @@ class TimeWalk(ROOT.FairTask):
                 if self.options.XT: self.sa.XTHists(hit)
                 self.sa.FillBarHists(hit)
                 # self.sa.ScifiCorrectedTimes(hit)
-<<<<<<< HEAD
-=======
-
->>>>>>> cf0e3201a (Updating files for use with simulation)
                 continue
 
             # Only investigate track related hits

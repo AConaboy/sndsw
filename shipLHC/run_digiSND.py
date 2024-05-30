@@ -102,7 +102,7 @@ import shipLHC_conf as sndDet_conf
 if options.geoFile.find('/eos')==0:
 	options.geoFile = os.environ['EOSSHIP']+options.geoFile
 import SndlhcGeo
-snd_geo = SndlhcGeo.GeoInterface(options.path+options.geoFile)
+snd_geo = SndlhcGeo.GeoInterface(options.geoFile)
 
 # set digitization parameters for MuFilter
 lsOfGlobals = ROOT.gROOT.GetListOfGlobals()
