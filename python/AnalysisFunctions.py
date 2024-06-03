@@ -1299,7 +1299,7 @@ class Analysis(object):
 			if not correctedtime: continue
 			if mode=='aligned' and not self.simulation: 
 				d = self.alignmentparameters[f'{detID}_{SiPM}']
-				correctedtime = self.task.reft - correctedtime - d[0] 
+				correctedtime = self.task.reft - correctedtime - d[0]
 			alignedtimes.append((SiPM, correctedtime))
 		return alignedtimes
 

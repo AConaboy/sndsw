@@ -88,6 +88,7 @@ parser.add_argument("--chi2xpred_zpos", dest="chi2xpred_zpos", help="z-position 
 parser.add_argument("--WriteOutTrackInfo", dest="WriteOutTrackInfo", type=int, default=0)
 parser.add_argument('--numbering', dest='numbering', type=str, default='systemPCB')
 parser.add_argument('--referencesystem', dest='referencesystem', type=int, default=3)
+parser.add_argument('--simulation', dest='simulation', action='store_true')
 
 parser.add_argument("--goodEvents", dest="goodEvents", action='store_true',default=False)
 parser.add_argument("--withTrack", dest="withTrack", action='store_true',default=False)

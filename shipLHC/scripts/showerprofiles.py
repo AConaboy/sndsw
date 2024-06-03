@@ -281,16 +281,11 @@ class ShowerProfiles(object):
         detID=hit.GetDetectorID()
         s,p,b = self.muAna.parseDetID(detID)
         
-        runNr=self.tw.M.eventTree.EventHeader.GetRunId()
+        # runNr=self.tw.M.eventTree.EventHeader.GetRunId()
         
         ### Apply time-walk correction to all times in the hit.
         qdcs = hit.GetAllSignals()
 
-        # nSiPMs criteria on hits. Should replace with a histogram check
-        # if len(qdcs) < 11: 
-        #     print(f'Fewer than 11 SiPMs firing!\nrun number: {runNr}, detID: {runNr}')
-        #     return
-        
         qdc_sides = {'left':[], 'right':[]}
         
         for idx in qdcs: 
@@ -317,11 +312,11 @@ class ShowerProfiles(object):
 
         if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
         averages={side:sum(aligned_times[side].values()) / len(aligned_times[side]) for side in aligned_times}
-        fastest = {side:min(aligned_times[side].values()) for side in aligned_times}
-        averagetime = 1/2 * sum(averages.values())
+        # fastest = {side:min(aligned_times[side].values()) for side in aligned_times}
+        # averagetime = 1/2 * sum(averages.values())
 
-        delta_averagetime = averages['left'] - averages['right']
-        delta_fastesttime = fastest['left'] - fastest['right']
+        # delta_averagetime = averages['left'] - averages['right']
+        # delta_fastesttime = fastest['left'] - fastest['right']
         
         self.all_times[p][detID] = averages
         self.all_qdcs[p][detID] = qdc_sides
@@ -483,7 +478,7 @@ class ShowerProfiles(object):
                 x[detID] = [x_barycentre, x_barycentre_uncertainty, Nfiredbars/2*6]
 
         return x
-        
+
     def RecordData(self, hit, barycentres, Ex, w):
         detID = hit.GetDetectorID()
         interactionWall = self.GetInteractionWall(self.runId)
@@ -492,7 +487,7 @@ class ShowerProfiles(object):
         qdcs = [(SiPM, qdc) for SiPM,qdc in hit.GetAllSignals()]
         rawtimes = [(SiPM, cc*self.TDC2ns) for SiPM,cc in hit.GetAllTimes()]
         twctimes = self.muAna.GetCorrectedTimes(hit)
-        atimes =self.muAna.GetCorrectedTimes(hit, mode='aligned')
+        atimes = self.muAna.GetCorrectedTimes(hit, mode='aligned')
 
         # Redetermine trackrelated?? 
         if self.tw.yresidual3(detID): trackrelated = True
@@ -513,7 +508,7 @@ class ShowerProfiles(object):
                         data[SiPM]['d'] = self.muAna.alignmentparameters[f'{detID}_{SiPM}']
                         data[SiPM]['trackrelated'] = trackrelated
                         data[SiPM]['cscint'] = self.muAna.cscintvalues[f'{detID}_{SiPM}']
-                        
+
                         # Writing out determined barycentres
                         xbc, ybc = barycentres
                         data[SiPM]['x-barycentre'] = xbc[0]
@@ -538,7 +533,7 @@ class ShowerProfiles(object):
         return seedpos
 
     def WriteOutRecordedTimes(self):
-        
+
         filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits'
 
         if self.options.notDSbar==True: filename+='-notDSbar'

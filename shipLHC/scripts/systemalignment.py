@@ -76,6 +76,7 @@ class SystemAlignment(object):
 
         correctedtimes = self.muAna.GetCorrectedTimes(hit, x=0, mode='aligned')
         tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex.x(), mode='aligned')
+        print(f'Len atimes, tof atimes: {len(correctedtimes)}, {len(tofcorrectedtimes)}')
         aligned_times={'left':{}, 'right':{}}
         tofaligned_times={'left':{}, 'right':{}}
 
@@ -90,6 +91,7 @@ class SystemAlignment(object):
             tofaligned_times[side][SiPM] = tofatime
 
         if any([len(aligned_times[i])==0 for i in ('left', 'right')]): return
+        if any([len(tofaligned_times[i])==0 for i in ('left', 'right')]): return
         averages = {side:(sum(aligned_times[side].values()) / len(aligned_times[side])) for side in aligned_times}
         fastest = {side:min(aligned_times[side].values()) for side in aligned_times}
         averagetime = 1/2 * sum(averages.values())

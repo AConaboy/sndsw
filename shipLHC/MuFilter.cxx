@@ -664,6 +664,7 @@ Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 		sum_signalspeeds += signalspeed;
 		++N;
 	}
+	std::cout << "N: " << to_string(N) <<std::endl;
 	if (N != 0) {return sum_signalspeeds/N;}
 	else {return 0.0;}
 }
@@ -697,7 +698,7 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 			continue;
 		}
 
-		SiPM_resolution = conf_floats["MuFilter/US_timeresolution"+fixed_ch];
+		SiPM_resolution = conf_floats["MuFilter/US_timeresolution_"+fixed_ch];
 		std::cout << fixed_ch << " : " << to_string(SiPM_resolution) << std::endl;
 
 		sum_sigmat_sq += std::pow(SiPM_resolution,2);

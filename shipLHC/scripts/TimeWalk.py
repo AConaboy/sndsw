@@ -123,16 +123,7 @@ class TimeWalk(ROOT.FairTask):
             self.muAna.AlignmentRun=self.AlignmentRun
 
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
-            ### Incase selection criteria distributions not made for the TWCorrectionRun
-            if not self.cutdists:
-                self.TWCorrectionRun=str(5408).zfill(6)
-                self.muAna.TWCorrectionRun=self.TWCorrectionRun
-                self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
-            if 'timingdiscriminant' in self.cutdists:
-                tdmin = self.cutdists['timingdiscriminant'].GetMean() - 3*self.cutdists['timingdiscriminant'].GetStdDev()
-                tdmax = self.cutdists['timingdiscriminant'].GetMean() + 3*self.cutdists['timingdiscriminant'].GetStdDev()
-                # print(f'td-min, td-max: {tdmin}, {tdmax}')
-
+            
             self.muAna.MakeAlignmentParameterDict(self.timealignment)
             self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
             self.muAna.MakeTWCorrectionDict(self.timealignment)
