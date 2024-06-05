@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns 
 import SndlhcGeo
+import subprocess
 sns.set_style("whitegrid")
 
 PDG_conv = {11: "e-", -11: "e+", 2212: "p", 211: "pi+", -211: "pi-", 1000060120: "C", 321: "K+", -321: "K-", 1000020040: "Ca", 13: "mu-", -13: "mu+"}
@@ -30,7 +31,7 @@ parser.add_argument('--nEvents', dest="nEvents",type = int,default=10)
 parser.add_argument('--Energy',dest="Energy",type = int,default=100)  
 parser.add_argument('--Merged',dest="merged",type = bool,default=True)  
 parser.add_argument("--genie",dest="genie",type=bool,default=False)
-
+parser.add_argument('--inputfile',dest="inputfile",type=str,default=None,help='GENIE input file for convert_script.C')
 parser.add_argument('-C', "--HTCondor", dest="HTCondor",action='store_true')
 
 # Set eos outpath
@@ -60,7 +61,7 @@ def EventLoop():
         start, end = 0, ch.GetEntries() 
     else: start, end = args.nStart, args.nStart + args.nEvents
     # for N in range(args.nStart, args.nStart + args.nEvents):
-    for N in range( start, end ):
+    for N in range(start, end):
         
         #ch.GetEvent(N)
         event = ch.GetEntry(N)
@@ -74,7 +75,6 @@ def EventLoop():
         if not len(us_data_general):
             for key in us_signal:
                 us_data_general[key] = us_signal[key]
-                #print(key, len(data_general[key]))
         for key in us_signal:
             us_data_general[key] += us_signal[key]
 
@@ -82,9 +82,9 @@ def EventLoop():
         if not len(scifi_data_general):
             for key in scifi_signal:
                 scifi_data_general[key] = scifi_signal[key]
-                #print(key, len(data_general[key]))
         for key in scifi_signal:
-            scifi_data_general[key] += scifi_signal[key]   
+            scifi_data_general[key] += scifi_signal[key]
+
     return us_data_general, scifi_data_general             
 
 def vis_info(wall_info):
@@ -130,14 +130,89 @@ def vis_info_parts(wall_info):
 def isVertical(detid):
     if floor(detid/100000)%10 == 1: return True
     else: return False
+
 def read_files(chain, eos, filepath, filename, file_num):
     for i in range(1, file_num + 1):
         chain.Add(eos + filepath + "/" + str(i) + "/" + filename)
 
+def run_convert_script(input_file, output_file):
+    cmd = f'root -l -q \'convert_script.C("{input_file}", "{output_file}")\\'
+    subprocess.call(cmd, shell=True)
+
+def read_convert_script_output(output_file):
+    data = {}
+    max_length = 0
+    with open(output_file, 'r', encoding='latin-1') as f:
+        for line in f:
+            line = line.strip()
+
+            if not line or not line[0].isdigit():
+                    continue
+
+            tokens = line.split()
+
+            event_number = int(tokens[0])
+            hit_id = int(tokens[1])
+            pdg = int(tokens[2])
+            first_mother = int(tokens[3])
+            name = tokens[4]
+            px = float(tokens[5])
+            py = float(tokens[6])
+            pz = float(tokens[7])
+            energy = float(tokens[8])
+            is_stable = bool(int(tokens[9]))
+            vx = float(tokens[10])
+            vy = float(tokens[11])
+            vz = float(tokens[12])
+
+            # Create a dictionary entry for each event number if it doesn't exist
+            if event_number not in data:
+                data[event_number] = []
+
+            # Append the particle information to the event entry
+            data[event_number].append({
+                'hit_id': hit_id,
+                'pdg': pdg,
+                'first_mother': first_mother,
+                'name': name,
+                'px': px,
+                'py': py,
+                'pz': pz,
+                'energy': energy,
+                'is_stable': is_stable,
+                'vx': vx,
+                'vy': vy,
+                'vz': vz
+            })
+
+            # Track the maximum length encountered
+            current_length = len(data[event_number])
+            if current_length > max_length:
+                max_length = current_length
+
+        # Fill in missing entries with None
+        for event_number in data:
+            while len(data[event_number]) < max_length:
+                data[event_number].append({
+                    'hit_id': None,
+                    'pdg': None,
+                    'first_mother': None,
+                    'name': None,
+                    'px': None,
+                    'py': None,
+                    'pz': None,
+                    'energy': None,
+                    'is_stable': None,
+                    'vx': None,
+                    'vy': None,
+                    'vz': None
+                })
+    return data
+
 def extract_us_signal(ch, N):
     signal_sum = 0
-    #us_points = {"Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
-    us_points = {"Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+    us_points = {"MotherID" : [], "Process": [], "TrackID" : [], "track_px": [], "track_py": [], "track_pz": [], "Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+
     for hit in ch.MuFilterPoint:   
 
         P = np.sqrt(hit.GetPx()**2 + hit.GetPy()**2 + hit.GetPz()**2)
@@ -145,22 +220,38 @@ def extract_us_signal(ch, N):
         pdg = hit.PdgCode()
         if pdg in [22, 111, 113, 2112]:
             continue
-        us_points["detectorID"].append(hit.GetDetectorID())
-        time = hit.GetTime()
-        # if time > 25. or time < 0.:
-        #     continue
+        
         signal_sum += hit.GetEnergyLoss()
+        us_points["detectorID"].append(hit.GetDetectorID())
+        us_points["TrackID"].append(hit.GetTrackID())
         us_points["px"].append(hit.GetPx())
         us_points["py"].append(hit.GetPy())
         us_points["pz"].append(hit.GetPz())
         us_points["time"].append(hit.GetTime())
         us_points["pdg_code"].append(hit.PdgCode())
-        #us_points["Energy"].append(E)
         us_points["Energy_loss"].append(hit.GetEnergyLoss())
         us_points["coordX"].append(hit.GetX())
         us_points["coordY"].append(hit.GetY())
         us_points["coordZ"].append(hit.GetZ())
         us_points["Eventnumber"].append(N)
+
+        trackID = hit.GetTrackID()
+        if trackID >= 0:
+            mctrack = ch.MCTrack[trackID]
+            mother_pdg = ch.MCTrack[ch.MCTrack[hit.GetTrackID()].GetMotherId()].GetPdgCode()
+            us_points["track_px"].append(mctrack.GetPx())
+            us_points["track_py"].append(mctrack.GetPy())
+            us_points["track_pz"].append(mctrack.GetPz())
+            us_points["MotherID"].append(mother_pdg)
+            us_points["Process"].append(mctrack.GetProcName())
+                    
+        elif trackID < 0:
+            us_points["track_px"].append(0)
+            us_points["track_py"].append(0)
+            us_points["track_pz"].append(0)
+            us_points["MotherID"].append(0)
+            us_points["Process"].append(0)
+
     return us_points
 
 def extract_scifi_signal(ch, N):
@@ -260,14 +351,28 @@ def MakeTChain():
 
     return ch, scifi, mufilter
 
-def SaveData(us_data, scifi_data):
+def SaveData(us_data, scifi_data, quark_data):
     scifi_df = pd.DataFrame(scifi_data)
     us_df = pd.DataFrame(us_data)
+    quark_df = pd.DataFrame(quark_data)
+
+    quark_df.to_csv(f"{eospath}data_quark.csv")
+    print(f'Quark csv written to: {eospath}data_quark.csv')
 
     scifi_df.to_csv(f"{eospath}data_scifi.csv")
     print(f'Scifi csv written to: {eospath}data_scifi.csv')
+
     us_df.to_csv(f"{eospath}data_us.csv")
     print(f'HCAL csv written to: {eospath}data_us.csv')
+
+if args.inputfile:
+    ch, scifi, mufilter = MakeTChain()
+    input_file = args.inputfile
+    output_file = "/afs/cern.ch/user/t/tismith/sndsw/macro/nu_genie/output"
+    run_convert_script(input_file, output_file)
+    converted_data = read_convert_script_output(output_file)
+    us_data, scifi_data = EventLoop()
+    SaveData(us_data, scifi_data, converted_data)
 
 if args.HTCondor:
     ch, scifi, mufilter = MakeTChain()
