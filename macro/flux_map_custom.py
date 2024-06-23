@@ -33,6 +33,8 @@ parser.add_argument('--Merged',dest="merged",type = bool,default=True)
 parser.add_argument("--genie",dest="genie",type=bool,default=False)
 parser.add_argument('--inputfile',dest="inputfile",type=str,default=None,help='GENIE input file for convert_script.C')
 parser.add_argument('-C', "--HTCondor", dest="HTCondor",action='store_true')
+parser.add_argument("--muonDIS", type=str, default=None)
+parser.add_argument("--muonPassing", type=str, default=None)
 
 # Set eos outpath
 eos_paths = {'tismith':'/eos/user/t/tismith/SWAN_projects/genie_ana_output/' , 'aconsnd':'/eos/user/a/aconsnd/SWAN_projects/Simulation/data/'} # can add Eduard
@@ -209,19 +211,17 @@ def read_convert_script_output(output_file):
                 })
     return data
 
+def GetInteractionWall(x, y, z):
+    nav = r.gGeoManager.GetCurrentNavigator()
+    node = nav.FindNode(x, y, z)
+    volume = node.GetVolume()
+
+    return volume.GetName()
+
 def extract_us_signal(ch, N):
-    signal_sum = 0
-    us_points = {"MotherID" : [], "Process": [], "TrackID" : [], "track_px": [], "track_py": [], "track_pz": [], "Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+    us_points = {"Wall": [], "start_pos" : [], "MotherID" : [], "Process": [], "TrackID" : [], "track_px": [], "track_py": [], "track_pz": [], "Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
 
     for hit in ch.MuFilterPoint:   
-
-        P = np.sqrt(hit.GetPx()**2 + hit.GetPy()**2 + hit.GetPz()**2)
-
-        pdg = hit.PdgCode()
-        if pdg in [22, 111, 113, 2112]:
-            continue
-        
-        signal_sum += hit.GetEnergyLoss()
         us_points["detectorID"].append(hit.GetDetectorID())
         us_points["TrackID"].append(hit.GetTrackID())
         us_points["px"].append(hit.GetPx())
@@ -235,6 +235,12 @@ def extract_us_signal(ch, N):
         us_points["coordZ"].append(hit.GetZ())
         us_points["Eventnumber"].append(N)
 
+    nav = r.gGeoManager.GetCurrentNavigator()
+    for x, y, z in zip(us_points["coordX"], us_points["coordY"], us_points["coordZ"]):
+        node = nav.FindNode(x, y, z)
+        volume = node.GetVolume()
+        us_points["Wall"].append(volume.GetName())
+
         trackID = hit.GetTrackID()
         if trackID >= 0:
             mctrack = ch.MCTrack[trackID]
@@ -244,6 +250,7 @@ def extract_us_signal(ch, N):
             us_points["track_pz"].append(mctrack.GetPz())
             us_points["MotherID"].append(mother_pdg)
             us_points["Process"].append(mctrack.GetProcName())
+            us_points["start_pos"].append(mctrack.GetStartZ())
                     
         elif trackID < 0:
             us_points["track_px"].append(0)
@@ -251,28 +258,32 @@ def extract_us_signal(ch, N):
             us_points["track_pz"].append(0)
             us_points["MotherID"].append(0)
             us_points["Process"].append(0)
+            us_points["start_pos"].append(0)
 
     return us_points
 
 def extract_scifi_signal(ch, N):
     signal_sum = 0
-    scifi_points = {"Eventnumber": [], "detectorID": [], "pdg_code": [], "Energy_loss": []}
+    scifi_points = {"Eventnumber": [], "time": [], "coordX": [], "coordY": [], "coordZ": [], "TrackID": [], "px": [], "py": [], "pz": [], "detectorID": [], "pdg_code": [], "Energy_loss": []}
     for hit in ch.ScifiPoint:   
         station = int(hit.GetDetectorID()/1000000)
         if station == 0:
             print(station)
-        P = np.sqrt(hit.GetPx()**2 + hit.GetPy()**2 + hit.GetPz()**2)
-        pdg = hit.PdgCode()
-        if pdg in [22, 111, 113, 2112]:
-            continue
-        time = hit.GetTime()
-        if time > 25 or time < 0:
-            continue
+
         signal_sum += hit.GetEnergyLoss() 
         scifi_points["detectorID"].append(hit.GetDetectorID())
+        scifi_points["TrackID"].append(hit.GetTrackID())
         scifi_points["pdg_code"].append(hit.PdgCode())
         scifi_points["Eventnumber"].append(N)
         scifi_points["Energy_loss"].append(hit.GetEnergyLoss())
+        scifi_points["px"].append(hit.GetPx())
+        scifi_points["py"].append(hit.GetPy())
+        scifi_points["pz"].append(hit.GetPz())
+        scifi_points["time"].append(hit.GetTime())
+        scifi_points["coordX"].append(hit.GetX())
+        scifi_points["coordY"].append(hit.GetY())
+        scifi_points["coordZ"].append(hit.GetZ())
+
     return scifi_points      
 
 def signal_relation(signal_data_init, energy):
@@ -307,43 +318,66 @@ def reco_resol(Data, energy):
     ax.set_title(f"Pion energy {energy} GeV")
     fig.savefig(f"reco_{energy}.pdf")
 
+def getMuonData(ntuple):
+
+    Muon_points = {"run": [], "event": [], "id": [], "generation": [], "E": [], "x": [], "y": [], "px": [], "py": [], "t": [], "z": [], "pz": []}
+
+    branches = ntuple.GetListOfBranches()
+    for branch in branches:
+        branch_name = branch.GetName()
+        if branch_name != "W":
+            Muon_points[branch_name] = []
+
+            for entry in range(ntuple.GetEntries()):
+                ntuple.GetEntry(entry)
+                value = ntuple.GetLeaf(branch_name).GetValue()
+                Muon_points[branch_name].append(value)
+
+    df_Muon_points = pd.DataFrame(Muon_points)
+
+    return df_Muon_points
+
+def getMuonDIS(ch):
+    muonDIS_points = {"Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+    
+    for event in ch:
+        for hit in event.MuFilterPoint:   
+
+            muonDIS_points["detectorID"].append(hit.GetDetectorID())
+            muonDIS_points["px"].append(hit.GetPx())
+            muonDIS_points["py"].append(hit.GetPy())
+            muonDIS_points["pz"].append(hit.GetPz())
+            muonDIS_points["time"].append(hit.GetTime())
+            muonDIS_points["pdg_code"].append(hit.PdgCode())
+            muonDIS_points["Energy_loss"].append(hit.GetEnergyLoss())
+            muonDIS_points["coordX"].append(hit.GetX())
+            muonDIS_points["coordY"].append(hit.GetY())
+            muonDIS_points["coordZ"].append(hit.GetZ())
+            muonDIS_points["Eventnumber"].append(event.GetEntries())
+    
+    MuonDIS = pd.DataFrame(muonDIS_points)
+    return MuonDIS
+
 def MakeTChain():
 
-    f = r.TFile.Open(args.outputfile, 'recreate')
-    h = {}
-    f.cd()
+    # f = r.TFile.Open(args.outputfile, 'recreate')
+    # f.cd()
     ch = r.TChain('cbmsim')
     eos = "root://eosuser.cern.ch/"
-    energy = args.Energy
-    genie = args.genie
-    if not genie:
-        if not args.merged:
-            if energy != 300:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi+/"
-                fileName = "sndLHC.PG_211-TGeant4.root"
-            else:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi-/"
-                fileName = "sndLHC.PG_-211-TGeant4.root"
-            # filename = "sndLHC.PG_-211-TGeant4.root"
-            path = filepath
-            basePath = sorted(Path(path).glob(f'**/{fileName}'))
-            print("{} files to read in {}".format(len(basePath), path))
-        else:
-            if energy != 300:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi+/"
-                fileName = "merge.root"
-            else:
-                filepath = f"/eos/user/e/ekhaliko/Documents/SND_Data/test_{energy}GeV_n10k_aug2023_pi-/"
-                filepath = "/eos/user/e/ekhaliko/Documents/SND_Data/test_300GeV_n100k_aug2023_pi-_new"
-                fileName = "merge.root"        
-            path = filepath
-            basePath = sorted(Path(path).glob(f'{fileName}'))
-            print("{} files to read in {}".format(len(basePath), path))
+    basePath = []
+    if not args.genie:
+        pass
     else:
-        #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volMuFilter_20fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
-        basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndLHC.Genie-TGeant4.root"]
+        if args.inputfile:
+            basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/2/sndLHC.Genie-TGeant4.root"]
+            #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndlhc_+volTarget_0.781e16_SNDG18_02a_01_000.0.ghep.root"]
+        else:
+            for i in range(1, 8):  # Loop over directories 
+                file_path = f"/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/{i}/sndLHC.Genie-TGeant4.root"
+                if os.path.exists(file_path):
+                    basePath.append(file_path)
+
     for base in basePath:
-        # print(base)
         ch.Add(str(base))    
 
     snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V0_2022.root")
@@ -365,17 +399,49 @@ def SaveData(us_data, scifi_data, quark_data):
     us_df.to_csv(f"{eospath}data_us.csv")
     print(f'HCAL csv written to: {eospath}data_us.csv')
 
-if args.inputfile:
+if args.genie == True:
+    r.FairTask
     ch, scifi, mufilter = MakeTChain()
-    input_file = args.inputfile
     output_file = "/afs/cern.ch/user/t/tismith/sndsw/macro/nu_genie/output"
-    run_convert_script(input_file, output_file)
+    if args.inputfile:
+        input_file = args.inputfile
+        run_convert_script(input_file, output_file)
+    else:
+        run_convert_script(ch, output_file)
     converted_data = read_convert_script_output(output_file)
     us_data, scifi_data = EventLoop()
     SaveData(us_data, scifi_data, converted_data)
 
 if args.HTCondor:
     ch, scifi, mufilter = MakeTChain()
-    us_data, scifi_data = EventLoop()
+    us_signal, scifi_signal = GetData(ch, N)
     SaveData(us_data, scifi_data)
+
+#get data from passing muon file
+if args.muonPassing:
+    muonfile = r.TFile.Open(args.muonPassing, "READ")
+    #file = ROOT.TFile.Open("root://eospublic.cern.ch//eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_up/version1/unit30_Nm.root")
+
+    #nt;2 = current cycle, nt;1 = backup cycle
+    ntuple = muonfile.Get("nt;2")
+
+    df_PassingMuons = getMuonData(ntuple)
+
+    df_PassingMuons.to_csv(f"{eospath}PassingMuons.csv")
+    print(f'Passing Muons csv written to: {eospath}PassingMuons.csv')
+
+    DISfile.Close()
+
+
+if args.muonDIS:
+    #path: /eos/experiment/sndlhc/users/dancc/MuonDIS/ecut1.0_z-7_2.5m_Ioni_latelateFLUKA/muonDis_201/1/sndLHC.muonDIS-TGeant4-muonDis_201.root
+    
+    ch = r.TChain('cbmsim')
+    ch.Add(str(args.muonDIS))
+
+    muonDIS = getMuonDIS(ch)
+
+    muonDIS.to_csv(f"{eospath}MuonDIS.csv")
+    print(f'Muon DIS csv written to: {eospath}MuonDIS.csv')
+
 
