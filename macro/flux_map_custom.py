@@ -33,8 +33,12 @@ parser.add_argument('--Merged',dest="merged",type = bool,default=True)
 parser.add_argument("--genie",dest="genie",type=bool,default=False)
 parser.add_argument('--inputfile',dest="inputfile",type=str,default=None,help='GENIE input file for convert_script.C')
 parser.add_argument('-C', "--HTCondor", dest="HTCondor",action='store_true')
-parser.add_argument("--muonDIS", type=str, default=None)
-parser.add_argument("--muonPassing", type=str, default=None)
+# parser.add_argument("--muonDIS", type=str, default=None)
+parser.add_argument('--muonDIS', action='store_true', help='flag to indicate muon DIS')
+parser.add_argument('--muonPassing', action='store_true', help='flag to indicate passing muons')
+# parser.add_argument("--muonPassing", type=str, default=None)
+parser.add_argument('--neutralhadrons', action='store_true', help='flag to indicate neutral hadrons')
+# parser.add_argument("--neutralhadrons", type=str, default=None)
 
 # Set eos outpath
 eos_paths = {'tismith':'/eos/user/t/tismith/SWAN_projects/genie_ana_output/' , 'aconsnd':'/eos/user/a/aconsnd/SWAN_projects/Simulation/data/'} # can add Eduard
@@ -67,7 +71,7 @@ def EventLoop():
         
         #ch.GetEvent(N)
         event = ch.GetEntry(N)
-        if N % 1000 == 0:
+        if N % 100 == 0:
             print(f"Event {N}")
         
         # Get data for us and scifi
@@ -219,7 +223,9 @@ def GetInteractionWall(x, y, z):
     return volume.GetName()
 
 def extract_us_signal(ch, N):
-    us_points = {"Wall": [], "start_pos" : [], "MotherID" : [], "Process": [], "TrackID" : [], "track_px": [], "track_py": [], "track_pz": [], "Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+    us_points = {"Wall": [], "start_pos" : [], "MotherID" : [], "Process": [], "TrackID" : [], "track_px": [], 
+    "track_py": [], "track_pz": [], "Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], 
+    "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": [], "w": [], "rapidity": []}
 
     for hit in ch.MuFilterPoint:   
         us_points["detectorID"].append(hit.GetDetectorID())
@@ -235,12 +241,6 @@ def extract_us_signal(ch, N):
         us_points["coordZ"].append(hit.GetZ())
         us_points["Eventnumber"].append(N)
 
-    nav = r.gGeoManager.GetCurrentNavigator()
-    for x, y, z in zip(us_points["coordX"], us_points["coordY"], us_points["coordZ"]):
-        node = nav.FindNode(x, y, z)
-        volume = node.GetVolume()
-        us_points["Wall"].append(volume.GetName())
-
         trackID = hit.GetTrackID()
         if trackID >= 0:
             mctrack = ch.MCTrack[trackID]
@@ -251,6 +251,8 @@ def extract_us_signal(ch, N):
             us_points["MotherID"].append(mother_pdg)
             us_points["Process"].append(mctrack.GetProcName())
             us_points["start_pos"].append(mctrack.GetStartZ())
+            us_points["w"].append(mctrack.GetPx())
+            us_points["rapidity"].append(mctrack.GetPx())
                     
         elif trackID < 0:
             us_points["track_px"].append(0)
@@ -259,6 +261,12 @@ def extract_us_signal(ch, N):
             us_points["MotherID"].append(0)
             us_points["Process"].append(0)
             us_points["start_pos"].append(0)
+
+    nav = r.gGeoManager.GetCurrentNavigator()
+    for x, y, z in zip(us_points["coordX"], us_points["coordY"], us_points["coordZ"]):
+        node = nav.FindNode(x, y, z)
+        volume = node.GetVolume()
+        us_points["Wall"].append(volume.GetName())
 
     return us_points
 
@@ -320,7 +328,7 @@ def reco_resol(Data, energy):
 
 def getMuonData(ntuple):
 
-    Muon_points = {"run": [], "event": [], "id": [], "generation": [], "E": [], "x": [], "y": [], "px": [], "py": [], "t": [], "z": [], "pz": []}
+    Muon_points = {"run": [], "event": [], "id": [], "generation": [], "E": [], "w": [], "x": [], "y": [], "px": [], "py": [], "t": [], "z": [], "pz": []}
 
     branches = ntuple.GetListOfBranches()
     for branch in branches:
@@ -337,26 +345,31 @@ def getMuonData(ntuple):
 
     return df_Muon_points
 
-def getMuonDIS(ch):
-    muonDIS_points = {"Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
-    
-    for event in ch:
-        for hit in event.MuFilterPoint:   
+def get_background_data(ch):
+    data_points = {"Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
 
-            muonDIS_points["detectorID"].append(hit.GetDetectorID())
-            muonDIS_points["px"].append(hit.GetPx())
-            muonDIS_points["py"].append(hit.GetPy())
-            muonDIS_points["pz"].append(hit.GetPz())
-            muonDIS_points["time"].append(hit.GetTime())
-            muonDIS_points["pdg_code"].append(hit.PdgCode())
-            muonDIS_points["Energy_loss"].append(hit.GetEnergyLoss())
-            muonDIS_points["coordX"].append(hit.GetX())
-            muonDIS_points["coordY"].append(hit.GetY())
-            muonDIS_points["coordZ"].append(hit.GetZ())
-            muonDIS_points["Eventnumber"].append(event.GetEntries())
+    start, end = 0, ch.GetEntries() 
+    for N in range(start, end):
+        event = ch.GetEntry(N)
+        if N % 1000 == 0:
+            print(f"Event {N}")
+
+    #for event in ch:
+        for hit in ch.MuFilterPoint:    
+            data_points["Eventnumber"].append(N)
+            data_points["detectorID"].append(hit.GetDetectorID())
+            data_points["px"].append(hit.GetPx())
+            data_points["py"].append(hit.GetPy())
+            data_points["pz"].append(hit.GetPz())
+            data_points["time"].append(hit.GetTime())
+            data_points["pdg_code"].append(hit.PdgCode())
+            data_points["Energy_loss"].append(hit.GetEnergyLoss())
+            data_points["coordX"].append(hit.GetX())
+            data_points["coordY"].append(hit.GetY())
+            data_points["coordZ"].append(hit.GetZ())
     
-    MuonDIS = pd.DataFrame(muonDIS_points)
-    return MuonDIS
+    data = pd.DataFrame(data_points)
+    return data
 
 def MakeTChain():
 
@@ -365,41 +378,74 @@ def MakeTChain():
     ch = r.TChain('cbmsim')
     eos = "root://eosuser.cern.ch/"
     basePath = []
-    if not args.genie:
-        pass
-    else:
+    if args.genie:
         if args.inputfile:
             basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/2/sndLHC.Genie-TGeant4.root"]
             #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndlhc_+volTarget_0.781e16_SNDG18_02a_01_000.0.ghep.root"]
         else:
-            for i in range(1, 8):  # Loop over directories 
+            for i in range(1, 3):  # Loop over directories 
                 file_path = f"/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/{i}/sndLHC.Genie-TGeant4.root"
                 if os.path.exists(file_path):
                     basePath.append(file_path)
 
-    for base in basePath:
-        ch.Add(str(base))    
+        for base in basePath:
+            ch.Add(str(base))    
 
-    snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V0_2022.root")
-    scifi, mufilter = snd_geo.modules['Scifi'], snd_geo.modules['MuFilter']
+        snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V0_2022.root")
+        scifi, mufilter = snd_geo.modules['Scifi'], snd_geo.modules['MuFilter']
 
-    return ch, scifi, mufilter
+        return ch, scifi, mufilter
+
+    else:
+        if args.muonDIS:
+            for i in range(1, 100):  # Loop over directories 
+                file_path = f"/eos/experiment/sndlhc/users/dancc/MuonDIS/ecut1.0_z-7_2.5m_Ioni_latelateFLUKA/muonDis_201/{i}/sndLHC.muonDIS-TGeant4-muonDis_201.root"
+                if os.path.exists(file_path):
+                    basePath.append(file_path)
+            
+        if args.muonPassing:
+            for i in range(1, 27):
+                file_path = f"/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muons_up/scoring_2.5/7135377/{i}/sndLHC.Ntuple-TGeant4.root"
+                 # file_path = "/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muons_up/scoring_2.5/7135377/1/sndLHC.Ntuple-TGeant4.root"
+                basePath.append(file_path)
+
+        if args.neutralhadrons:
+            for j in (1, 10):
+                file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_5_10/Ntuples/{j}/sndLHC.PG_2112-TGeant4_20240126.root"
+                basePath.append(file_path)
+
+                for i in range(10, 90):
+                    file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_{i}_{i+10}/Ntuples/{j}/sndLHC.PG_2112-TGeant4_20240126.root"
+                    if os.path.exists(file_path):
+                        basePath.append(file_path)
+
+                file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_100_150/Ntuples/{j}/sndLHC.PG_2112-TGeant4.root"
+                basePath.append(file_path)
+
+                file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_150_200/Ntuples/{j}/sndLHC.PG_2112-TGeant4.root"
+                basePath.append(file_path)
+
+        for base in basePath:
+            ch.Add(str(base))    
+
+        return ch
 
 def SaveData(us_data, scifi_data, quark_data):
     scifi_df = pd.DataFrame(scifi_data)
     us_df = pd.DataFrame(us_data)
     quark_df = pd.DataFrame(quark_data)
 
-    quark_df.to_csv(f"{eospath}data_quark.csv")
-    print(f'Quark csv written to: {eospath}data_quark.csv')
+    quark_df.to_csv(f"{eospath}data_quark_3.csv")
+    print(f'Quark csv written to: {eospath}data_quark_3.csv')
 
-    scifi_df.to_csv(f"{eospath}data_scifi.csv")
-    print(f'Scifi csv written to: {eospath}data_scifi.csv')
+    scifi_df.to_csv(f"{eospath}data_scifi_3.csv")
+    print(f'Scifi csv written to: {eospath}data_scifi_3.csv')
 
-    us_df.to_csv(f"{eospath}data_us.csv")
-    print(f'HCAL csv written to: {eospath}data_us.csv')
+    us_df.to_csv(f"{eospath}data_us_3.csv")
+    print(f'HCAL csv written to: {eospath}data_us_3.csv')
 
-if args.genie == True:
+#get numu data from file
+if args.genie:
     r.FairTask
     ch, scifi, mufilter = MakeTChain()
     output_file = "/afs/cern.ch/user/t/tismith/sndsw/macro/nu_genie/output"
@@ -412,36 +458,34 @@ if args.genie == True:
     us_data, scifi_data = EventLoop()
     SaveData(us_data, scifi_data, converted_data)
 
+#get data from background file
+if args.muonPassing or args.muonDIS or args.neutralhadrons:
+    ch = MakeTChain()
+    data = get_background_data(ch)
+    filename = "PassingMuons_new.csv2"
+    # filename = "MuonDIS_100.csv"
+    # filename = "NeutralHadrons_largerdataset.csv"
+
+    data.to_csv(f"{eospath}{filename}")
+    print(f'csv written to: {eospath}{filename}')
+
+    # muonfile = r.TFile.Open(args.muonPassing, "READ")
+    #file = ROOT.TFile.Open("root://eospublic.cern.ch//eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_up/version1/unit30_Nm.root")
+
+    #nt;2 = current cycle, nt;1 = backup cycle
+    # ntuple = muonfile.Get("nt;2")
+    # ntuple = muonfile.Get("nt;1")
+
+    # df_PassingMuons = getMuonData(ntuple)
+
+    # df_PassingMuons.to_csv(f"{eospath}PassingMuons_otherfile.csv")
+    # print(f'Passing Muons csv written to: {eospath}PassingMuons_otherfile.csv')
+
+    # DISfile.Close()
+
 if args.HTCondor:
     ch, scifi, mufilter = MakeTChain()
     us_signal, scifi_signal = GetData(ch, N)
     SaveData(us_data, scifi_data)
-
-#get data from passing muon file
-if args.muonPassing:
-    muonfile = r.TFile.Open(args.muonPassing, "READ")
-    #file = ROOT.TFile.Open("root://eospublic.cern.ch//eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_up/version1/unit30_Nm.root")
-
-    #nt;2 = current cycle, nt;1 = backup cycle
-    ntuple = muonfile.Get("nt;2")
-
-    df_PassingMuons = getMuonData(ntuple)
-
-    df_PassingMuons.to_csv(f"{eospath}PassingMuons.csv")
-    print(f'Passing Muons csv written to: {eospath}PassingMuons.csv')
-
-    DISfile.Close()
-
-
-if args.muonDIS:
-    #path: /eos/experiment/sndlhc/users/dancc/MuonDIS/ecut1.0_z-7_2.5m_Ioni_latelateFLUKA/muonDis_201/1/sndLHC.muonDIS-TGeant4-muonDis_201.root
-    
-    ch = r.TChain('cbmsim')
-    ch.Add(str(args.muonDIS))
-
-    muonDIS = getMuonDIS(ch)
-
-    muonDIS.to_csv(f"{eospath}MuonDIS.csv")
-    print(f'Muon DIS csv written to: {eospath}MuonDIS.csv')
 
 
