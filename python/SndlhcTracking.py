@@ -109,6 +109,7 @@ class Tracking(ROOT.FairTask):
                 # rc==-2: not converged, rc==-1 not consistent
                 print('trackfit failed',rc,aTrack)
            else:
+               #  print('track fitted apparently')
                 i_muon += 1
                 if x=='DS':   rc.SetUniqueID(3)
                 if x=='Scifi': rc.SetUniqueID(1)
@@ -184,10 +185,10 @@ class Tracking(ROOT.FairTask):
     for p in clusPerStation:
          if clusPerStation[p]>self.DSnHits: return trackCandidates
 
-# require one plane with 1 cluster as seed
+   # require one plane with 1 cluster as seed
 
-# proj = 0, horizontal, max 3 planes
-# proj = 1, vertex,     max 4 planes
+   # proj = 0, horizontal, max 3 planes
+   # proj = 1, vertex,     max 4 planes
     seed = -1
     combinations = {}
     hitlist = {}

@@ -22,7 +22,7 @@ parser.add_argument("-M", "--online", dest="online", help="online mode",default=
 parser.add_argument("--batch", dest="batch", help="batch mode",default=False,action='store_true')
 parser.add_argument("--server", dest="server", help="xrootd server",default=os.environ["EOSSHIP"])
 parser.add_argument("-r", "--runNumber", dest="runNumber", help="run number", type=int,default=-1)
-parser.add_argument('-p', '--path', dest='path', help='path', type=str)
+parser.add_argument('-p', '--path', dest='path', help='path', default='./', type=str)
 parser.add_argument("-P", "--partition", dest="partition", help="partition of data", type=int,required=False,default=-1)
 parser.add_argument("-d", "--debug", dest="debug", help="debug", type=int, default=False)
 parser.add_argument("-cpp", "--convRawCPP", action='store_true', dest="FairTask_convRaw", help="convert raw data using ConvRawData FairTask", default=False)
@@ -61,7 +61,8 @@ parser.add_argument('--numusignalevents', dest='numusignalevents', action='store
 parser.add_argument('--signalpartitions', dest='signalpartitions', required=False)
 parser.add_argument('--numuStudy', dest='numuStudy', action='store_true')
 parser.add_argument('--simulation', dest='simulation', action='store_true')
-parser.add_argument('--simEngine', dest='simEngine', type=str)
+parser.add_argument('--simMode', dest='simMode', type=str)
+parser.add_argument('--simTest', dest='simTest', action='store_true')
 
 parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
 parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
@@ -84,7 +85,7 @@ options = parser.parse_args()
 
 # if no geofile given, use defaults according to run number
 
-if options.runNumber < 0  and not options.geoFile and not options.numusignalevents: 
+if options.runNumber < 0 and not options.geoFile and not options.numusignalevents: 
     print('No run number given and no geoFile. Do not know what to do. Exit.')
     exit()
 if not options.geoFile:
@@ -148,7 +149,6 @@ if options.numusignalevents:
     numu = numusignals(options)
     numu.InvestigateSignalEvents()
 
-
 if options.Task=='TimeWalk':
     if not options.mode:
         print('=='*20+f'\nNo mode given for time walk task. Give mode as zeroth, tof or tw.\n'+'=='*20)
@@ -156,24 +156,17 @@ if options.Task=='TimeWalk':
     if options.numusignalevents: options.mode='numusignalevents'
     monitorTasks['TimeWalk'] = TimeWalk.TimeWalk(options, M) 
 
-# else:
-if not options.auto:   # default online/offline mode
-    # trackIDdict={'DS':3, 'Scifi':1}
-    start, nEvents=options.nStart, options.nEvents
-    deciles=[i/10 for i in range(11)]
-    for n in range(start,start+nEvents):
-        event = M.GetEvent(n)
+start, nEvents=options.nStart, options.nEvents
+deciles=[i/10 for i in range(11)]
+for n in range(start,start+nEvents):
+    event = M.GetEvent(n)
 
-        if ((n-start)/nEvents) in deciles:
-            progstr=f'Progress: {n}/{start+nEvents}, {int(100*(n-start)/nEvents)}%'
-            print('='*len(progstr)+'\n')
-            print(progstr, '\n')
+    if ((n-start)/nEvents) in deciles:
+        progstr=f'Progress: {n}/{start+nEvents}, {int(100*(n-start)/nEvents)}%'
+        print('='*len(progstr)+'\n')
+        print(progstr, '\n')
 
-        for m in monitorTasks:
-            monitorTasks[m].ExecuteEvent(M.eventTree)
-    if 'SelectionCriteria' in monitorTasks:
-        if not options.debug: 
-            monitorTasks['SelectionCriteria'].WriteOutHistograms()
-            if options.WriteOutTrackInfo: monitorTasks['SelectionCriteria'].SaveTrackInfos()
-    if 'TimeWalk' in monitorTasks:
-        if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()
+    for m in monitorTasks:
+        monitorTasks[m].ExecuteEvent(M.eventTree)
+if 'TimeWalk' in monitorTasks:
+    if not options.debug: monitorTasks['TimeWalk'].WriteOutHistograms()

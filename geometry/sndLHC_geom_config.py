@@ -327,7 +327,7 @@ with ConfigRegistry.register_config("basic") as c:
         ### Add these files into /eos/experiment/sndlhc/calibration/
         timing_calibration_files = {'timeresolution':'/afs/cern.ch/work/a/aconsnd/Timing-physics2022/Results/run005408/run005408_timeresolution_corrected.json',
                                 'signalspeed':'/afs/cern.ch/work/a/aconsnd/Timing-physics2022/Results/run005408/run005408_cscint_corrected.json',
-                                'timingxt':'/afs/cern.ch/work/a/aconsnd/Timing-physics2022/TimingCovariance/run005408/timingcovariance.json'
+                                'timingxt':'/afs/cern.ch/work/a/aconsnd/Timing-physics2022/TimingCovariance/run005408/run005408_truncatedcovariance.json'
                                 }
 
         for idx,param in enumerate(timing_calibration_files):

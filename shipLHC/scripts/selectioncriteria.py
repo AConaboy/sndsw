@@ -35,6 +35,9 @@ class MuonSelectionCriteria(object):
         self.freq=160.316E6
         self.TDC2ns=1E9/self.freq
 
+        self.MuFilter=tw.MuFilter
+        self.Scifi=tw.Scifi
+
         self.hists=tw.hists
 
         self.histtypes=['slopes', 'dy', 'nSiPMs']
@@ -45,7 +48,7 @@ class MuonSelectionCriteria(object):
         
         slopetitle = f'Track slopes;slope x [rad];slope y [rad]'
         self.hists[f'slopes'] = ROOT.TH2F(f'slopes',slopetitle, 300, -1.5, 1.5, 300, -1.5, 1.5)        
-        
+
         slopetitle = f'Number of fired DS horizontal bars;Fired DS horizontal bars;Counts'
         self.hists[f'firedDSHbars'] = ROOT.TH1I(f'firedDSHbars',slopetitle,10, 0, 9)
 
@@ -106,7 +109,7 @@ class MuonSelectionCriteria(object):
         self.hists['NPlanes']=ROOT.TH1F('NPlanes', NPlanestitle, 10, 0., 1.)
 
         NRecoTrackstitle='Number of tracks reconstructed in Scifi and DS;N tracks [dimensionless];Counts'
-        self.hists['NRecoTracks']=ROOT.TH1F('NRecoTracks', NRecoTrackstitle, 5, 0, 5)        
+        self.hists['NRecoTracks']=ROOT.TH1F('NRecoTracks', NRecoTrackstitle, 5, 0, 5)
 
         for criterion in ('OneHitPerSystem', 'Atleast2planeswith1scintillator', None):
             chi2xypredtitle='#splitline{Fitted DS track #chi^{2}_{#nu}# correlated with track xy position}{evaluated at DS '+str(options.chi2xpred_zpos+1)+'};x [cm];y [cm];DS track #chi^{2}_{#nu}#, [dimensionless]'
@@ -114,11 +117,19 @@ class MuonSelectionCriteria(object):
             else: name='chi2xypred'
             self.hists[name]=ROOT.TH3F(name, chi2xypredtitle, 100, -90, 10, 80, 0, 80, 400, 0, 400)
 
-        self.hists['reft']=ROOT.TH1F('reft','Average of fired DS horizontal SiPMs;DS horizontal average [ns];Counts', 200, 0, 50)
+        # if self.referencesystem==3:
+        #     self.hists['reft']=ROOT.TH1F('reft','Average of fired DS horizontal SiPMs;DS horizontal average [ns];Counts', 200, 0, 50)
+        # if self.referencesystem==3:
+        #     self.hists['reft']=ROOT.TH1F('reft','Average of fired DS horizontal SiPMs;DS horizontal average [ns];Counts', 200, 0, 50)            
 
         for i in (3,2):
             name=f'delta{i}{i-1}'
             title='Time difference between horizontal SiPMs in DS horizontal plane '+str(i)+' and '+str(i-1)+';DS'+str(i)+' - DS'+str(i-1)+' [ns]; Counts'
+            self.hists[name]=ROOT.TH1F(name, title, 80, -10, 10)
+
+        for st in range(5):
+            name=f'scifi-delta{st+1}{st}'
+            title='Time difference between average time measured in Scifi plane '+str(st+1)+' and '+str(st)+';#Delta(station' +str(st+1)+','+str(st)+') [ns];Counts'
             self.hists[name]=ROOT.TH1F(name, title, 80, -10, 10)
 
         for subsystem in (1,2):
@@ -219,17 +230,21 @@ class MuonSelectionCriteria(object):
         Nfired=self.muAna.OneHitPerSystem(hits, tmp, Nfired=True)
         hists['NPlanes'].Fill(Nfired)        
 
-    def FillHists(self, hits):
+    def FillHists(self, hits, scifi_hits):
         
-        # self.redchi2hists(fitStatus)        
+        # self.redchi2hists(fitStatus)
+       
 
-        if self.options.debug:
+        if self.options.debug and self.tw.hasTrack:
             self.FillChannelRateHists()
     
             # self.Fillchi2xy(tmp)
 
         # if self.cuts['OneHitPerSystem']:
-        self.FillTimingDiscriminantHists(hits)
+        if self.tw.hasTrack:
+            self.FillTimingDiscriminantHists(hits)
+            self.Fillyresidual(hits)
+            self.FilldeltaDSH(hits)            
         
         # Both of these methods loop through the hits
         # self.FillPlaneMultiplicity(hits)
@@ -240,11 +255,8 @@ class MuonSelectionCriteria(object):
         
         # Loops through hits
         self.FillnSiPMs(hits)
-        
-        # Loops through hits
-        self.Fillyresidual(hits)
-        
-        self.FilldeltaDSH(hits)
+
+        self.FilldeltaSF(scifi_hits)
         
         # Loops through hits, requires at least 6 SiPMs per side in Veto and 4 large SiPMs per side in US
         # self.FillAverageBarTime(hits)
@@ -457,6 +469,10 @@ class MuonSelectionCriteria(object):
         if not res: return
         [self.hists[i].Fill(res[i]) for i in res]
 
+    def FilldeltaSF(self, scifihits):
+        res=self.muAna.GetScifiAverageTime(self.Scifi, scifihits, 'deltastations')
+        [self.hists[i].Fill(res[i]) for i in res]
+
     def FillScifiDSresidual(self):
         scifi_track=self.M.Reco_MuonTracks[1]
 
@@ -494,9 +510,15 @@ class MuonSelectionCriteria(object):
                 if self.OneHitPerUS: self.hists[f'channelhitrate-{self.subsystemdict[s]}-1USb'].Fill(channel)
                 if self.OneHitPerDS: self.hists[f'channelhitrate-{self.subsystemdict[s]}-1DSb'].Fill(channel)
                 self.hists[f'channelhitrate-{self.subsystemdict[s]}'].Fill(channel)
-                td=self.GetTimingDiscriminant()
-                if not self.TimingDiscriminantCut(td): self.hists[f'channelhitrate-{self.subsystemdict[s]}-tdcut'].Fill(channel)
-                if not self.yresidual3(detID): self.hists[f'channelhitrate-{self.subsystemdict[s]}-dycut'].Fill(channel)
+
+                if self.tw.hasTrack:
+
+                    td=self.muAna.GetTimingDiscriminant()
+                    if not self.TimingDiscriminantCut(td):
+                        self.hists[f'channelhitrate-{self.subsystemdict[s]}-tdcut'].Fill(channel)
+
+                    if not self.yresidual3(detID): 
+                        self.hists[f'channelhitrate-{self.subsystemdict[s]}-dycut'].Fill(channel)
 
     def TimingDiscriminantCut(self, td):
         timingalignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)
@@ -514,10 +536,10 @@ class MuonSelectionCriteria(object):
 
     def WriteOutHistograms(self):
 
-        outpath=f'{self.outpath}splitfiles/run{self.runNr}/SelectionCriteria/'
+        outpath=f'{self.outpath}splitfiles/run{self.runNr}/selectioncriteria/'
         path_obj=Path(outpath)
         path_obj.mkdir(parents=True, exist_ok=True)        
-        outfile=f'SelectionCriteria_{self.options.nStart}.root'
+        outfile=f'selectioncriteria_{self.options.nStart}.root'
         f=ROOT.TFile.Open(outpath+outfile, 'recreate')
         
         additionalkeys=['averagetime', 'DSxvScifix']

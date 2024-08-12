@@ -631,12 +631,11 @@ Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t ra
 
 Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 {
-	Int_t nSiPMs = GetnSiPMs(detID);
 	Int_t N=0;
-	Float_t sum_signalspeeds, signalspeed;
+	Float_t sum_signalspeeds=0, signalspeed=0;
 	TString fixed_ch;
 
-	Int_t start, end;
+	Int_t start=0, end=0;
 	if (side=="left") {
 		start=0;
 		end=8;
@@ -657,22 +656,22 @@ Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 		// Get signal speed for SiPM i
 		fixed_ch = to_string(detID)+"_"+to_string(i);
 		signalspeed = conf_floats["MuFilter/US_signalspeed_"+fixed_ch]; 
-		std::cout << fixed_ch << " : " << to_string(signalspeed) << std::endl;
+		// std::cout << fixed_ch << " : " << to_string(signalspeed) << std::endl;
 		sum_signalspeeds += signalspeed;
 		++N;
 	}
-	std::cout << "N: " << to_string(N) <<std::endl;
+	// std::cout << "N: " << to_string(N) <<std::endl;
 	if (N != 0) {return sum_signalspeeds/N;}
 	else {return 0.0;}
 }
 
 Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 {
-	Float_t sum_sigmat_sq, sum_covariance, SiPM_resolution, xt;
-	Int_t N;
+	Float_t sum_sigmat_sq=0, sum_covariance=0, SiPM_resolution=0, xt=0, result=0;
+	Int_t N=0;
 	TString fixed_ch;
 
-	Int_t start, end;
+	Int_t start=0, end=0;
 	if (side=="left") {
 		start=0;
 		end=8;
@@ -696,7 +695,7 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 		}
 
 		SiPM_resolution = conf_floats["MuFilter/US_timeresolution_"+fixed_ch];
-		std::cout << fixed_ch << " : " << to_string(SiPM_resolution) << std::endl;
+		// std::cout << fixed_ch << " : " << to_string(SiPM_resolution) << std::endl;
 
 		sum_sigmat_sq += std::pow(SiPM_resolution,2);
 
@@ -718,7 +717,7 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 		N++;
 	}
 
-	Float_t result=0;
+	// Float_t result=0;
 	if (N==0) {return result;}
 	else {
 		result = 1/std::pow(N,2) * ( sum_sigmat_sq + sum_covariance );

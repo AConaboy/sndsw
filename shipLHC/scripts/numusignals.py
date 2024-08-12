@@ -176,7 +176,7 @@ class Numusignaleventtiming(object):
         for runNr in runs:
             self.InvestigateEvent(runNr)
         self.tw.sp.WriteOutRecordedTimes()
-        self.tw.sp.SaveClusters()
+        self.tw.sp.SaveScifiHits()
         self.MakeAngularPlots()
         
     def InvestigateEvent(self, runNr):

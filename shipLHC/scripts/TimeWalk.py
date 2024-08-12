@@ -18,7 +18,6 @@ class TimeWalk(ROOT.FairTask):
         self.simulation = options.simulation
         self.muAna = Analysis(options)
         self.options=options
-        self.mode=options.mode
 
         lsOfGlobals=ROOT.gROOT.GetListOfGlobals()
         self.MuFilter=lsOfGlobals.FindObject('MuFilter')
@@ -48,20 +47,47 @@ class TimeWalk(ROOT.FairTask):
         self.hists=self.M.h
 
         run=ROOT.FairRunAna.Instance()
-        self.trackTask=run.GetTask('simpleTracking')
 
         ioman=ROOT.FairRootManager.Instance()
         self.OT=ioman.GetSink().GetOutTree()
 
-        self.referencesystem=options.referencesystem                         
+        """
+        NEW FEATURE!
         
-        if self.simulation:        
-  
+        In order to switch between analysis with different reference systems, now I can submit runs with mode {mode}{referencesystem} and parse the options.mode here and look for an integer, if an integer is found that that will be passed as 
+        options.referencesystem. By default options.referencesystem is 3 (DS)
+        """
+        if options.mode.find('1')>0: 
+            self.referencesystem=1
+            self.mode=options.mode[:-1]
+        elif options.mode.find('3')>0: 
+            self.referencesystem=3
+            self.mode=options.mode[:-1]
+        else:
+            self.referencesystem=options.referencesystem
+            self.mode=options.mode
+
+        if options.path.find('commissioning/TI18')>0:
+            self.outpath=options.afswork+'-commissioning/'
+            self.path='TI18'
+        elif options.path.find('physics/202')>0: 
+            self.outpath=options.afswork+'-physics2022/'
+            self.path='TI18'
+        elif options.path.find('testbeam_June2023_H8')>0: 
+            self.outpath=options.afswork+'-H8/'
+            self.path='H8'
+        elif options.path=='./':
+            self.outpath=options.afswork+'-physics2022/'
+            self.path='TI18'
+
+        #### Time walk correction run is independent of time alignment settings. 
+        self.TWCorrectionRun=str(5408).zfill(6)            
+        
+        if self.simulation:
             self.timealignment='sim'     
-            self.simEngine = self.GetSimEngine()
+            # self.simMode = self.GetSimEngine()
+            self.simMode = options.simMode
             self.cutdists=self.muAna.GetCutDistributions("005408", ('dy'))
-            self.outpath = options.path+self.simEngine+'/'
-            options.nStart = int(options.fname.split('-')[-1].split('_')[0])
 
         elif not self.simulation:
             statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
@@ -72,28 +98,16 @@ class TimeWalk(ROOT.FairTask):
                         'showerprofiles':'corrected', 
                         'numusignalevents':'corrected',
                         'tds0-studies':'uncorrected',
-                        '2muon':'corrected'}
+                        'extendedreconstruction':'corrected'}
             
-            self.state=statedict[options.mode]
+            self.state=statedict[self.mode]
             
-            if self.options.path.find('commissioning/TI18')>0:
-                self.outpath=options.afswork+'-commissioning/'
-                self.path='TI18'
-            elif self.options.path.find('physics/202')>0: 
-                self.outpath=options.afswork+'-physics2022/'
-                self.path='TI18'            
-            elif self.options.path.find('testbeam_June2023_H8')>0: 
-                self.outpath=options.afswork+'-H8/'
-                self.path='H8'
-
             self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)                
             
             if options.debug: self.trackevents=[]
             
-            # self.correctionfunction=lambda ps, qdc: 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
             self.getaverage=lambda d, key, i:sum( [(d[key][i]) for k in range(2) ])/len(d)        
 
-            # if options.mode in ('TW', 'res'):
             if not options.CorrectionType: self.CorrectionType=4
             else: self.CorrectionType=options.CorrectionType
 
@@ -110,9 +124,6 @@ class TimeWalk(ROOT.FairTask):
                 from testbeam_analysis import Testbeam_Analysis
                 self.tb_analysis = testbeam_analysis(options, self)
                 return
-
-            #### Time walk correction run is independent of time alignment settings. 
-            self.TWCorrectionRun=str(5408).zfill(6)
 
             ### If no time-walk correction run is provided. Set the default correction run depending on time alignment of the data set
             if options.AlignmentRun==None or self.muAna.GetTimeAlignmentType(runNr=options.AlignmentRun) != self.timealignment:
@@ -139,6 +150,7 @@ class TimeWalk(ROOT.FairTask):
         elif self.mode == 'showerprofiles':
             from showerprofiles import ShowerProfiles
             if options.numuStudy: self.numuStudy=True
+            else: self.numuStudy=False
             self.sp = ShowerProfiles(options, self)
             self.barycentredata={}
 
@@ -146,8 +158,16 @@ class TimeWalk(ROOT.FairTask):
             from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
             self.sc = SelectionCriteria(options, self)   
 
+        elif self.mode == 'extendedreconstruction':
+            from extendedmuonreconstruction import ExtendedMuonReconstruction as ExtendedMuonReconstruction
+            self.emr = ExtendedMuonReconstruction(options, self)
+
         with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
-            self.histformatting=json.load(x)                
+            self.histformatting=json.load(x)  
+
+        self.notInDS=0            
+
+        self.trackRequired=True if self.mode in('c0', 'tof', 'tw', 'res', 'systemalignment', 'reconstructmuonposition') else False
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -160,27 +180,21 @@ class TimeWalk(ROOT.FairTask):
         if not hasattr(self.muAna, 'task'): self.muAna.SetTask(self)
 
         tracks={1:[], 3:[]}
-        Reco_MuonTracks=self.M.Reco_MuonTracks
-        inVeto, inDS=False, False
-        for i,track in enumerate(Reco_MuonTracks):
-            if any([not track.getFitStatus().isFitConverged(), track.getFitStatus().getNdf()==0]): continue
+        inScifi, inDS = False, False
+
+        hits = event.Digi_MuFilterHits
+        scifi_hits = event.Digi_ScifiHits        
+
+        for i,track in enumerate(self.M.Reco_MuonTracks):
+            if any([not track.getFitStatus().isFitConverged(), track.getFitStatus().getNdf()==0]): 
+                continue
             if track.GetUniqueID()==1: 
-                if self.options.numuStudy: print(f'Scifi track in numu event')
-                inVeto=True
-                tracks[1].append(Reco_MuonTracks[i])
+                inScifi=True
+                tracks[1].append(self.M.Reco_MuonTracks[i])
             if track.GetUniqueID()==3: 
                 inDS=True
-                tracks[3].append(Reco_MuonTracks[i])
-        
-        if self.referencesystem==3 and not inDS: return
-        elif self.referencesystem==1 and not inVeto: return
+                tracks[3].append(self.M.Reco_MuonTracks[i])
 
-        hits=event.Digi_MuFilterHits
-        scifi_hits = event.Digi_ScifiHits
-
-        if self.mode=='dimuon' and not len(tracks[3])==2: return
-        elif self.mode=='dimuon' and len(tracks[3])==2: self.dm.FillHists(hits)
-            
         ### If there are more than 1 DS track, take the track with the lowest chi2/Ndf
         if self.referencesystem==3 and len(tracks[3])==1: self.track= tracks[3][0]
         elif self.referencesystem==3 and len(tracks[3])>1: 
@@ -189,17 +203,25 @@ class TimeWalk(ROOT.FairTask):
         if self.referencesystem==1 and len(tracks[1])==1: self.track= tracks[1][0]
         elif self.referencesystem==1 and len(tracks[1])>1: 
             tmp={i:i.getFitStatus().getChi2()/i.getFitStatus().getNdf() for i in tracks[1]}
-            self.track=tmp[ min(tmp) ]            
+            self.track=tmp[ min(tmp) ]               
+        
+        self.hasTrack=True
+        if (self.referencesystem==3 and not inDS) or (self.referencesystem==1 and not inScifi): 
+            self.hasTrack=False 
+        
+        # Only throw event out if we need a track but don't have one
+        if self.trackRequired and not self.hasTrack: return 
+        elif self.hasTrack:
 
-        fitStatus=self.track.getFitStatus()
-        fstate=self.track.getFittedState()
+            fitStatus=self.track.getFitStatus()
+            fstate=self.track.getFittedState()
 
-        self.pos=fstate.getPos()
-        self.mom=fstate.getMom()
-        self.trackchi2NDF=fitStatus.getChi2()/fitStatus.getNdf()+1E-10
+            self.pos=fstate.getPos()
+            self.mom=fstate.getMom()
+            self.trackchi2NDF=fitStatus.getChi2()/fitStatus.getNdf()+1E-10   
 
         # Get DS event t0
-        if self.referencesystem==3:
+        if self.referencesystem==3 and self.hasTrack and not self.simulation:
             x=self.muAna.GetDSHaverage(hits) # Now returns in ns
             if x==-999.: return
             self.reft, firedDSHbars=x
@@ -207,60 +229,54 @@ class TimeWalk(ROOT.FairTask):
                 self.hists['reft']=ROOT.TH1F('reft','Average time of DS horizontal bars;DS horizontal average time [ns];Counts', 200, 0, 50)
             self.hists['reft'].Fill(self.reft)
 
-            ### Timing discriminant cut only for real data
-            if not self.simulation:
-                self.td = self.muAna.GetTimingDiscriminant(hits) # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
-                if self.TimingDiscriminantCut(): self.passtdcut=True 
-                else: self.passtdcut=False
+            self.td = self.muAna.GetTimingDiscriminant(hits) # Require that US1 TDC average is less than the DSH TDC average to ensure forward travelling track
+            if self.TimingDiscriminantCut(): self.passtdcut=True 
+            else: self.passtdcut=False
 
-        elif self.referencesystem==1:
+        elif self.referencesystem==1 and not self.simulation:
             self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
             if not self.reft:   return
             if not 'reft' in self.hists:
-                self.hists['reft']=ROOT.TH1F('reft','Average time of SiPMs in Scifi track;Time [ns];Counts', 200, 0, 50)
-            self.hists['reft'].Fill(self.reft)            
-        
-        ### Slope cut
-        if self.slopecut(): self.passslopecut=True 
-        else: self.passslopecut=False
+                self.hists['reft']=ROOT.TH1F('reft','Average time of SiPMs in Scifi;Time [ns];Counts', 200, -25, 25)
+            self.hists['reft'].Fill(self.reft)                         
         
         if self.mode == 'selectioncriteria':
-            self.sc.FillHists(hits)
-            self.data
+            self.sc.FillHists(hits, scifi_hits)
             return
         
         elif self.mode=='showerprofiles':
-            # Make Scifi clusters with the positions weighted by QDC
-            self.M.FairTasks['simpleTracking'].scifiCluster(withQDC=self.options.scifiClustersQDC)
-            clusters = self.M.clusScifi
-            self.sp.ScifiClusterInfo(clusters)
 
-            # scifi_hits = self.M.eventTree.Digi_ScifiHits
-            self.sp.ExtractScifiData(scifi_hits)
+            # self.sp.ExtractScifiData(scifi_hits)
             self.sp.ShowerDirection(hits)
-
             return
-
-        elif self.mode == 'tds0-studies':            
-            self.tds0_studies(hits)
+        
+        elif self.mode == 'extendedreconstruction':
+            self.emr.ExtendReconstruction(hits)
             return
         
         elif self.mode == 'reconstructmuonposition':
             # self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
             self.sa.ReconstructMuonPosition(hits)
-            return
+            return        
+
+        # Everything from here on requires a track found in the reference system (Scifi or DS)
+
+        ### Slope cut
+        if self.slopecut(): self.passslopecut=True 
+        else: self.passslopecut=False
 
         for hit in event.Digi_MuFilterHits:
             nLeft, nRight=self.muAna.GetnFiredSiPMs(hit)
-
+            if not hit.isValid(): continue
             # if not self.nSiPMscut(hit, nLeft, nRight): continue
 
             detID=hit.GetDetectorID()
             s,p,b=self.muAna.parseDetID(detID)
             if s==3: continue
+            if s==1 and p==2: continue 
 
             # Only investigate veto hits if there is a Scifi track!
-            if not inVeto and s==1: continue
+            if not inScifi and s==1: continue
 
             if self.yresidual3(detID): self.trackrelated = True
             else: self.trackrelated=False
@@ -268,8 +284,6 @@ class TimeWalk(ROOT.FairTask):
             zEx=self.zPos['MuFilter'][s*10+p]
             lam=(zEx-self.pos.z())/self.mom.z()
             self.Ex=ROOT.TVector3(self.pos.x()+lam*self.mom.x(), self.pos.y()+lam*self.mom.y(), self.pos.z()+lam*self.mom.z())
-
-            # self.pred=self.GetDistanceToSiPM(Ex)
 
             if self.options.debug: self.trackevents.append(self.M.EventNumber)
 
@@ -281,7 +295,6 @@ class TimeWalk(ROOT.FairTask):
                 if self.options.XT: self.sa.XTHists(hit)
                 self.sa.FillBarHists(hit)
                 # self.sa.ScifiCorrectedTimes(hit)
-
                 continue
 
             # Only investigate track related hits
@@ -385,7 +398,6 @@ class TimeWalk(ROOT.FairTask):
         ### Check if fixed_ch has tw corr params and a cscint value
         if any([fixed_ch not in self.muAna.twparameters, fixed_ch not in self.muAna.cscintvalues]): return 
 
-        cdata=self.muAna.cscintvalues[fixed_ch]
         twparams=self.muAna.twparameters[fixed_ch]
         twcorrection = self.correctionfunction(twparams, qdc)
 
@@ -398,13 +410,12 @@ class TimeWalk(ROOT.FairTask):
         ### Make histograms
         if not self.muAna.DSVcheck(detID):  dtvxpred=f'dtvxpred_{fixed_ch}_{self.state}'
         else: dtvxpred=f'dtvypred_{fixed_ch}_{self.state}'
-        if not dtvxpred in hists:
+        if not dtvxpred in hists and self.referencesystem==3:
             coord='x' if not self.muAna.DSVcheck(detID) else 'y'
             subtitle='{Time-walk corrected t_{0}^{DS}-t^{tw corr}_{SiPM} v '+coord+'-position w/ run'+str(self.TWCorrectionRun)+'};'+coord+'_{predicted} [cm];t_{0}^{DS}-t^{tw corr}_{SiPM} [ns]'
             title='#splitline{'+ReadableFixedCh+'}'+subtitle
-            histformat = self.histformatting['dtvxpred'][self.state]
-            # hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,110,-10,100, 800, -20, 20.)          
-            hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,*histformat[0], *histformat[1])
+            histformat = self.histformatting['dtvxpred'][self.state]        
+            hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,*histformat[0], *histformat[1])          
     
         hists[dtvxpred].Fill(self.Ex.x(), TWt_rel)
         
@@ -429,13 +440,19 @@ class TimeWalk(ROOT.FairTask):
         ToFTWt_rel=self.reft-ToFTWtime
 
         ### Make histograms
-        dtvqdc=f'dtvqdc_{fixed_ch}_corrected'
+        if self.referencesystem==3: dtvqdc=f'dtvqdc_{fixed_ch}_corrected'
+        elif self.referencesystem==1: dtvqdc=f'dtSFvqdc_{fixed_ch}_corrected'
+
         if not dtvqdc in hists:
             subtitle='{Time-walk corrected t_{0}^{DS}-t^{tw corr}_{SiPM '+str(SiPM)+'} v QDC_{SiPM '+str(SiPM)+'} w/ run'+str(self.TWCorrectionRun)+'};QDC_{SiPM '+str(SiPM)+'} [a.u];t_{0}^{DS}-t^{tw corr}_{SiPM '+str(SiPM)+'} [ns]'
             title='#splitline{'+ReadableFixedCh+'}'+subtitle
             histformat = self.histformatting['dtvqdc'][self.state]
-            # hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, 200, 0, 200, 3000, -5, 10)
-            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, *histformat[0], *histformat[1])     
+            hists[dtvqdc]=ROOT.TH2F(dtvqdc, title, *histformat[0], *histformat[1])
+        if not dtvqdc in hists and self.referencesystem==1:
+            subtitle='{Time-walk corrected t_{0}^{SF}-t^{tw corr}_{SiPM '+str(SiPM)+'} v QDC_{SiPM '+str(SiPM)+'} w/ run'+str(self.TWCorrectionRun)+'};QDC_{SiPM '+str(SiPM)+'} [a.u];t_{0}^{SF}-t^{tw corr}_{SiPM '+str(SiPM)+'} [ns]'
+            title='#splitline{'+ReadableFixedCh+'}'+subtitle
+            histformat = self.histformatting['dtScifivxpred'][self.state]
+            hists[dtvqdc]=ROOT.TH2F(dtvqdc,title,*histformat[0], *histformat[1])
 
         ### Fill histograms 
         hists[dtvqdc].Fill(qdc, ToFTWt_rel)

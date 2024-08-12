@@ -4,18 +4,19 @@ firstEvent = 0
 import resource
 def mem_monitor():
  # Getting virtual memory size 
-    pid = os.getpid()
-    with open(os.path.join("/proc", str(pid), "status")) as f:
-        lines = f.readlines()
-    _vmsize = [l for l in lines if l.startswith("VmSize")][0]
-    vmsize = int(_vmsize.split()[1])
-    #Getting physical memory size  
-    pmsize = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    print("memory: virtuell = %5.2F MB  physical = %5.2F MB"%(vmsize/1.0E3,pmsize/1.0E3))
+		pid = os.getpid()
+		with open(os.path.join("/proc", str(pid), "status")) as f:
+				lines = f.readlines()
+		_vmsize = [l for l in lines if l.startswith("VmSize")][0]
+		vmsize = int(_vmsize.split()[1])
+		#Getting physical memory size  
+		pmsize = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+		print("memory: virtuell = %5.2F MB  physical = %5.2F MB"%(vmsize/1.0E3,pmsize/1.0E3))
 
 import ROOT,os,sys
 import shipRoot_conf
 import shipunit as u
+from pathlib import Path
 
 shipRoot_conf.configure()
 
@@ -23,7 +24,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument("-f", "--inputFile", dest="inputFile", help="single input file", required=True)
 parser.add_argument("-g", "--geoFile", dest="geoFile", help="geofile", required=True)
-parser.add_argument("-p", "--path",dest="path",  help="Output directory", required=False)
+parser.add_argument("-p", "--path",dest="path",  help="Output directory", default='/eos/experiment/sndlhc/users/aconsnd/simulation/', required=False)
 parser.add_argument("-n", "--nEvents", dest="nEvents",  type=int, help="number of events to process", default=100000)
 parser.add_argument("-ts", "--thresholdScifi", dest="ts", type=float, help="threshold energy for Scifi [p.e.]", default=3.5)
 parser.add_argument("-ss", "--saturationScifi", dest="ss", type=float, help="saturation energy for Scifi [p.e.]", default=104.)
@@ -41,29 +42,65 @@ makeClusterScifi = not options.noClusterScifi
 timer = ROOT.TStopwatch()
 timer.Start()
 
-# # Path is where my MC files are stored, directories separate the different generators/physics cases
-input_file = options.inputFile
-# output_file = input_file.replace('.root','_digi.root')
-
 # If working with Daniele's data, output path must be changed
-if input_file.find('dancc/MuonDIS')!=-1:
-  f=input_file.split('/')[-1]
-  output_file = options.path+f
+if options.inputFile.find('dancc/MuonDIS') != -1:
+	f = options.inputFile.split('/')[-1]
+	file_number = options.inputFile.split('/')[-2]
+	output_file = options.path + 'muonDIS/data/' + f.replace('.root', f'_{file_number}.root')
+		
 
-# if options.inputFile.find('/eos')==0:
-#    if options.FairTask_digi:
-#       #  options.inputFile = os.environ['EOSSHIP']+options.inputFile
-#    else:   
-#        os.system('xrdcp '+os.environ['EOSSHIP']+options.inputFile+' '+output_file)
-# else:
-#     if not options.FairTask_digi:
-#        os.system('cp '+options.inputFile+' '+outFile)    
+# Working with neutral hadrons
+elif options.inputFile.find('NeutralHadrons') != -1:
+	f = options.inputFile.split('/')[-1]
+	
+	particle_type, Emin, Emax = options.inputFile.split('/')[-4].split('_')
+	
+	# sanity check
+	if not particle_type in ('K', 'neu'):
+		print(f'Input file name not compatible!\nExiting...')
+		sys.exit(1)
+
+	file_number=options.inputFile.split('/')[-2]
+	output_file = options.path+'neutralhadrons/data/'+f.replace('.root', f'_{particle_type}_{Emin}_{Emax}_{file_number}.root')
+
+elif options.inputFile.find('MuonBackground') != -1:
+
+	f=options.inputFile.split('/')[-1]
+	sim_folder=options.inputFile.split('/')[-3]
+	key=options.inputFile.split('/')[-2]
+
+	output_file = options.path+'passingmuon/data/'+f.replace('.root', f'_{sim_folder}_{key}.root')
+
+# Working with neutrino data 
+elif options.inputFile.find('/Neutrinos/Genie') != -1:
+	f = options.inputFile.split('/')[-1]
+	keys, file_number = options.inputFile.split('/')[-3: -1]
+
+	output_file = options.path+'neutrino/data/'+keys+'/'+f.replace('.root', f'_{file_number}.root')
+	
+elif options.inputFile.find('/')==-1:
+	f = options.inputFile.split('/')[-1]
+	output_file = options.inputFile
+
+output_file = output_file.replace('.root','_digi.root')  
+print(f'output file: {output_file}')
+# sys.exit(1)
+
+# All data is stored on /eos
+if options.inputFile.find('/eos')==0:
+	if options.FairTask_digi: # flag for C++ digitisation, should be used
+		options.inputFile = os.environ['EOSSHIP']+options.inputFile
+	else:   
+		os.system('xrdcp '+os.environ['EOSSHIP']+options.inputFile+' '+output_file)
+else:
+	if not options.FairTask_digi:
+		os.system('cp '+options.inputFile+' '+outFile)    
 
 # -----Create geometry----------------------------------------------
 import shipLHC_conf as sndDet_conf
 
 if options.geoFile.find('/eos')==0:
-  options.geoFile = os.environ['EOSSHIP']+options.geoFile
+	options.geoFile = os.environ['EOSSHIP']+options.geoFile
 import SndlhcGeo
 snd_geo = SndlhcGeo.GeoInterface(options.geoFile)
 
@@ -86,56 +123,56 @@ scifiDet.SetConfPar("Scifi/timeResol",150.*u.picosecond) # time resolution in ps
 
 # Fair digitization task
 if options.FairTask_digi:
-  output_file = output_file.replace('.root','CPP.root')
-  run = ROOT.FairRunAna()
-  ioman = ROOT.FairRootManager.Instance()
-  ioman.RegisterInputObject('Scifi', snd_geo.modules['Scifi'])
-  ioman.RegisterInputObject('MuFilter', snd_geo.modules['MuFilter'])
-  # Don't use FairRoot's default event header settings
-  run.SetEventHeaderPersistence(False)
-  
-  # Set input
-  fileSource = ROOT.FairFileSource(input_file)
-  run.SetSource(fileSource)
-  # Set output
-  outfile = ROOT.FairRootFileSink(output_file)
-  run.SetSink(outfile)
+	output_file = output_file.replace('.root','CPP.root')
+	run = ROOT.FairRunAna()
+	ioman = ROOT.FairRootManager.Instance()
+	ioman.RegisterInputObject('Scifi', snd_geo.modules['Scifi'])
+	ioman.RegisterInputObject('MuFilter', snd_geo.modules['MuFilter'])
+	# Don't use FairRoot's default event header settings
+	run.SetEventHeaderPersistence(False)
+	
+	# Set input
+	fileSource = ROOT.FairFileSource(options.inputFile)
+	run.SetSource(fileSource)
+	# Set output
+	outfile = ROOT.FairRootFileSink(output_file)
+	run.SetSink(outfile)
 
-  # Set number of events to process
-  inRootFile = ROOT.TFile.Open(input_file)
-  inTree = inRootFile.Get('cbmsim')
-  nEventsInFile = inTree.GetEntries()
-  nEvents = min(nEventsInFile, options.nEvents)
+	# Set number of events to process
+	inRootFile = ROOT.TFile.Open(options.inputFile)
+	inTree = inRootFile.Get('cbmsim')
+	nEventsInFile = inTree.GetEntries()
+	nEvents = min(nEventsInFile, options.nEvents)
 
-  rtdb = run.GetRuntimeDb()
-  DigiTask = ROOT.DigiTaskSND()
-  DigiTask.withScifiClusters(makeClusterScifi)
-  run.AddTask(DigiTask)
-  run.Init()
-  run.Run(firstEvent, nEvents)
+	rtdb = run.GetRuntimeDb()
+	DigiTask = ROOT.DigiTaskSND()
+	DigiTask.withScifiClusters(makeClusterScifi)
+	run.AddTask(DigiTask)
+	run.Init()
+	run.Run(firstEvent, nEvents)
 
 # Digitization using python code SndlhcDigi
 else:
  # import digi task
-  import SndlhcDigi
-  Sndlhc = SndlhcDigi.SndlhcDigi(output_file,makeClusterScifi)
+	import SndlhcDigi
+	Sndlhc = SndlhcDigi.SndlhcDigi(output_file,makeClusterScifi)
 
-  nEvents = min(Sndlhc.sTree.GetEntries(),options.nEvents)
+	nEvents = min(Sndlhc.sTree.GetEntries(),options.nEvents)
 # main loop
-  for iEvent in range(firstEvent, nEvents):
-    if iEvent % 50000 == 0 or options.debug:
-        print('event ', iEvent, nEvents - firstEvent)
-    Sndlhc.iEvent = iEvent
-    rc = Sndlhc.sTree.GetEvent(iEvent)
-    Sndlhc.digitize()
-    if makeClusterScifi:
-       Sndlhc.clusterScifi()
+	for iEvent in range(firstEvent, nEvents):
+		if iEvent % 50000 == 0 or options.debug:
+				print('event ', iEvent, nEvents - firstEvent)
+		Sndlhc.iEvent = iEvent
+		rc = Sndlhc.sTree.GetEvent(iEvent)
+		Sndlhc.digitize()
+		if makeClusterScifi:
+			 Sndlhc.clusterScifi()
  # memory monitoring
  # mem_monitor()
 
-  # end loop over events
-  Sndlhc.finish()
-  
+	# end loop over events
+	Sndlhc.finish()
+	
 timer.Stop()
 rtime = timer.RealTime()
 ctime = timer.CpuTime()

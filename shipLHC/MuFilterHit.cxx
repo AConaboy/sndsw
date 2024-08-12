@@ -9,6 +9,11 @@
 #include <TRandom.h>
 #include <iomanip> 
 
+using std::cout;
+using std::endl;
+using std::to_string;
+using std::string;
+
 // -----   Default constructor   -------------------------------------------
 MuFilterHit::MuFilterHit()
   : SndlhcHit()
@@ -94,34 +99,32 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
      LOG(DEBUG) << "detid "<<detID<< " size "<<nSiPMs<< "  side "<<nSides;
 
      fDetectorID  = detID;
-     Float_t signalLeft = 0;
-     Float_t signalRight = 0;
-     Float_t earliestToAL = 1E20;
-     Float_t earliestToAR = 1E20;
-     Float_t dxL;
-     Float_t dxR;     
+
+     // Instance a load of floats used in next block
+     Float_t signalLeft = 0, signalRight = 0, signal = 0;
+     Float_t earliestToAL = 1E20, earliestToAR = 1E20;
+     Float_t dxLphys=0, dxRphys=0, dxL=0, dxR=0;
      TVector3 vLeft,vRight;
+     Float_t distance_Left=0, distance_Right=0;
+
+     // for the timing, find earliest particle and smear with time resolution
+     Float_t t_Left=0, t_Right=0;
 
      // Load bar positions
      MuFilterDet->GetPosition(fDetectorID,vLeft, vRight);
      auto x_ref = 0.5*( vLeft[0] + vRight[0] );
 
-     for(auto p = std::begin(V); p!= std::end(V); ++p) {
+     for (auto p = std::begin(V); p!= std::end(V); ++p) {
 
-        Float_t signal = (*p)->GetEnergyLoss();
-        if (signal < 0.001) {continue;} // Hard coding 1 MeV energy cut :sweat_smiling: 
+        signal = (*p)->GetEnergyLoss();
 
         // Find distances from MCPoint centre to ends of bar 
         TVector3 impact((*p)->GetX(),(*p)->GetY() ,(*p)->GetZ() );
+        distance_Left = (vLeft-impact).Mag();
+        distance_Right = (vRight-impact).Mag();
 
-        Float_t distance_Left    =  (vLeft-impact).Mag();
-        Float_t distance_Right =  (vRight-impact).Mag();
-        signalLeft+=signal*TMath::Exp(-distance_Left/attLength);
-        signalRight+=signal*TMath::Exp(-distance_Right/attLength);
-
-        // for the timing, find earliest particle and smear with time resolution
-        Float_t ptime = (*p)->GetTime();
-        Float_t t_Left, t_Right;
+        signalLeft+=signal/nSides*TMath::Exp(-distance_Left/attLength);
+        signalRight+=signal/nSides*TMath::Exp(-distance_Right/attLength);
 
         if (subsystem==3) {
           signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
@@ -135,34 +138,42 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
           signalspeed_left = MuFilterDet->GetBarSideSignalSpeed(detID, "left");
           signalspeed_right = MuFilterDet->GetBarSideSignalSpeed(detID, "right");
         }
+        
+        // Assume earliest arriving photons set the time on each side
         t_Left = distance_Left/signalspeed_left;
-        t_Right = distance_Right/signalspeed_right;        
+        t_Right = distance_Right/signalspeed_right;
+
         if ( t_Left < earliestToAL){
           earliestToAL = t_Left;
-          dxL = distance_Left - x_ref;
+          dxLphys = impact[0]; // For aligned times in data, they correspond to distances from x=0 in the physics FoR
+          dxL = -1*x_ref + dxLphys; // At the moment, the time alignment in data is done with respect to the bar centre. This quantity is wrt the bar centre 
           }
+        
         if ( t_Right < earliestToAR){
           earliestToAR = t_Right;
-          dxR = x_ref - distance_Right;
+          dxRphys = impact[0];
+          dxR = x_ref - dxRphys; // At the moment, the time alignment in data is done with respect to the bar centre. This quantity is wrt the bar centre
           }
-     } 
+     }
 
-     // shortSiPM = {3,6,11,14,19,22,27,30,35,38,43,46,51,54,59,62,67,70,75,78}; - counting from 1!
      // In the SndlhcHit class the 'signals' array starts from 0.
-     Float_t timeResol, aligned_time, SiPMcalibrationConstant, signal; 
+     Float_t timeResol=0, aligned_time=0, SiPMcalibrationConstant=0; 
      TString side;
      for (unsigned int j=0; j<nSiPMs*nSides; ++j){
         
+        // If small SiPM (j==2, 5, 10, 13) in HCAL
         if ( (subsystem==2) and (j%8==2 or j%8==5) ) { SiPMcalibrationConstant = SiPMcalibrationS;}
         else { SiPMcalibrationConstant = SiPMcalibration; }
 
         if ( (subsystem!=3 and j<8) || (subsystem==3 and j==0) ) { // If left-side channel
-          side="left"; timeResol=timeresol_left;
+          side="left";
+          timeResol=timeresol_left;
           aligned_time = dxL/signalspeed_left;
           signal=signalLeft;
         }
         else {
-          side="right"; timeResol=timeresol_right;
+          side="right";
+          timeResol=timeresol_right;
           aligned_time = dxR/signalspeed_right;          
           signal=signalRight;
         }    
@@ -171,7 +182,10 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
         times[j] = gRandom->Gaus(aligned_time, timeResol);
      }
 
-     flag = true;
+     // Hard coding 1 MeV energy cut :sweat_smiling: 
+     if (signalLeft < 0.001 or signalRight < 0.001) {flag=false;}
+     else {flag = true;}
+     
      for (Int_t i=0;i<16;i++){fMasked[i]=kFALSE;}
      LOG(DEBUG) << "signal created";
 }

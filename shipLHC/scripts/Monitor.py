@@ -60,140 +60,150 @@ Value = ROOT.std.vector('float')()
 class Monitoring():
    " set of monitor histograms "
    def __init__(self,options,FairTasks):
-        
-        self.simulation = options.simulation
-        self.options = options
-        self.EventNumber = -1
-        self.TStart = -1
-        self.TEnd   = -1
-        self.Weight = 1
 
-        path     = options.path
-        self.myclient = None
+      self.simulation = options.simulation
+      self.options = options
+      self.EventNumber = -1
+      self.TStart = -1
+      self.TEnd   = -1
+      self.Weight = 1
 
-        if options.online:
-            pass
-# setup geometry
-        if self.simulation: self.snd_geo = SndlhcGeo.GeoInterface(options.path + options.geoFile)
-        else: 
-            if path.find('eos')>0:
-               path  = options.server+options.path         
-            self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
-        self.MuFilter = self.snd_geo.modules['MuFilter']
-        self.Scifi       = self.snd_geo.modules['Scifi']
-        self.systemAndPlanes = {1:2,2:5,3:7}
-        self.zPos = self.getAverageZpositions()
+      path     = options.path
+      self.myclient = None
 
-        self.h = {}   # histogram storage
+      if options.online:
+         pass
+      # setup geometry
+      if self.simulation: self.snd_geo = SndlhcGeo.GeoInterface(options.path + options.geoFile)
+      else: 
+         if path.find('eos')>0: path  = options.server+options.path         
+         self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
+      
+      self.MuFilter = self.snd_geo.modules['MuFilter']
+      self.Scifi       = self.snd_geo.modules['Scifi']
+      self.systemAndPlanes = {1:2,2:5,3:7}
+      self.zPos = self.getAverageZpositions()
 
-        self.runNr   = str(options.runNumber).zfill(6)
-        self.FairTasks = {}
-        for x in FairTasks:   #  keeps extended methods if from python class
-                 self.FairTasks[x.GetName()] = x
+      self.h = {}   # histogram storage
 
-# setup input
-        if options.online:
-         pass 
-        else:
-            if self.simulation:
-                eventChain = ROOT.TChain('cbmsim')
-                allfiles = os.listdir(options.path)
-                files = [ options.path+i for i in allfiles if all( [i.find(options.simEngine), i.find('dig.root')>0] ) ]
-                [eventChain.Add(f) for f in files]
+      self.runNr   = str(options.runNumber).zfill(6)
+      self.FairTasks = {}
+      for x in FairTasks:   #  keeps extended methods if from python class
+         self.FairTasks[x.GetName()] = x
+
+      # setup input
+      if self.simulation:
+         partitions=[]
+         
+         #### For studying events that pass nue selection
+         if options.fname == 'nue': options.fname='/eos/user/c/cvilela/SND_nue_analysis_May24/nuMC/filtered_stage1.root'
+
+         eventChain = ROOT.TChain('cbmsim')
+         if options.simTest or options.simMode in ('muonDIS', 'neutralhadron', 'neutrino', 'passingmuon', 'nue'):
+            if options.simMode != 'nue': files = [ options.path+options.fname ]
+            else: files = [ options.fname ]
+            eventChain.Add( files[0] ) # Only run when 1 file is used per job
+         else:
+            allfiles = os.listdir(options.path)
+            files = [ options.path+i for i in allfiles if all( [i.find(f"sndLHC.{options.simMode}")==0, i.find('digiCPP.root')>0] ) ]
+            [eventChain.Add(f) for f in files]
             
-            elif options.customEventChain:
-                eventChain=options.customEventChain
-                
-               # Code added to analyse a collection of partitions from different runs e.g. for looking at mu_nu candidates 
-               # Passing a dictionary of {runNr : partition}
-                if options.signalpartitions:
-                  partitions=[f'sndsw_raw-{p}.root' for p in list(options.signalpartitions.values())]
+      elif options.customEventChain:
+         eventChain=options.customEventChain
+                  
+         # Code added to analyse a collection of partitions from different runs e.g. for looking at mu_nu candidates 
+         # Passing a dictionary of {runNr : partition}
+         if options.signalpartitions:
+            partitions=[f'sndsw_raw-{p}.root' for p in list(options.signalpartitions.values())]
 
-            else:
-              partitions = 0
-              if options.partition < 0:
-                 partitions = []
-                 if path.find('eos')>0:
-# check for partitions
-                    dirlist  = str( subprocess.check_output("xrdfs "+options.server+" ls "+options.path+"run_"+self.runNr,shell=True) )
-                    for x in dirlist.split('\\n'):
-                       ix = x.find('sndsw_raw-')
-                       if ix<0: continue
-                       partitions.append(x[ix:])
-                 else:
-# check for partitions
-                   dirlist  = os.listdir(options.path+"run_"+self.runNr)
-                   for x in dirlist:
-                     if not x.find('sndsw_raw-')<0:
-                          partitions.append(x)
-              else:
-                 partitions = ["sndsw_raw-"+ str(options.partition).zfill(4)+".root"]
-              if options.runNumber>0:
-                eventChain = ROOT.TChain('rawConv')
-                for p in partitions:
-                       eventChain.Add(path+'run_'+self.runNr+'/'+p)
+      else:
+         partitions = []
+         if path.find('eos')>0:
+            # check for partitions
+            dirlist  = str( subprocess.check_output("xrdfs "+options.server+" ls "+options.path+"run_"+self.runNr,shell=True) )
+            for x in dirlist.split('\\n'):
+               ix = x.find('sndsw_raw-')
+               if ix<0: continue
+               partitions.append(x[ix:])
+         else:
+            # check for partitions
+            dirlist  = os.listdir(options.path+"run_"+self.runNr)
+            for x in dirlist:
+               if not x.find('sndsw_raw-')<0: partitions.append(x)
+               else: partitions = ["sndsw_raw-"+ str(options.partition).zfill(4)+".root"]
 
-            rc = eventChain.GetEvent(0)
-            if hasattr(eventChain, "EventHeader"):
-               self.TStart = eventChain.EventHeader.GetEventTime()
-               if options.nEvents <0:
-                  rc = eventChain.GetEvent(eventChain.GetEntries()-1)
-               else:
-                  rc = eventChain.GetEvent(options.nEvents-1)
-               self.TEnd = eventChain.EventHeader.GetEventTime()
+         if options.runNumber>0:
+               eventChain = ROOT.TChain('rawConv')
+               for p in partitions:
+                  eventChain.Add(path+'run_'+self.runNr+'/'+p)
+
+      rc = eventChain.GetEvent(0)
+      if hasattr(eventChain, "EventHeader"):
+         self.TStart = eventChain.EventHeader.GetEventTime()
+         if options.nEvents <0:
+            rc = eventChain.GetEvent(eventChain.GetEntries()-1)
+         else:
+            rc = eventChain.GetEvent(options.nEvents-1)
+         self.TEnd = eventChain.EventHeader.GetEventTime()
             
-            # start FairRunAna
-            self.run  = ROOT.FairRunAna()
-            ioman = ROOT.FairRootManager.Instance()
-            ioman.SetTreeName(eventChain.GetName())
-            outFile = ROOT.TMemFile('dummy','CREATE')
-            source = ROOT.FairFileSource(eventChain.GetCurrentFile())
-            if self.simulation: 
-               [source.AddFile(f) for f in files] 
-            elif not options.customEventChain:
-               for i in range(1,len(partitions)):
-                     p = partitions[i]
-                     source.AddFile(path+'run_'+self.runNr+'/'+p)
-            else:
-               for idx, runNr in enumerate(options.signalpartitions):
-                  if idx!=0: source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
-            self.run.SetSource(source)
-            self.sink = ROOT.FairRootFileSink(outFile)
-            self.run.SetSink(self.sink)
+      # start FairRunAna
+      self.run  = ROOT.FairRunAna()
+      ioman = ROOT.FairRootManager.Instance()
+      ioman.SetTreeName(eventChain.GetName())
+      outFile = ROOT.TMemFile('dummy','CREATE')
+      source = ROOT.FairFileSource(eventChain.GetCurrentFile()) # first file in chain is added here
+      
+      if self.simulation: 
+         # Only need to add more files to source if multiple files are being used
+         if not ( options.simTest or options.simMode in ('muonDIS', 'neutralhadron', 'neutrino', 'passingmuon', 'nue') ):
+            [source.AddFile(f) for f in files[1:]] # Skip first file
 
-            for t in FairTasks: 
-                self.run.AddTask(t)
+      elif options.customEventChain: # Code run when investigating numu candidates
+         for idx, runNr in enumerate(options.signalpartitions):
+            if idx!=0: source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
 
-#avoiding some error messages
-            xrdb = ROOT.FairRuntimeDb.instance()
-            xrdb.getContainer("FairBaseParSet").setStatic()
-            xrdb.getContainer("FairGeoParSet").setStatic()
+      else:
+         for i in range(1,len(partitions)):
+               p = partitions[i]
+               source.AddFile(path+'run_'+self.runNr+'/'+p)
 
-            self.run.Init()
-            if len(partitions)>0:  self.eventTree = ioman.GetInChain()
-            else:                 self.eventTree = ioman.GetInTree()
-#fitted tracks
-            if "simpleTracking" in self.FairTasks:
-               self.trackTask = self.FairTasks["simpleTracking"]
-               self.Reco_MuonTracks = self.trackTask.fittedTracks
-               self.clusMufi        = self.trackTask.clusMufi
-               self.clusScifi       = self.trackTask.clusScifi
-               self.trackTask.DSnPlanes = 3
+      self.run.SetSource(source)
+      self.sink = ROOT.FairRootFileSink(outFile)
+      self.run.SetSink(self.sink)
 
-# initialize detector class for access to eventheader
-        if not self.simulation:
+      for t in FairTasks: 
+         self.run.AddTask(t)
+
+      # avoiding some error messages
+      xrdb = ROOT.FairRuntimeDb.instance()
+      xrdb.getContainer("FairBaseParSet").setStatic()
+      xrdb.getContainer("FairGeoParSet").setStatic()
+
+      self.run.Init()
+      if len(partitions)>0 or self.simulation:  self.eventTree = ioman.GetInChain()
+      else:  self.eventTree = ioman.GetInTree()
+
+      # fitted tracks
+      if "simpleTracking" in self.FairTasks:
+         self.trackTask = self.FairTasks["simpleTracking"]
+         self.Reco_MuonTracks = self.trackTask.fittedTracks
+         self.clusMufi = self.trackTask.clusMufi
+         self.clusScifi = self.trackTask.clusScifi
+         self.trackTask.DSnPlanes = 3
+
+      # initialize detector class for access to eventheader
+      if not self.simulation:
          rc = eventChain.GetEvent(0)
-         if not self.simulation:
-            self.snd_geo.modules['Scifi'].InitEvent(eventChain.EventHeader)
-            self.snd_geo.modules['MuFilter'].InitEvent(eventChain.EventHeader)
+         self.snd_geo.modules['Scifi'].InitEvent(eventChain.EventHeader)
+         self.snd_geo.modules['MuFilter'].InitEvent(eventChain.EventHeader)
 
          # get filling scheme, only necessary if not encoded in EventHeader, before 2022 reprocessing
          self.hasBunchInfo = False
          self.fsdict = False
          if hasattr(eventChain.EventHeader,"GetBunchType"):
             if not eventChain.EventHeader.GetBunchType()<0:
-                  self.hasBunchInfo = True
-                  print('take bunch info from event header')
+               self.hasBunchInfo = True
+               print('take bunch info from event header')
          if not self.hasBunchInfo:
             try:
                fg  = ROOT.TFile.Open(options.server+options.path+'FSdict.root')
@@ -203,12 +213,6 @@ class Monitoring():
                if options.runNumber in FSdict: self.fsdict = FSdict[options.runNumber]
             except:
                print('continue without knowing filling scheme',options.server+options.path)
-         # if self.fsdict: 
-         #   print('extract bunch info from filling scheme')
-      #   if self.fsdict or self.hasBunchInfo: 
-      #     for x in ['B1only','B2noB1','noBeam']:
-      #        self.presenterFile.mkdir('mufilter/'+x)
-      #        self.presenterFile.mkdir('scifi/'+x)
 
    def GetEntries(self):
        if  self.options.online:
@@ -218,35 +222,28 @@ class Monitoring():
            return self.eventTree.GetEntries()
 
    def GetEvent(self,n):
-      if not self.options.online:   # offline, FairRoot in charge
 
-         if self.eventTree.GetBranchStatus('Reco_MuonTracks'):
-            for aTrack in self.eventTree.Reco_MuonTracks:
-                if aTrack: aTrack.Delete()
-            self.eventTree.Reco_MuonTracks.Delete()
-         if "simpleTracking" in self.FairTasks:
-            self.Reco_MuonTracks.Delete()
+      if self.eventTree.GetBranchStatus('Reco_MuonTracks'):
+         for aTrack in self.eventTree.Reco_MuonTracks:
+               if aTrack: aTrack.Delete()
+         self.eventTree.Reco_MuonTracks.Delete()
+      if "simpleTracking" in self.FairTasks:
+         self.Reco_MuonTracks.Delete()
 
-      if self.options.online:
-            online = self.options.online
-            online.executeEvent(n)
-            self.Reco_MuonTracks.Delete()
-            if self.options.FairTask_convRaw:
-                self.options.online.sTree.GetEvent(self.options.online.sTree.GetEntries()-1)
-            for t in self.FairTasks: 
-                if not t=='simpleTracking': self.FairTasks[t].ExecuteTask()
-                else: self.FairTasks[t].ExecuteTask(options.trackType)
-            self.eventTree = self.options.online.sTree
-      else: 
-            self.eventTree.GetEvent(n)
-            if not self.simulation:
-              # initialize detector class for access to eventheader
-              self.snd_geo.modules['Scifi'].InitEvent(self.eventTree.EventHeader)
-              self.snd_geo.modules['MuFilter'].InitEvent(self.eventTree.EventHeader)
-            if self.simulation: self.Weight = self.eventTree.MCTrack[0].GetWeight()
-            for t in self.FairTasks: 
-                if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
-                else: self.FairTasks[t].ExecuteTask()
+      self.eventTree.GetEvent(n)
+
+      if not self.simulation:
+         # initialize detector class for access to eventheader
+         self.snd_geo.modules['Scifi'].InitEvent(self.eventTree.EventHeader)
+         self.snd_geo.modules['MuFilter'].InitEvent(self.eventTree.EventHeader)
+
+      if self.simulation: 
+         self.Weight = self.eventTree.MCTrack[0].GetWeight()
+      
+      for t in self.FairTasks: 
+            if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
+            else: self.FairTasks[t].ExecuteTask()
+
       self.EventNumber = n
 
 # check for bunch xing type
@@ -314,10 +311,6 @@ class Monitoring():
              zPos['Scifi'][s*10+o] = (A.Z()+B.Z())/2.
       return zPos
 
-   def smallSiPMchannel(self,i):
-      if i==2 or i==5 or i==10 or i==13: return True
-      else: return False
-
 #  Scifi specific code
    def Scifi_xPos(self,detID):
         orientation = (detID//100000)%10
@@ -325,326 +318,3 @@ class Monitoring():
         mat   = (detID%100000)//10000
         X = detID%1000+(detID%10000)//1000*128
         return [nStation,mat,X]   # even numbers are Y (horizontal plane), odd numbers X (vertical plane)
-
-# decode MuFilter detID
-   def MuFilter_PlaneBars(self,detID):
-         s = detID//10000
-         l  = (detID%10000)//1000  # plane number
-         bar = (detID%1000)
-         if s>2:
-             l=2*l
-             if bar>59:
-                  bar=bar-60
-                  if l<6: l+=1
-         return {'station':s,'plane':l,'bar':bar}
-
-   def map2Dict(self,aHit,T='GetAllSignals',mask=True):
-      if T=="SumOfSignals":
-         key = Tkey
-      elif T=="GetAllSignals" or T=="GetAllTimes":
-         key = Ikey
-      else: 
-           print('use case not known',T)
-           1/0
-      key.clear()
-      Value.clear()
-      if T=="GetAllTimes": ROOT.fixRootT(aHit,key,Value,mask)
-      else:                         ROOT.fixRoot(aHit,key,Value,mask)
-      theDict = {}
-      for k in range(key.size()):
-          if T=="SumOfSignals": theDict[key[k].Data()] = Value[k]
-          else: theDict[key[k]] = Value[k]
-      return theDict
-
-   def fit_langau(self,hist,o,bmin,bmax,opt=''):
-      if opt == 2:
-         params = {0:'Width(scale)',1:'mostProbable',2:'norm',3:'sigma',4:'N2'}
-         F = ROOT.TF1('langau',langaufun,0,200,len(params))
-      else:
-         params = {0:'Width(scale)',1:'mostProbable',2:'norm',3:'sigma'}
-         F = ROOT.TF1('langau',twoLangaufun,0,200,len(params))
-      for p in params: F.SetParName(p,params[p])
-      rc = hist.Fit('landau','S'+o,'',bmin,bmax)
-      res = rc.Get()
-      if not res: return res
-      F.SetParameter(2,res.Parameter(0))
-      F.SetParameter(1,res.Parameter(1))
-      F.SetParameter(0,res.Parameter(2))
-      F.SetParameter(3,res.Parameter(2))
-      F.SetParameter(4,0)
-      F.SetParLimits(0,0,100)
-      F.SetParLimits(1,0,100)
-      F.SetParLimits(3,0,10)
-      rc = hist.Fit(F,'S'+o,'',bmin,bmax)
-      res = rc.Get()
-      return res
-
-   def twoLangaufun(self,x,par):
-      N1 = self.langaufun(x,par)
-      par2 = [par[0],par[1]*2,par[4],par[3]]
-      N2 = self.langaufun(x,par2)
-      return N1+abs(N2)
-
-   def  langaufun(self,x,par):
-   #Fit parameters:
-   #par[0]=Width (scale) parameter of Landau density
-   #par[1]=Most Probable (MP, location) parameter of Landau density
-   #par[2]=Total area (integral -inf to inf, normalization constant)
-   #par[3]=Width (sigma) of convoluted Gaussian function
-   #
-   #In the Landau distribution (represented by the CERNLIB approximation),
-   #the maximum is located at x=-0.22278298 with the location parameter=0.
-   #This shift is corrected within this function, so that the actual
-   #maximum is identical to the MP parameter.
-#
-      # Numeric constants
-      invsq2pi = 0.3989422804014   # (2 pi)^(-1/2)
-      mpshift  = -0.22278298       # Landau maximum location
-#
-      # Control constants
-      np = 100.0      # number of convolution steps
-      sc =   5.0      # convolution extends to +-sc Gaussian sigmas
-#
-      # Variables
-      summe = 0.0
-#
-      # MP shift correction
-      mpc = par[1] - mpshift * par[0]
-#
-      # Range of convolution integral
-      xlow = max(0,x[0] - sc * par[3])
-      xupp = x[0] + sc * par[3]
-#
-      step = (xupp-xlow) / np
-#
-      # Convolution integral of Landau and Gaussian by sum
-      i=1.0
-      if par[0]==0 or par[3]==0: return 9999
-      while i<=np/2:
-         i+=1
-         xx = xlow + (i-.5) * step
-         fland = ROOT.TMath.Landau(xx,mpc,par[0]) / par[0]
-         summe += fland * ROOT.TMath.Gaus(x[0],xx,par[3])
-#
-         xx = xupp - (i-.5) * step
-         fland = ROOT.TMath.Landau(xx,mpc,par[0]) / par[0]
-         summe += fland * ROOT.TMath.Gaus(x[0],xx,par[3])
-#
-      return (par[2] * step * summe * invsq2pi / par[3])
-
-   def myPrint(self,tc,name,subdir='',withRootFile=True):
-     srun = 'run'+str(self.options.runNumber)
-     tc.Update()
-     if withRootFile:
-         self.presenterFile.cd(subdir)
-         tc.Write()
-     else:
-         if not os.path.isdir(srun): os.system('mkdir '+srun)
-         pname = srun+'/'+name+'-'+srun
-         tc.Print(pname+'.png')
-         tc.Print(pname+'.pdf')
-
-   def fillHist1(self,hname,parx):
-      for x in ['','B1only','B2noB1','noBeam']:
-         if x=='':  
-             rc = self.h[hname].Fill(parx,self.Weight)
-         elif self.xing[x]:
-             rc = self.h[hname+x].Fill(parx,self.Weight)
-   def fillHist2(self,hname,parx,pary):
-      for x in ['','B1only','B2noB1','noBeam']:
-         if x=='':  
-             rc = self.h[hname].Fill(parx,pary,self.Weight)
-         elif self.xing[x]:
-             rc = self.h[hname+x].Fill(parx,pary,self.Weight)
-
-class TrackSelector():
-   " run reconstruction, select events with tracks"
-   def __init__(self,options):
-        self.options = options
-        self.EventNumber = -1
-        self.MonteCarlo = False
-
-        path     = options.path
-        if path.find('eos')>0:
-             path  = options.server+options.path
-# setup geometry
-        if (options.geoFile).find('../')<0: self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
-        else:                                         self.snd_geo = SndlhcGeo.GeoInterface(options.geoFile[3:])
-        self.MuFilter = self.snd_geo.modules['MuFilter']
-        self.Scifi       = self.snd_geo.modules['Scifi']
-
-        self.runNr   = str(options.runNumber).zfill(6)
-        if options.runNumber > 0:
-           if options.partition < 0:
-              partitions = []
-              if path.find('eos')>0:
-# check for partitions
-                 print("xrdfs "+options.server+" ls "+options.path+"run_"+self.runNr)
-                 dirlist  = str( subprocess.check_output("xrdfs "+options.server+" ls "+options.path+"run_"+self.runNr,shell=True) )
-                 for x in dirlist.split('\\n'):
-                     ix = x.find('sndsw_raw-')
-                     if ix<0: continue
-                     partitions.append(x[ix:])
-              else:
-# check for partitions
-                 dirlist  = os.listdir(options.path+"run_"+self.runNr)
-                 for x in dirlist:
-                     if not x.find("sndsw_raw-")<0:
-                          partitions.append(x)
-           else:
-                 partitions = ["sndsw_raw-"+ str(options.partition).zfill(4)+".root"]
-           eventChain = ROOT.TChain('rawConv')
-           for p in partitions:
-               eventChain.Add(path+'run_'+self.runNr+'/'+p)
-        else:
-# for MC data
-                eventChain = ROOT.TChain("cbmsim")
-                eventChain.Add(options.fname)
-                self.MonteCarlo = True
-                partitions = []
-        rc = eventChain.GetEvent(0)
-# start FairRunAna
-        self.run  = ROOT.FairRunAna()
-        ioman = ROOT.FairRootManager.Instance()
-        ioman.SetTreeName(eventChain.GetName())
-        source = ROOT.FairFileSource(eventChain.GetCurrentFile())
-        ioman.SetInChain(eventChain)
-        first = True
-        for p in partitions:
-           if first:
-                first = False
-                continue
-           source.AddFile(path+'run_'+self.runNr+'/'+p+'.root')
-           self.run.SetSource(source)
-
-#avoiding some error messages
-        xrdb = ROOT.FairRuntimeDb.instance()
-        xrdb.getContainer("FairBaseParSet").setStatic()
-        xrdb.getContainer("FairGeoParSet").setStatic()
-
-# init() tracking tasks
-        if self.options.HoughTracking:
-           if self.options.trackType == 'Scifi' or self.options.trackType == 'ScifiDS':
-              self.muon_reco_task_Sf = options.FairTasks["houghTransform_Sf"]
-              self.muon_reco_task_Sf.Init()
-              self.genfitTrack = self.muon_reco_task_Sf.genfitTrack
-           if self.options.trackType == 'DS' or self.options.trackType == 'ScifiDS':
-              self.muon_reco_task_DS = options.FairTasks["houghTransform_DS"]
-              self.muon_reco_task_DS.Init()
-              self.genfitTrack = self.muon_reco_task_DS.genfitTrack
-        if self.options.simpleTracking:
-           self.trackTask = options.FairTasks["simpleTracking"]
-           if not self.options.HoughTracking:
-              self.genfitTrack = self.options.genfitTrack
-           
-           self.trackTask.SetTrackClassType(self.genfitTrack)
-           self.trackTask.Init()
-
-# prepare output tree, same branches as input plus track(s)
-        self.outFile = ROOT.TFile(options.oname,'RECREATE')
-        self.fSink    = ROOT.FairRootFileSink(self.outFile)
-
-        self.outTree = eventChain.CloneTree(0)
-        ROOT.gDirectory.pwd()
-        
-        # after track tasks init(), output track format is known
-        if self.genfitTrack:
-                self.fittedTracks = ROOT.TClonesArray("genfit::Track")
-                self.fittedTracks.BypassStreamer(ROOT.kFALSE)
-        else:
-                self.fittedTracks = ROOT.TClonesArray("sndRecoTrack")
-        self.MuonTracksBranch    = self.outTree.Branch("Reco_MuonTracks",self.fittedTracks,32000,0)
-
-        if self.options.simpleTracking and not self.options.trackType.find('Scifi')<0 and not eventChain.GetBranch("Cluster_Scifi"):
-           self.clusScifi   = ROOT.TClonesArray("sndCluster")
-           self.clusScifiBranch    = self.outTree.Branch("Cluster_Scifi",self.clusScifi,32000,1)
-        if self.options.simpleTracking and not self.options.trackType.find('DS')<0 and not eventChain.GetBranch("Cluster_Mufi"):
-           self.clusMufi   = ROOT.TClonesArray("sndCluster")
-           self.clusMufiBranch    = self.outTree.Branch("Cluster_Mufi",self.clusMufi,32000,1)
-
-        B = ROOT.TList()
-        B.SetName('BranchList')
-        B.Add(ROOT.TObjString('Reco_MuonTracks'))
-        B.Add(ROOT.TObjString('Scifi_sndCluster'))
-        B.Add(ROOT.TObjString('Mufi_sndCluster'))
-        B.Add(ROOT.TObjString('sndScifiHit'))
-        B.Add(ROOT.TObjString('MuFilterHit'))
-        B.Add(ROOT.TObjString('FairEventHeader'))
-        self.fSink.WriteObject(B,"BranchList", ROOT.TObject.kSingleKey)
-        self.fSink.SetRunId(options.runNumber)
-        self.fSink.SetOutTree(self.outTree)
-
-        self.eventTree = eventChain
-        self.run.SetSink(self.fSink)
-        self.OT = ioman.GetSink().GetOutTree()
-
-   def ExecuteEvent(self,event):
-           track_container_list = []
-           # Delete SndlhcTracking fitted tracks container
-           if self.options.simpleTracking:
-              self.trackTask.fittedTracks.Delete()
-
-           if self.options.trackType == 'ScifiDS':
-              if self.options.HoughTracking:
-                 self.muon_reco_task_Sf.Exec(0)
-                 self.muon_reco_task_DS.Exec(0)
-                 track_container_list = [self.muon_reco_task_Sf.kalman_tracks,self.muon_reco_task_DS.kalman_tracks]
-              if self.options.simpleTracking:
-                 self.trackTask.ExecuteTask(option='ScifiDS')
-                 track_container_list.append(self.trackTask.fittedTracks)
-
-           elif self.options.trackType == 'Scifi':
-              if self.options.HoughTracking:
-                 self.muon_reco_task_Sf.Exec(0)
-                 track_container_list.append(self.muon_reco_task_Sf.kalman_tracks)
-              if self.options.simpleTracking:
-                 self.trackTask.ExecuteTask(option='Scifi')
-                 track_container_list.append(self.trackTask.fittedTracks)
-                 
-           elif self.options.trackType == 'DS':
-              if self.options.HoughTracking:
-                 self.muon_reco_task_DS.Exec(0)
-                 track_container_list.append(self.muon_reco_task_DS.kalman_tracks)
-              if self.options.simpleTracking:
-                 self.trackTask.ExecuteTask(option='DS')
-                 track_container_list.append(self.trackTask.fittedTracks)
-
-           i_muon = -1
-           for item in track_container_list:
-               for aTrack in item:
-                   i_muon += 1
-                   self.fittedTracks[i_muon] = aTrack
-
-   def Execute(self):
-      for n in range(self.options.nStart,self.options.nStart+self.options.nEvents):
-
-          if self.options.scaleFactor > 1:
-             if ROOT.gRandom.Rndm() > 1.0/self.options.scaleFactor: continue
-
-          self.eventTree.GetEvent(n)
-          # delete track containers
-          self.fittedTracks.Delete()
-          
-          self.ExecuteEvent(self.eventTree)
-          if not self.MonteCarlo and self.fittedTracks.GetEntries() == 0: continue
-          if self.options.simpleTracking and not self.options.trackType.find('Scifi')<0:
-             if not self.eventTree.GetBranch("Cluster_Scifi"):
-                self.clusScifi.Delete()
-                self.clusScifi.Expand(len(self.trackTask.clusScifi))
-                for index, aCl in enumerate(self.trackTask.clusScifi):
-                     self.clusScifi[index] = aCl
-          if self.options.simpleTracking and not self.options.trackType.find('DS')<0:
-             if not self.eventTree.GetBranch("Cluster_Mufi"):
-                self.clusMufi.Delete()
-                self.clusMufi.Expand(len(self.trackTask.clusMufi))
-                for index, aCl in enumerate(self.trackTask.clusMufi):
-                     self.clusMufi[index] = aCl
-
-          # if using FairEventHeader, i.e. before sndlhc header was introduced
-          if hasattr(self.OT.EventHeader, "SetMCEntryNumber"):
-              self.OT.EventHeader.SetMCEntryNumber(n)
-          self.fSink.Fill()
-
-   def Finalize(self):
-         self.fSink.Write()
-         self.outFile.Close()
