@@ -124,6 +124,7 @@ class Monitoring():
 >>>>>>> cf0e3201a (Updating files for use with simulation)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       # setup input
       if self.simulation:
          partitions=[]
@@ -276,6 +277,113 @@ class Monitoring():
             self.snd_geo.modules['Scifi'].InitEvent(eventChain.EventHeader)
             self.snd_geo.modules['MuFilter'].InitEvent(eventChain.EventHeader)
 >>>>>>> d2ea8d70b (at HEPHY)
+=======
+      # setup input
+      if self.simulation:
+         partitions=[]
+         
+         #### For studying events that pass nue selection
+         if options.fname == 'nue': options.fname='/eos/user/c/cvilela/SND_nue_analysis_May24/nuMC/filtered_stage1.root'
+
+         eventChain = ROOT.TChain('cbmsim')
+         if options.simTest or options.simMode in ('muonDIS', 'neutralhadron', 'neutrino', 'passingmuon', 'nue'):
+            if options.simMode != 'nue': files = [ options.path+options.fname ]
+            else: files = [ options.fname ]
+            eventChain.Add( files[0] ) # Only run when 1 file is used per job
+         else:
+            allfiles = os.listdir(options.path)
+            files = [ options.path+i for i in allfiles if all( [i.find(f"sndLHC.{options.simMode}")==0, i.find('digiCPP.root')>0] ) ]
+            [eventChain.Add(f) for f in files]
+            
+      elif options.customEventChain:
+         eventChain=options.customEventChain
+                  
+         # Code added to analyse a collection of partitions from different runs e.g. for looking at mu_nu candidates 
+         # Passing a dictionary of {runNr : partition}
+         if options.signalpartitions:
+            partitions=[f'sndsw_raw-{p}.root' for p in list(options.signalpartitions.values())]
+
+      else:
+         partitions = []
+         if path.find('eos')>0:
+            # check for partitions
+            dirlist  = str( subprocess.check_output("xrdfs "+options.server+" ls "+options.path+"run_"+self.runNr,shell=True) )
+            for x in dirlist.split('\\n'):
+               ix = x.find('sndsw_raw-')
+               if ix<0: continue
+               partitions.append(x[ix:])
+         else:
+            # check for partitions
+            dirlist  = os.listdir(options.path+"run_"+self.runNr)
+            for x in dirlist:
+               if not x.find('sndsw_raw-')<0: partitions.append(x)
+               else: partitions = ["sndsw_raw-"+ str(options.partition).zfill(4)+".root"]
+
+         if options.runNumber>0:
+               eventChain = ROOT.TChain('rawConv')
+               for p in partitions:
+                  eventChain.Add(path+'run_'+self.runNr+'/'+p)
+
+      rc = eventChain.GetEvent(0)
+      if hasattr(eventChain, "EventHeader"):
+         self.TStart = eventChain.EventHeader.GetEventTime()
+         if options.nEvents <0:
+            rc = eventChain.GetEvent(eventChain.GetEntries()-1)
+         else:
+            rc = eventChain.GetEvent(options.nEvents-1)
+         self.TEnd = eventChain.EventHeader.GetEventTime()
+            
+      # start FairRunAna
+      self.run  = ROOT.FairRunAna()
+      ioman = ROOT.FairRootManager.Instance()
+      ioman.SetTreeName(eventChain.GetName())
+      outFile = ROOT.TMemFile('dummy','CREATE')
+      source = ROOT.FairFileSource(eventChain.GetCurrentFile()) # first file in chain is added here
+      
+      if self.simulation: 
+         # Only need to add more files to source if multiple files are being used
+         if not ( options.simTest or options.simMode in ('muonDIS', 'neutralhadron', 'neutrino', 'passingmuon', 'nue') ):
+            [source.AddFile(f) for f in files[1:]] # Skip first file
+
+      elif options.customEventChain: # Code run when investigating numu candidates
+         for idx, runNr in enumerate(options.signalpartitions):
+            if idx!=0: source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
+
+      else:
+         for i in range(1,len(partitions)):
+               p = partitions[i]
+               source.AddFile(path+'run_'+self.runNr+'/'+p)
+
+      self.run.SetSource(source)
+      self.sink = ROOT.FairRootFileSink(outFile)
+      self.run.SetSink(self.sink)
+
+      for t in FairTasks: 
+         self.run.AddTask(t)
+
+      # avoiding some error messages
+      xrdb = ROOT.FairRuntimeDb.instance()
+      xrdb.getContainer("FairBaseParSet").setStatic()
+      xrdb.getContainer("FairGeoParSet").setStatic()
+
+      self.run.Init()
+      if len(partitions)>0 or self.simulation:  self.eventTree = ioman.GetInChain()
+      else:  self.eventTree = ioman.GetInTree()
+
+      # fitted tracks
+      if "simpleTracking" in self.FairTasks:
+         self.trackTask = self.FairTasks["simpleTracking"]
+         self.Reco_MuonTracks = self.trackTask.fittedTracks
+         self.clusMufi = self.trackTask.clusMufi
+         self.clusScifi = self.trackTask.clusScifi
+         self.trackTask.DSnPlanes = 3
+
+      # initialize detector class for access to eventheader
+      if not self.simulation:
+         rc = eventChain.GetEvent(0)
+         self.snd_geo.modules['Scifi'].InitEvent(eventChain.EventHeader)
+         self.snd_geo.modules['MuFilter'].InitEvent(eventChain.EventHeader)
+>>>>>>> dfd288d1f (loads of stuff on the simulation side and adding more details to scifi event t0)
 
 <<<<<<< HEAD
       # fitted tracks
@@ -333,23 +441,14 @@ class Monitoring():
            if options.runNumber in FSdict: self.fsdict = FSdict[options.runNumber]
          except:
            print('continue without knowing filling scheme',options.server+options.path)
-<<<<<<< HEAD
-         if self.fsdict: 
-           print('extract bunch info from filling scheme')
-        if self.fsdict or self.hasBunchInfo: 
-          for x in ['B1only','B2noB1','noBeam']:
-            for role in ['shifter', 'expert']:
-             self.presenterFile.mkdir('mufilter/'+role+'/'+x)
-             self.presenterFile.mkdir('scifi/'+role+'/'+x)
-=======
-=======
+
          # get filling scheme, only necessary if not encoded in EventHeader, before 2022 reprocessing
          self.hasBunchInfo = False
          self.fsdict = False
          if hasattr(eventChain.EventHeader,"GetBunchType"):
             if not eventChain.EventHeader.GetBunchType()<0:
-                  self.hasBunchInfo = True
-                  print('take bunch info from event header')
+               self.hasBunchInfo = True
+               print('take bunch info from event header')
          if not self.hasBunchInfo:
             try:
                fg  = ROOT.TFile.Open(options.server+options.path+'FSdict.root')
@@ -359,6 +458,7 @@ class Monitoring():
                if options.runNumber in FSdict: self.fsdict = FSdict[options.runNumber]
             except:
                print('continue without knowing filling scheme',options.server+options.path)
+<<<<<<< HEAD
 >>>>>>> d8db0120 (at HEPHY)
          # if self.fsdict: 
          #   print('extract bunch info from filling scheme')
@@ -368,6 +468,8 @@ class Monitoring():
       #        self.presenterFile.mkdir('scifi/'+x)
 >>>>>>> 3a2ccf43 (Updating files for use with simulation)
 >>>>>>> cf0e3201a (Updating files for use with simulation)
+=======
+>>>>>>> dfd288d1f (loads of stuff on the simulation side and adding more details to scifi event t0)
 
    def GetEntries(self):
        if  self.options.online:
@@ -384,6 +486,7 @@ class Monitoring():
          self.eventTree.Reco_MuonTracks.Delete()
       if "simpleTracking" in self.FairTasks:
          self.Reco_MuonTracks.Delete()
+<<<<<<< HEAD
 
       self.eventTree.GetEvent(n)
 
@@ -422,6 +525,23 @@ class Monitoring():
                 if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
                 else: self.FairTasks[t].ExecuteTask()
 >>>>>>> d2ea8d70b (at HEPHY)
+=======
+
+      self.eventTree.GetEvent(n)
+
+      if not self.simulation:
+         # initialize detector class for access to eventheader
+         self.snd_geo.modules['Scifi'].InitEvent(self.eventTree.EventHeader)
+         self.snd_geo.modules['MuFilter'].InitEvent(self.eventTree.EventHeader)
+
+      if self.simulation: 
+         self.Weight = self.eventTree.MCTrack[0].GetWeight()
+      
+      for t in self.FairTasks: 
+            if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
+            else: self.FairTasks[t].ExecuteTask()
+
+>>>>>>> dfd288d1f (loads of stuff on the simulation side and adding more details to scifi event t0)
       self.EventNumber = n
 
 # check for bunch xing type
@@ -461,6 +581,7 @@ class Monitoring():
 
       return self.eventTree
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 <<<<<<< HEAD
@@ -603,6 +724,8 @@ class Monitoring():
 =======
 >>>>>>> d8db0120 (at HEPHY)
 >>>>>>> d2ea8d70b (at HEPHY)
+=======
+>>>>>>> dfd288d1f (loads of stuff on the simulation side and adding more details to scifi event t0)
    def systemAndOrientation(self,s,plane):
       if s==1 or s==2: return "horizontal"
       if plane%2==1 or plane == 6: return "vertical"

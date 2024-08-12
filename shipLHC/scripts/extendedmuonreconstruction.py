@@ -8,7 +8,6 @@ ROOT.gInterpreter.ProcessLine('#include "/afs/cern.ch/user/a/aconsnd/sndsw/analy
 class ExtendedMuonReconstruction(object):
 
     def __init__(self, options, tw):
-
         self.options=options
         self.tw=tw
         self.simulation=tw.simulation

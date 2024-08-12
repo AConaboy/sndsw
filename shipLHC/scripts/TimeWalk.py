@@ -268,7 +268,13 @@ class TimeWalk(ROOT.FairTask):
         elif self.mode == 'reconstructmuonposition':
             # self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
             self.sa.ReconstructMuonPosition(hits)
-            return
+            return        
+
+        # Everything from here on requires a track found in the reference system (Scifi or DS)
+
+        ### Slope cut
+        if self.slopecut(): self.passslopecut=True 
+        else: self.passslopecut=False
 
         ### Slope cut
         if self.slopecut(): self.passslopecut=True 
