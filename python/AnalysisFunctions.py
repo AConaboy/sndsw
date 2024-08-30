@@ -10,12 +10,12 @@ from itertools import combinations
 class Analysis(object):
 
 	def __init__(self, options):
+
 		self.options=options
 		self.simulation = options.simulation
 
 		# Adding flag for LaserMeasurements/ work to use some functions defined in here
 		if not hasattr(options, "LaserMeasurements"):
-			if not hasattr(options, 'runNumber'): options.runNumber=options.runs[0]
 			if options.runNumber==-1: self.runNr='005408'
 			else: self.runNr = str(options.runNumber).zfill(6)
 			self.TWCorrectionRun = str(5408).zfill(6)
@@ -23,7 +23,7 @@ class Analysis(object):
 			self.timealignment=self.GetTimeAlignmentType(self.runNr)
 			self.state=options.state
 			if hasattr(options, 'datafiletype'): self.fileext=options.datafiletype
-			else: self.fileext='csv'		
+			else: self.fileext='json'		
 			self.CorrectionType=options.CorrectionType
 
 			afswork='/afs/cern.ch/work/a/aconsnd/Timing'
@@ -263,9 +263,20 @@ class Analysis(object):
 		averagetime = sum(times) / len(times)
 		return averagetime
 
-	def GetBarycentres(self, hits):
+	def GetBarycentres(self, hits, **kwargs):
 
-		if not hasattr(self, "barlengths"): self.BuildBarLengths(self.task.MuFilter)
+		"""
+		Adding some kwargs for using when the analysis instance
+		isn't connected to a FairTask
+		"""
+		if hasattr(self, "task"):
+			mufilter=self.task.MuFilter
+			hasTrack=self.task.hasTrack
+		elif not hasattr(self, "task"):
+			if "MuFilter" in kwargs: mufilter=kwargs.get("MuFilter")
+			if "hasTrack" in kwargs: hasTrack=kwargs.get("hasTrack")
+
+		if not hasattr(self, "barlengths"): self.BuildBarLengths(mufilter)
 
 		barycentres={}
 		planewise_data = {}
@@ -292,7 +303,7 @@ class Analysis(object):
 			atimes_right_mean = sum(atimes_right)/len(atimes_right)
 
 			# Skip hit if abs( atimes_left(right) ) > L/2 / cscint_L(R)
-			averagecscint_left, averagecscint_right = self.GetBarAveragecscint(self.task.TWCorrectionRun, detID, 'corrected')
+			averagecscint_left, averagecscint_right = self.GetBarAveragecscint(mufilter, detID)
 			if abs(atimes_left_mean) > self.barlengths[2]/2 / averagecscint_left[0] or abs(atimes_right_mean) > self.barlengths[2]/2 / averagecscint_right[0]: continue
 
 			if not p in planewise_data: planewise_data[p]={}
@@ -315,19 +326,17 @@ class Analysis(object):
 			weighted_ys = []
 			x_barycentres = {}
 
-			# xEx, yEx, zEx = self.GetExtrapolatedPosition(plane)
-
 			for detID in pdata:
 				# Get weighted y-position for each hit that passes selection in this plane
 				s,p,b = self.parseDetID(detID)
-
-				if self.task.hasTrack: 
+				
+				if hasTrack:
 					if self.GetExtrapolatedBarDetID(p) == detID: trackInBar = True
 					else: trackInBar=False
 				else: trackInBar=False
 
 				barQDC = pdata[detID]['bar-QDC']
-				self.task.MuFilter.GetPosition(detID, self.A, self.B)
+				mufilter.GetPosition(detID, self.A, self.B)
 				y_pos = barQDC/planeQDC * 0.5 * (self.A.y() + self.B.y())
 				x_midpoint = 0.5 * (self.A.x() + self.B.x())
 				weighted_ys.append(y_pos) # Get weighted y-pos
@@ -367,18 +376,15 @@ class Analysis(object):
 					'relQDC':barQDC/planeQDC,
 					"trackInBar":shower_side
 					}
-				
+
 			y_barycentre=sum(weighted_ys) 
-			
-			# Testing different lambda-y methods
-			# 1. max y-pos - min y-pos
-			# 2. max weighted_y pos - min weighted_y pos
-			# 3. sqrt(var) of weighted y_positions
-			# lambda_y = max(weighted_ys) - min(weighted_ys)
-			self.task.MuFilter.GetPosition(max(pdata.keys()), self.A, self.B)
+			if len(pdata)==1:
+				print(f'1 fired bar in plane {plane}: y_B = {y_barycentre}')
+				
+			mufilter.GetPosition(max(pdata.keys()), self.A, self.B)
 			max_y = 0.5*(self.A.y() + self.B.y())
-			self.task.MuFilter.GetPosition(max(pdata.keys()), self.A, self.B)
-			min_y = 0.5*(self.A.y() + self.B.y())			
+			mufilter.GetPosition(max(pdata.keys()), self.A, self.B)
+			min_y = 0.5*(self.A.y() + self.B.y())
 			lambda_y = max_y - min_y
 			
 			y_barycentres = {
@@ -386,8 +392,8 @@ class Analysis(object):
 				'lambda_y':lambda_y
 				}
 
-			barycentres[plane] = {'x-barycentres':x_barycentres, "y_barycentre":y_barycentres}				
-				
+			barycentres[plane] = {'x-barycentres':x_barycentres, "y-barycentre":y_barycentres}				
+
 		return barycentres
 
 			# 	# if trackInBar and abs(x_barycentre-xEx) < 5: 
@@ -436,6 +442,7 @@ class Analysis(object):
 			for p,pdata in barycentres.items():
 				
 				xb_data = pdata['x-barycentres']
+				
 				xL = sum([xb_data[detID]['relQDC']*xb_data[detID]['xL'][0] for detID in xb_data.keys()])
 				sigma_xL = np.sqrt(sum([xb_data[detID]['relQDC']**2*xb_data[detID]['xL'][1]**2 for detID in xb_data.keys()]))
 
@@ -1171,7 +1178,7 @@ class Analysis(object):
 
 		return d[state][2], d[state][3]
 
-	def GetBarAveragecscint(self, runNr, detID, state):
+	def GetBarAveragecscint(self, MuFilter, detID):
 
 		subsystem, plane, bar = self.parseDetID(detID)
 		cscintvalues={'left':[], 'right':[]}
@@ -1182,7 +1189,7 @@ class Analysis(object):
 				if fixed_ch not in self.cscintvalues:continue
 				cscint=self.cscintvalues[fixed_ch]
 			else: 
-				cscint = self.task.MuFilter.GetConfParF(f'MuFilter/US_signalspeed_{fixed_ch}')
+				cscint = MuFilter.GetConfParF(f'MuFilter/US_signalspeed_{fixed_ch}')
 				if cscint==0:continue
 				cscint=(cscint,0) # at the moment, no uncertainty for signal speed in simulation
 			if not cscint: continue
@@ -1194,7 +1201,7 @@ class Analysis(object):
 	
 		return (average_left_cscint, uncertainty_left), (average_right_cscint, uncertainty_right)
 
-	def GetBarAveragesigmat(self, runNr, detID, state):
+	def GetBarAveragesigmat(self, detID):
 
 		subsystem, plane, bar = self.parseDetID(detID)
 		bartimeresolutionvalues={}
@@ -1506,17 +1513,17 @@ class Analysis(object):
 	the SiPM time to x=L/2 in the physics FoR. That is not equal to the bar centre!!!! 
 	"""
 
-	def correct_ToF(self, fixed_ch, clock, xEx):
+	def correct_ToF(self, MuFilter, fixed_ch, clock, xEx):
 		detID=int(fixed_ch.split('_')[0])
 		SiPM=int(fixed_ch.split('_')[-1])
 
 		# Correct to the centre of the bar in the physics FoR
-		self.task.MuFilter.GetPosition(detID, self.A, self.B)	
+		MuFilter.GetPosition(detID, self.A, self.B)	
 		xref = 0.5 * (self.A.x() + self.B.x())
 		if not self.simulation: 
 			cs = self.cscintvalues[fixed_ch]
 			c_SiPM = float(cs[0])
-		else: c_SiPM = self.task.MuFilter.GetConfParF(f'MuFilter/US_signalspeed_{fixed_ch}')
+		else: c_SiPM = MuFilter.GetConfParF(f'MuFilter/US_signalspeed_{fixed_ch}')
 
 		# fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
 		time=clock*self.TDC2ns
@@ -1833,14 +1840,7 @@ class Analysis(object):
 		f.Close()
 		return entries
 
-	def MakeTWCorrectionDict(self, alignment, withErrors=False):
-  
-		# Update stored string for alignment params stored
-		self.timealignment=alignment
-	
-		if alignment=='old': run=str(5097).zfill(6)
-		elif alignment=='new': run=str(5408).zfill(6)
-		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
+	def MakeTWCorrectionDict(self, withErrors=False):
 
 		d={}
 		for s in (2,): # Only make dict for US
@@ -1869,14 +1869,14 @@ class Analysis(object):
 		print(f'TW param dict written to {twparamsfilename}')
 
 	### Make dictionary of the alignment parameter determined as the truncated y-mean of tw-corr (tds0 - tSiPM)
-	def MakeAlignmentParameterDict(self, alignment):
+	def MakeAlignmentParameterDict(self):
 
 		# Update stored string for alignment params stored
-		self.timealignment=alignment
+		# self.timealignment=alignment
 
-		if alignment=='old': run=str(5097).zfill(6)
-		elif alignment=='new': run=str(5408).zfill(6)
-		elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
+		# if alignment=='old': run=str(5097).zfill(6)
+		# elif alignment=='new': run=str(5408).zfill(6)
+		# elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
 
 		d={}
 		for s in (2,): # Just US
@@ -1884,17 +1884,17 @@ class Analysis(object):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-						correction=self.GetAlignmentParameters(run, fixed_ch)
+						correction=self.GetAlignmentParameters(self.runNr, fixed_ch)
 						if not correction: continue
 						d[fixed_ch]=correction
 		if len(d)==0: self.alignmentparameters=None
 		self.alignmentparameters=d
 
 	def WriteAlignmentParamDict(self):
-		if not hasattr(self, "alignmentparameters"): self.MakeAlignmentParameterDict(self.timealignment)
+		if not hasattr(self, "alignmentparameters"): self.MakeAlignmentParameterDict()
 
 		alignmentparamsdir = f'{self.path}/Alignmentparams/run{self.runNr}/'
-		alignmentparamsfilename=alignmentparamsdir+f'alignmentparams.json'	
+		alignmentparamsfilename=alignmentparamsdir+f'alignmentparams_{self.refsysname}.json'	
 		with open(alignmentparamsfilename, 'w') as jf: 
 			json.dump(self.alignmentparameters, jf)
 		print(f'Alignment param dict written to {alignmentparamsfilename}')

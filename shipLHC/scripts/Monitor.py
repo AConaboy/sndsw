@@ -68,7 +68,7 @@ class Monitoring():
       self.TEnd   = -1
       self.Weight = 1
 
-      path     = options.path
+      path = options.path
       self.myclient = None
 
       if options.online:
@@ -78,7 +78,7 @@ class Monitoring():
       else: 
          if path.find('eos')>0: path  = options.server+options.path         
          self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
-      
+
       self.MuFilter = self.snd_geo.modules['MuFilter']
       self.Scifi       = self.snd_geo.modules['Scifi']
       self.systemAndPlanes = {1:2,2:5,3:7}
@@ -94,48 +94,60 @@ class Monitoring():
       # setup input
       if self.simulation:
          partitions=[]
-         
-         #### For studying events that pass nue selection
-         if options.fname == 'nue': options.fname='/eos/user/c/cvilela/SND_nue_analysis_May24/nuMC/filtered_stage1.root'
 
          eventChain = ROOT.TChain('cbmsim')
-         if options.simTest or options.simMode in ('muonDIS', 'neutralhadron', 'neutrino', 'passingmuon', 'nue'):
-            if options.simMode != 'nue': files = [ options.path+options.fname ]
-            else: files = [ options.fname ]
+
+         if options.allFiles: 
+            if options.simMode=='neutrino' and options.mode=='nue-extendedreconstruction':
+               path=options.path+'sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/nueFilter/'
+            else: 
+               print(f'Options not set for all files and other modes')
+               os.exit(1)
+            allfiles=os.listdir(path)
+            files= [ path+i for i in allfiles 
+                     if all( [ i.split('.')[-1]=='root', i.find('geofile')==-1 ] ) ]
+            [eventChain.Add(i) for i in files]
+
+         elif not options.allFiles:
+         # elif options.simMode in ('muonDIS', 'neutralhadron', 'neutrino', 'passingmuon'):
+            files = [ options.path+options.fname ]
             eventChain.Add( files[0] ) # Only run when 1 file is used per job
-         else:
-            allfiles = os.listdir(options.path)
-            files = [ options.path+i for i in allfiles if all( [i.find(f"sndLHC.{options.simMode}")==0, i.find('digiCPP.root')>0] ) ]
-            [eventChain.Add(f) for f in files]
-            
-      elif options.customEventChain:
-         eventChain=options.customEventChain
-                  
-         # Code added to analyse a collection of partitions from different runs e.g. for looking at mu_nu candidates 
-         # Passing a dictionary of {runNr : partition}
-         if options.signalpartitions:
-            partitions=[f'sndsw_raw-{p}.root' for p in list(options.signalpartitions.values())]
+
+         # else:
+         #    allfiles = os.listdir(options.path)
+         #    files = [ options.path+i for i in allfiles if all( [i.find(f"sndLHC.{options.simMode}")==0, i.find('digiCPP.root')>0] ) ]
+         #    [eventChain.Add(f) for f in files]
 
       else:
-         partitions = []
-         if path.find('eos')>0:
-            # check for partitions
-            dirlist  = str( subprocess.check_output("xrdfs "+options.server+" ls "+options.path+"run_"+self.runNr,shell=True) )
-            for x in dirlist.split('\\n'):
-               ix = x.find('sndsw_raw-')
-               if ix<0: continue
-               partitions.append(x[ix:])
-         else:
-            # check for partitions
-            dirlist  = os.listdir(options.path+"run_"+self.runNr)
-            for x in dirlist:
-               if not x.find('sndsw_raw-')<0: partitions.append(x)
-               else: partitions = ["sndsw_raw-"+ str(options.partition).zfill(4)+".root"]
 
-         if options.runNumber>0:
-               eventChain = ROOT.TChain('rawConv')
-               for p in partitions:
-                  eventChain.Add(path+'run_'+self.runNr+'/'+p)
+         if options.customEventChain:
+            eventChain=options.customEventChain
+                     
+            # Code added to analyse a collection of partitions from different runs e.g. for looking at mu_nu candidates 
+            # Passing a dictionary of {runNr : partition}
+            if options.signalpartitions:
+               partitions=[f'sndsw_raw-{p}.root' for p in list(options.signalpartitions.values())]     
+
+         else:
+            partitions = []
+            if path.find('eos')>0:
+               # check for partitions
+               dirlist  = str( subprocess.check_output("xrdfs "+options.server+" ls "+options.path+"run_"+self.runNr,shell=True) )
+               for x in dirlist.split('\\n'):
+                  ix = x.find('sndsw_raw-')
+                  if ix<0: continue
+                  partitions.append(x[ix:])
+            else:
+               # check for partitions
+               dirlist  = os.listdir(options.path+"run_"+self.runNr)
+               for x in dirlist:
+                  if not x.find('sndsw_raw-')<0: partitions.append(x)
+                  else: partitions = ["sndsw_raw-"+ str(options.partition).zfill(4)+".root"]
+
+            if options.runNumber>0:
+                  eventChain = ROOT.TChain('rawConv')
+                  for p in partitions:
+                     eventChain.Add(path+'run_'+self.runNr+'/'+p)
 
       rc = eventChain.GetEvent(0)
       if hasattr(eventChain, "EventHeader"):
@@ -155,8 +167,7 @@ class Monitoring():
       
       if self.simulation: 
          # Only need to add more files to source if multiple files are being used
-         if not ( options.simTest or options.simMode in ('muonDIS', 'neutralhadron', 'neutrino', 'passingmuon', 'nue') ):
-            [source.AddFile(f) for f in files[1:]] # Skip first file
+         [source.AddFile(f) for f in files[1:]] # Skip first file
 
       elif options.customEventChain: # Code run when investigating numu candidates
          for idx, runNr in enumerate(options.signalpartitions):

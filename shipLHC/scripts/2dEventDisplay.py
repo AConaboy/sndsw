@@ -175,33 +175,16 @@ def goodEvent(event):
            elif not onlyScifi  and totalN >  Nlimit: return True
            else: return False
 
-def userProcessing(event):
-    '''User hook to add action after event is plotted.
+def userProcessing(event,mode):
+    
+    if mode=='HCALbarycentres':
+         
+         muAna = SetUpAnalysisClass()
 
-    Useful for adding special objects to the display for example.
-    An example for display of 3-track events with external reco:
-
-    ```python
-    trackTask.multipleTrackCandidates(
-        nMaxCl=8, dGap=0.2, dMax=0.8, dMax3=0.8, ovMax=1, doublet=True, debug=False
-    )
-    n3D = [0, 0]
-    for p in range(2):
-        tc = h['simpleDisplay'].cd(-p + 2)
-        for trackId in trackTask.multipleTrackStore['trackCand'][p]:
-            if trackId < 100000 and not trackTask.multipleTrackStore['doublet']:
-                continue
-            if trackId in trackTask.multipleTrackStore['cloneCand'][p]:
-                continue
-            n3D[p] += 1
-            rc = trackTask.multipleTrackStore['trackCand'][p][trackId].Fit('pol1', 'SQ')
-            trackTask.multipleTrackStore['trackCand'][p][trackId].Draw('same')
-        tc.Update()
-    print('Number of full tracks', n3D)
-    return True
-    ```
-    '''
-    return
+         barycentres=muAna.GetBarycentres(event.Digi_MuFilterHits, MuFilter=geo.modules['MuFilter'], hasTrack=False)
+         x_barycentres=muAna.GetOverallXBarycentre(barycentres, mode='relQDC')
+         DrawBarycentres(barycentres, x_barycentres, mode='all-xBs')
+    return    
 
 def bunchXtype():
 # check for b1,b2,IP1,IP2
@@ -289,6 +272,9 @@ def loopEvents(
               start=0,
               save=False,
               goodEvents=False,
+              onlyValid=True,
+              HCALbarycentres=False,
+              outgoingMuon=False,
               withTrack=-1,
               withHoughTrack=-1,
               nTracks=0,
@@ -340,6 +326,16 @@ def loopEvents(
     if goodEvents and not goodEvent(event): continue
     nHoughtracks = 0
     OT.Reco_MuonTracks = ROOT.TObjArray(10)
+    
+    ### Only display events that contain a muon
+    if outgoingMuon:
+      if not mc: 
+         print(f'Cannot use mode "outgoingMuon" with data')
+         return
+      if abs(event.MCTrack[1].GetPdgCode()) != 13: 
+         print(f'No muon')
+         continue
+
     if withHoughTrack > 0:
        rc = source.GetInTree().GetEvent(N)
        # Delete SndlhcMuonReco kalman tracks container
@@ -434,6 +430,7 @@ def loopEvents(
       drawDetectors()
     for D in digis:
       for digi in D:
+         if onlyValid and not digi.isValid: continue
          detID = digi.GetDetectorID()
          sipmMult = 1
          if digi.GetName()  == 'MuFilterHit':
@@ -468,16 +465,16 @@ def loopEvents(
              rc = c[1].SetPoint(c[0], Z, Y)
              rc = c[1].SetPointError(c[0], detSize[system][2], sY)
              c[0] += 1
-         if hitColour == "q" :
+         if hitColour == "q":
                 max_QDC = 200 * 16
                 this_qdc = 0
                 ns = max(1,digi.GetnSides())
                 for side in range(ns):
                        for m in  range(digi.GetnSiPMs()):
                               qdc = digi.GetSignal(m+side*digi.GetnSiPMs())
-                              if not qdc < 0  :
+                              if not qdc < 0:
                                      this_qdc += qdc
-                if this_qdc > max_QDC :
+                if this_qdc > max_QDC:
                        this_qdc = max_QDC
                 fillNode(curPath, ROOT.TColor.GetPalette()[int(this_qdc/max_QDC*(len(ROOT.TColor.GetPalette())-1))])
          else :
@@ -490,7 +487,7 @@ def loopEvents(
              for m in  range(digi.GetnSiPMs()):
                    qdc = digi.GetSignal(m+side*digi.GetnSiPMs())
                    if qdc < 0 and qdc > -900:  h[F][systems[system]][1]+=1
-                   elif not qdc<0:   
+                   elif not qdc<0:
                        h[F][systems[system]][0]+=1
                        if len(h[F][systems[system]]) < 2+side: continue
                        h[F][systems[system]][2+side]+=qdc
@@ -564,7 +561,7 @@ def loopEvents(
           if not rc: rc = twoTrackEvent(sMin=10,dClMin=7,minDistance=0.5,sepDistance=3.0)
 
     if verbose>0: dumpChannels()
-    userProcessing(event)
+    if HCALbarycentres: userProcessing(event, 'HCALbarycentres')
 
     if save: h['simpleDisplay'].Print('{:0>2d}-event_{:04d}'.format(runId,N)+'.png')
     if auto:
@@ -578,6 +575,77 @@ def loopEvents(
        else:
           eventComment[f"{runId}-event_{event.EventHeader.GetEventNumber()}"] = rc
  if save: os.system("convert -delay 60 -loop 0 event*.png animated.gif")
+
+def DrawBarycentres(barycentres, x_barycentres, mode='all-xBs'):
+   colour=ROOT.TColor.GetColorTransparent(ROOT.kBlue, 0.5)
+   proj={'X':0, 'Y':1}
+   h['barycentre_gs'] = {'X':[ROOT.TGraphErrors()], 'Y':[ROOT.TGraphErrors()]}
+   for g in h['barycentre_gs'].values():
+      g[0].SetMarkerColor(ROOT.kRed+1)
+      g[0].SetMarkerSize(1.5)
+      g[0].SetMarkerStyle(20)
+   
+   if mode == 'all-xBs': 
+      points={}
+      for p in proj:
+         tmp=0
+         for i in range(5):
+            geo.modules['MuFilter'].GetPosition(20000+i*1000, A, B)
+            z=0.5*(A.z()+B.z())
+         
+            if p=='X':
+               if not i in barycentres: continue
+               xbs=[]
+               for detID in barycentres[i]['x-barycentres']:
+                  xb=barycentres[i]['x-barycentres'][detID]['xB']
+                  lambda_x = barycentres[i]['x-barycentres'][detID]['xR'][0] - barycentres[i]['x-barycentres'][detID]['xL'][0]
+                  xbs.append([xb, lambda_x])
+
+               for x in xbs:
+                  xb, lambda_x = x
+                  h['barycentre_gs'][p][0].SetPoint(tmp, z, xb)
+                  width_box = ROOT.TBox(z-0.5, xb-abs(lambda_x/2), z+0.5, xb+abs(lambda_x/2))
+                  width_box.SetFillColor(colour)
+                  width_box.SetLineColor(colour)
+                  width_box.SetLineWidth(2)
+                  h['barycentre_gs'][p].append(width_box)
+                  # h['barycentre_gs'][p][0].SetPointError(tmp, 0, abs(lambda_x/2))
+                  tmp+=1
+
+            elif p=='Y':
+               if not i in barycentres: continue
+               b=barycentres[i]['y-barycentre']['yB']
+               h['barycentre_gs'][p][0].SetPoint(tmp, z, b)
+               # print(f'proj {p.lower()}z point {(z,b)}')
+               tmp+=1
+
+   elif mode=='overall-xB':
+      for p in proj:
+         tmp=0
+         for i in range(5):
+
+            geo.modules['MuFilter'].GetPosition(20000+i*1000, A, B)
+            z=0.5*(A.z()+B.z())
+            if p=='X':
+                  if not i in x_barycentres: continue
+                  b=x_barycentres[i]['dxB']
+            elif p=='Y':
+                  if not i in barycentres: continue
+                  b=barycentres[i]['y-barycentre']['yB']
+
+            h['barycentre_gs'][p][0].SetPoint(tmp, z, b)
+            print(f'proj {p.lower()}z point {(z,b)}')
+            tmp+=1
+
+   proj={'X':0, 'Y':1}
+   for p in proj: 
+      c=proj[p]
+      c=h['simpleDisplay'].cd(c+1)
+      h['barycentre_gs'][p][0].Draw('P same')
+      if proj=='X':
+         [box.Draw('same') for box in h['barycentre_gs'][p][1:]]
+      c.Update()
+   h['simpleDisplay'].Update()
 
 def addTrack(OT,scifi=False):
    xax = h['xz'].GetXaxis()
@@ -1124,4 +1192,22 @@ def drawInfo(pad, k, run, event, timestamp,moreEventInfo=[]):
       for i in range(7):
         textInfo.DrawLatex(0.4, 0.9-dely*i, moreEventInfo[i])
       pad.cd(k)
+
+def SetUpAnalysisClass():
+   from AnalysisFunctions import Analysis 
+   from args_config import add_arguments
+   muAna_parser = ArgumentParser()
+   add_arguments(muAna_parser)
+   muAna_options = muAna_parser.parse_args()
+   muAna_options.simulation=mc 
+   muAna = Analysis(muAna_options)
+   muAna.BuildBarLengths(geo.modules['MuFilter'])
+   muAna.Makecscintdict(muAna_options.TWCorrectionRun, 'corrected')
+   
+   if not muAna.simulation:
+      timealignment=muAna.GetTimeAlignmentType(runNr=str(muAna_options.runNr).zfill(6))
+      muAna.MakeAlignmentParameterDict(timealignment)
+      muAna.MakeTWCorrectionDict()
+
+   return muAna       
 

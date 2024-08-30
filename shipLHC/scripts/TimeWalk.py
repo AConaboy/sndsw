@@ -88,6 +88,7 @@ class TimeWalk(ROOT.FairTask):
             # self.simMode = self.GetSimEngine()
             self.simMode = options.simMode
             self.cutdists=self.muAna.GetCutDistributions("005408", ('dy'))
+        
 
         elif not self.simulation:
             statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
@@ -135,7 +136,7 @@ class TimeWalk(ROOT.FairTask):
 
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
             
-            self.muAna.MakeAlignmentParameterDict(self.timealignment)
+            self.muAna.MakeAlignmentParameterDict()
             self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
             self.muAna.MakeTWCorrectionDict(self.timealignment)
 
@@ -158,7 +159,7 @@ class TimeWalk(ROOT.FairTask):
             from selectioncriteria import MuonSelectionCriteria as SelectionCriteria
             self.sc = SelectionCriteria(options, self)   
 
-        elif self.mode == 'extendedreconstruction':
+        elif self.mode.find('extendedreconstruction')>-1:
             from extendedmuonreconstruction import ExtendedMuonReconstruction as ExtendedMuonReconstruction
             self.emr = ExtendedMuonReconstruction(options, self)
 
@@ -183,12 +184,12 @@ class TimeWalk(ROOT.FairTask):
         inScifi, inDS = False, False
 
         hits = event.Digi_MuFilterHits
-        scifi_hits = event.Digi_ScifiHits        
+        scifi_hits = event.Digi_ScifiHits
 
         for i,track in enumerate(self.M.Reco_MuonTracks):
             if any([not track.getFitStatus().isFitConverged(), track.getFitStatus().getNdf()==0]): 
                 continue
-            if track.GetUniqueID()==1: 
+            if track.GetUniqueID()==1:
                 inScifi=True
                 tracks[1].append(self.M.Reco_MuonTracks[i])
             if track.GetUniqueID()==3: 
@@ -203,7 +204,7 @@ class TimeWalk(ROOT.FairTask):
         if self.referencesystem==1 and len(tracks[1])==1: self.track= tracks[1][0]
         elif self.referencesystem==1 and len(tracks[1])>1: 
             tmp={i:i.getFitStatus().getChi2()/i.getFitStatus().getNdf() for i in tracks[1]}
-            self.track=tmp[ min(tmp) ]               
+            self.track=tmp[ min(tmp) ]
         
         self.hasTrack=True
         if (self.referencesystem==3 and not inDS) or (self.referencesystem==1 and not inScifi): 
@@ -250,14 +251,14 @@ class TimeWalk(ROOT.FairTask):
             self.sp.ShowerDirection(hits)
             return
         
-        elif self.mode == 'extendedreconstruction':
+        elif self.mode.find('extendedreconstruction')>-1:
             self.emr.ExtendReconstruction(hits)
             return
         
         elif self.mode == 'reconstructmuonposition':
             # self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
             self.sa.ReconstructMuonPosition(hits)
-            return        
+            return
 
         # Everything from here on requires a track found in the reference system (Scifi or DS)
 
@@ -520,7 +521,7 @@ class TimeWalk(ROOT.FairTask):
 
     def WriteOutHistograms(self):
 
-        if self.mode not in ('systemalignment', 'selectioncriteria', 'showerprofiles', 'tds0-studies', 'reconstructmuonposition'):
+        if self.mode in ('zeroth', 'ToF', 'TW', 'res'):
             for h in self.hists:
                 if len(h.split('_'))==4:
                     if len(h.split('_'))==4: histkey,detID,SiPM,state=h.split('_')
@@ -550,7 +551,10 @@ class TimeWalk(ROOT.FairTask):
             self.sc.WriteOutHistograms()
 
         elif self.mode == 'reconstructmuonposition':
-            self.sa.WriteOutReconstructionHistograms()            
+            self.sa.WriteOutReconstructionHistograms()   
+
+        elif self.mode.find('extendedreconstruction')>-1:
+            self.emr.WriteOutHistograms()
         
         elif self.mode == 'tds0-studies':
             outfilename=f'{self.outpath}/splitfiles/run{self.runNr}/tds0-studies.root'

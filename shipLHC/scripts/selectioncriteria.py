@@ -233,7 +233,9 @@ class MuonSelectionCriteria(object):
     def FillHists(self, hits, scifi_hits):
         
         # self.redchi2hists(fitStatus)
-       
+
+        # Loops through hits
+        self.FillnSiPMs(hits)
 
         if self.options.debug and self.tw.hasTrack:
             self.FillChannelRateHists()
@@ -241,10 +243,12 @@ class MuonSelectionCriteria(object):
             # self.Fillchi2xy(tmp)
 
         # if self.cuts['OneHitPerSystem']:
-        if self.tw.hasTrack:
+        if self.tw.hasTrack and self.tw.referencesystem==3:
             self.FillTimingDiscriminantHists(hits)
             self.Fillyresidual(hits)
             self.FilldeltaDSH(hits)            
+        elif self.tw.hasTrack and self.tw.referencesystem==1:
+            self.FilldeltaSF(scifi_hits)
         
         # Both of these methods loop through the hits
         # self.FillPlaneMultiplicity(hits)
@@ -252,11 +256,8 @@ class MuonSelectionCriteria(object):
 
         # Loops through hits
         # self.FillPullHists(hits)
-        
-        # Loops through hits
-        self.FillnSiPMs(hits)
 
-        self.FilldeltaSF(scifi_hits)
+        
         
         # Loops through hits, requires at least 6 SiPMs per side in Veto and 4 large SiPMs per side in US
         # self.FillAverageBarTime(hits)
