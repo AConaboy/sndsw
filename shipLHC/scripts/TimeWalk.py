@@ -161,7 +161,6 @@ class TimeWalk(ROOT.FairTask):
             from extendedmuonreconstruction import QuarkVectorExtrapolation as QuarkVectorExtrapolation
             self.qve = QuarkVectorExtrapolation(options, self)
 
-
         with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
             self.histformatting=json.load(x)  
 
@@ -259,6 +258,10 @@ class TimeWalk(ROOT.FairTask):
         
         elif self.mode.find('extendedreconstruction')>-1:
             self.emr.ExtendReconstruction(hits, scifi_hits)
+            return
+        
+        elif self.mode == 'struckquark': 
+            self.qve.StruckQuarkExtrapolation(hits)
             return
         
         elif self.mode == 'struckquark': 
