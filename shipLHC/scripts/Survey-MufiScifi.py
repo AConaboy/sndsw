@@ -136,6 +136,8 @@ nav = ROOT.gGeoManager.GetCurrentNavigator()
 nScifi = Scifi.GetConfParI("Scifi/nscifi")
 nMats = Scifi.GetConfParI("Scifi/nmats")
 
+nVeto = MuFilter.GetConfParI("MuFilter/NVetoPlanes")
+
 A,B,locA,locB,globA,globB    = ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3(),ROOT.TVector3()
 latex = ROOT.TLatex()
 
@@ -149,8 +151,8 @@ systemAndBars     = {1:MuFilter.GetConfParI("MuFilter/NVetoBars"),
                      3:MuFilter.GetConfParI("MuFilter/NDownstreamBars")}
 
 def systemAndOrientation(s,plane):
-   if s==1 or s==2: return "horizontal"
-   if plane%2==1 or plane == 6: return "vertical"
+   if s==1 and plane==2: return "vertical"
+   if s==3 and (plane%2==1 or plane == 6): return "vertical"
    return "horizontal"
 
 systemAndChannels     = {1:[MuFilter.GetConfParI("MuFilter/VetonSiPMs"),0],
@@ -158,8 +160,8 @@ systemAndChannels     = {1:[MuFilter.GetConfParI("MuFilter/VetonSiPMs"),0],
                          3:[MuFilter.GetConfParI("MuFilter/DownstreamnSiPMs"),0]}
 sdict                 = {1:'Veto',2:'US',3:'DS'}
 
-freq      = 160.316E6
-TDC2ns = 1E9/freq
+freq   = u.snd_freq
+TDC2ns = u.snd_TDC2ns
 
 # some helper functions
 
@@ -1296,7 +1298,8 @@ def USDSEnergy(Nev=options.nEvents,nproc=15):
 def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='True',NbinsRes=100,X=10.):
  
  projs = {1:'Y',0:'X'}
- for s in range(1,6):
+ v = Scifi.GetConfParF("Scifi/signalSpeed") #signal propagation in fibre
+ for s in range(1,nScifi+1):
      for p in projs:
          ut.bookHist(h,'dtScifivsX_'+str(s)+projs[p],'dt vs x track '+projs[p]+";X [cm]; dt [ns]",100,-10.,40.,260,-8.,5.)
          ut.bookHist(h,'clN_'+str(s)+projs[p],'cluster size '+projs[p],10,-0.5,9.5)
@@ -1314,11 +1317,15 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
         for proj in ['X','Y']:
           xmin = -X*NbinsRes/100. * scale
           xmax = -xmin
-          ut.bookHist(h,'res'+proj+'_'+sdict[s]+side+str(s*10+l),'residual  '+proj+str(s*10+l),NbinsRes,xmin,xmax,100,-100.,100.)
-          ut.bookHist(h,'gres'+proj+'_'+sdict[s]+side+str(s*10+l),'residual  '+proj+str(s*10+l),NbinsRes,xmin,xmax,100,-100.,100.)
+          ut.bookHist(h,'res'+proj+'_'+sdict[s]+side+str(s*10+l),'residual  '+proj+str(s*10+l)+
+                        '; residual [cm]; local position [cm]',NbinsRes,xmin,xmax,100,-100.,100.)
+          ut.bookHist(h,'gres'+proj+'_'+sdict[s]+side+str(s*10+l),'residual  '+proj+str(s*10+l)+
+                        '; residual [cm]; global position [cm]',NbinsRes,xmin,xmax,100,-100.,100.)
           if side=='S': continue
           if side=='':
-             if s==1: ut.bookHist(h,'resBar'+proj+'_'+sdict[s]+str(s*10+l),'residual '+proj+str(s*10+l),NbinsRes,xmin,xmax,7,-0.5,6.5)
+             if s==1: 
+               ut.bookHist(h,'resBar'+proj+'_'+sdict[s]+str(s*10+l),'residual '+proj+str(s*10+l)+
+                             '; residual [cm]; bar number',NbinsRes,xmin,xmax,7,-0.5,6.5)
         if side=='':
              ut.bookHist(h,'track_'+sdict[s]+str(s*10+l),'track x/y '+str(s*10+l)+';X [cm];Y [cm]',100,-90.,10.,100,-20.,80.)
              ut.bookHist(h,'locBarPos_'+sdict[s]+str(s*10+l),'bar sizes;X [cm];Y [cm]',100,-100,100,100,-100,100)
@@ -1351,14 +1358,13 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
 
  ut.bookHist(h,'resVETOY_1','channel vs residual  1',NbinsRes,xmin,xmax,112,-0.5,111.5)
  ut.bookHist(h,'resVETOY_2','channel vs residual  2',NbinsRes,xmin,xmax,112,-0.5,111.5)
+ ut.bookHist(h,'resVETOX_3','channel vs residual  3',NbinsRes,xmin,xmax,112,-0.5,111.5)
 
  ut.bookHist(h,'trackslxy','track direction',200,-0.1,0.1,200,-0.1,0.1)
  ut.bookHist(h,'trackslxy_badChi2','track direction',200,-0.1,0.1,200,-0.1,0.1)
  ut.bookHist(h,'tracksChi2Ndof','chi2/ndof',100,0.0,100.,10,-0.5,9.5)
  ut.bookHist(h,'NdofvsNMeas','ndof Nmeas',20,-0.5,19.5,20,-0.5,19.5)
 
- Scifi = geo.modules['Scifi']
- v = Scifi.GetConfParF("Scifi/signalSpeed") #signal propagation in fibre
  if Nev < 0 : Nev = eventTree.GetEntries()
  N=0
  for event in eventTree:
@@ -1390,10 +1396,13 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
     rc = h['NdofvsNMeas'].Fill(fitStatus.getNdf(),theTrack.getNumPointsWithMeasurement())
 # map clusters to hit keys
     DetID2Key={}
-    if hasattr(event,"Cluster_Scifi"):
-               clusters = event.Cluster_Scifi
+    if not hasattr(event,"Cluster_Scifi"): # or remakeClusters
+       if hasattr(trackTask,"clusScifi"): 
+          trackTask.clusScifi.Clear()
+       trackTask.scifiCluster()
+       clusters = trackTask.clusScifi
     else:
-               clusters = Cluster_Scifi
+       clusters = event.Cluster_Scifi
 
     for aCluster in clusters:
         for nHit in range(event.Digi_ScifiHits.GetEntries()):
@@ -1444,7 +1453,7 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
          L0 = X.Mag()/v
          # need to correct for signal propagation along fibre
          clkey  = W.getHitId()
-         aCl = event.Cluster_Scifi[clkey]
+         aCl = clusters[clkey]
          T0track = aCl.GetTime() - L0
          TZero    = aCl.GetTime()
          Z0track = pos[2]
@@ -1456,7 +1465,7 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
             W = M.getRawMeasurement()
             detID = W.getDetId()
             clkey = W.getHitId()
-            aCl = event.Cluster_Scifi[clkey]
+            aCl = clusters[clkey]
             aHit = event.Digi_ScifiHits[ DetID2Key[detID] ]
             Scifi.GetSiPMPosition(detID,A,B)
             if aHit.isVertical(): X = B-posM
@@ -1472,7 +1481,7 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
                  l = posM[1]
             rc = h['dtScifivsX_'+ss+prj].Fill(X.Mag(),dT)
             times[ss+prj]=[aCl.GetTime(),L*v,detID,l]
-         for s in range(1,6):
+         for s in range(1,nScifi+1):
             if str(s)+'X' in times and  str(s)+'Y' in times:
                deltaT = times[str(s)+'X'][0] - times[str(s)+'Y'][0]
                deltaL = times[str(s)+'X'][1] - times[str(s)+'Y'][1]
@@ -1497,8 +1506,10 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
          bar = (aHit.GetDetectorID()%1000)%60
          plane = s*10+p
          if s==3:
-           if aHit.isVertical(): plane = s*10+2*p+1
-           else:                     plane = s*10+2*p
+           if aHit.isVertical(): 
+             plane = s*10+2*p+1
+             if p==3: plane = s*10+2*p
+           else: plane = s*10+2*p
          muHits[plane].append(aHit)
 
 # get T0 from VETO
@@ -1506,7 +1517,7 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
     Z0Veto = zPos['MuFilter'][1*10+0]
     dZ = zPos['MuFilter'][1*10+1] - zPos['MuFilter'][1*10+0]
     avT = {}
-    for p in range(systemAndPlanes[s]): 
+    for p in range(systemAndPlanes[s]-1):# exclude the vertical Veto3
          plane = s*10+p
          if len(muHits[plane])!=1: continue
          aHit = muHits[plane][0]
@@ -1523,7 +1534,7 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
     if len(avT)==2:
          T0Veto = (avT[10]+(avT[11]-dZ/u.speedOfLight))/2.
 
-    vetoHits = {0:[],1:[]}
+    vetoHits = {0:[],1:[], 2:[]}
     for s in sdict:
      name = str(s)
      for plane in range(systemAndPlanes[s]):
@@ -1567,13 +1578,21 @@ def Mufi_Efficiency(Nev=options.nEvents,optionTrack=options.trackType,withReco='
               S = map2Dict(aHit,'GetAllSignals')
               # check for signal in left / right or small sipm
               left,right,smallL,smallR,Sleft,Sright,SleftS,SrightS = 0,0,0,0,0,0,0,0
-              if  s==1:        
+              if s==1:
+                 if plane<2:
                     vetoHits[plane].append( [gdy,bar] )
                     rc = h['resBarY_'+sdict[s]+str(s*10+plane)].Fill(gdy,bar)
+                 elif plane==2:
+                    vetoHits[plane].append( [gdx,bar] )
+                    rc = h['resBarX_'+sdict[s]+str(s*10+plane)].Fill(gdx,bar)
               for x in S:
-                  if  s==1:
-                      nc = x + 2*nSiPMs*bar
-                      h['resVETOY_'+str(plane+1)].Fill(dy,nc)
+                  if s==1:
+                     if plane<2:
+                        nc = x + 2*nSiPMs*bar
+                        h['resVETOY_'+str(plane+1)].Fill(dy,nc)
+                     elif plane==2:
+                        nc = x + nSiPMs*bar
+                        h['resVETOX_'+str(plane+1)].Fill(dx,nc)
                   if x<nSiPMs: 
                        if s==2 and smallSiPMchannel(x):  smallL+=1
                        else:    left+=1
@@ -2656,26 +2675,36 @@ def analyze_EfficiencyAndResiduals(readHists=False,mode='S',local=True,zoom=Fals
   h['tracksChi2Ndof'].Draw('colz')
   h['Tracks'].cd(2)
   h['trackslxy'].Draw('colz')
+  
+  # params for the double symmetrical Crystal Ball - symetric core and tails 
+  a1 = ROOT.RooRealVar("alpha", "alpha", 2, 1e-3, 10.)
+  p1 = ROOT.RooRealVar("n", "n", 1, 1e-3, 10.)
 
   if local:  res = 'res'
   else: res='gres'
   for proj in ['X','Y']:
    if mode == "S":
       if proj=="Y": ut.bookCanvas(h,'EVetoUS'+proj,'',1200,2000,2,7)
-      if proj=="Y": ut.bookCanvas(h,'EDS'+proj,'',1200,2000,2,3)
-      if proj=="X": ut.bookCanvas(h,'EDS'+proj,'',1200,2000,2,4)
+      if proj=="Y": ut.bookCanvas(h,'EDS'+proj,'',1400,2100,2,3)
+      if proj=="X": 
+         ut.bookCanvas(h,'EDS'+proj,'',1000,2000,2,4)
+         ut.bookCanvas(h,'EVeto'+proj,'',800,400,2,1)
    else:
-      ut.bookCanvas(h,'EVetoUS'+proj,'',1200,2000,4,7)
+      ut.bookCanvas(h,'EVetoUS'+proj,'',1200,2000,4,8)
       ut.bookCanvas(h,'EDS'+proj,'',1200,2000,3,7)
    k = 1
    residualsAndSigma = {}
    for s in  [1,2,3]:
-    if mode == "S" and s<3 and proj=="X": continue
+    if mode == "S" and s==2 and proj=="X": continue
     if s==3: k=1
     sy = sdict[s]
-    if s<3: tname = 'EVetoUS'+proj
+    if s<3: tname = 'EVetoUS'+proj # changed for veto3 in the plane loop below
     else: tname = 'EDS'+proj
     for plane in range(systemAndPlanes[s]):
+     if mode == "S" and s==1 and proj=="X" and plane<2: continue
+     if s==1 and plane==2: 
+        if proj=="Y": continue# vertical Veto3
+        tname = 'EVeto'+proj
      if s==3 and proj=="X" and (plane%2==0 and plane<5): continue
      if s==3 and proj=="Y" and (plane%2==1 or plane==6): continue
      tc = h[tname].cd(k)
@@ -2698,15 +2727,35 @@ def analyze_EfficiencyAndResiduals(readHists=False,mode='S',local=True,zoom=Fals
       resH.Draw()
       binw = resH.GetBinWidth(1)
       if resH.GetEntries()>10:
+         #fit using a double sided CB shape with symmetric tails
+         x = ROOT.RooRealVar("x", "residual [cm]", -10., 10.)
+         mu = ROOT.RooRealVar("mu", "mu", resH.GetMean(), resH.GetMean()-1, resH.GetMean()+1)
+         width = ROOT.RooRealVar("width", "width",  resH.GetRMS(), 1e-5,  resH.GetRMS()+2)
+         dcbPdf = ROOT.RooCrystalBall("dcbPdf", "DoubleSidedCB", x, mu, width, a1, p1, True)
+         roofit_hist = ROOT.RooDataHist("roofit_hist", "roofit_hist", ROOT.RooArgList(x), ROOT.RooFit.Import(resH))
+         fitResult = dcbPdf.fitTo(roofit_hist, ROOT.RooFit.PrintLevel(-1), ROOT.RooFit.Save(True))
+         pl = x.frame()
+         roofit_hist.plotOn(pl)
+         dcbPdf.plotOn(pl)
+         pl.Draw()
+         latex.DrawLatexNDC(0.13,0.8, "#mu = {:.3f} +/- {:.3f}".format(mu.getVal(), mu.getError()))
+         latex.DrawLatexNDC(0.13,0.7,"#sigma = {:.3f} +/- {:.3f}".format(width.getVal(), width.getError()))
+         ''' 
+         # changed to CB fit function so commenting the modified Gaussian fit
+         # Keeping it however since Thomas was able to get resolutions ~ bar_size/sqrt(12) in 2022.
+         # For the 2024 data that is not the case, so swapped with CB
          myGauss = ROOT.TF1('gauss','abs([0])*'+str(binw)+'/(abs([2])*sqrt(2*pi))*exp(-0.5*((x-[1])/[2])**2)+abs([3])',4)
          myGauss.SetParameter(0,resH.GetEntries())
          myGauss.SetParameter(1,0)
          myGauss.SetParameter(2,2.)
          rc = resH.Fit(myGauss,'SL','',-15.,15.)
          fitResult = rc.Get()
+         '''
          if not (s*10+plane) in residualsAndSigma:
-             residualsAndSigma[s*10+plane] = [fitResult.Parameter(1)/u.mm,fitResult.ParError(1)/u.mm,abs(fitResult.Parameter(2)/u.cm),fitResult.ParError(2)/u.cm]
+             residualsAndSigma[s*10+plane] = [mu.getVal()/u.mm,mu.getError()/u.mm,abs(width.getVal()/u.cm),width.getError()/u.cm]
+             #residualsAndSigma[s*10+plane] = [fitResult.Parameter(1)/u.mm,fitResult.ParError(1)/u.mm,abs(fitResult.Parameter(2)/u.cm),fitResult.ParError(2)/u.cm]
          tc.Update()
+         '''
          stats = resH.FindObject('stats')
          stats.SetOptFit(111111)
          stats.SetX1NDC(0.63)
@@ -2718,7 +2767,9 @@ def analyze_EfficiencyAndResiduals(readHists=False,mode='S',local=True,zoom=Fals
              eff = fitResult.Parameter(0)/tracks
              effErr = fitResult.ParError(0)/tracks
              latex.DrawLatexNDC(0.2,0.8,'eff=%5.2F+/-%5.2F%%'%(eff,effErr))
+         '''
    if 'EVetoUS'+proj in h: myPrint(h['EVetoUS'+proj],'EVetoUS'+proj)
+   if 'EVeto'+proj in h: myPrint(h['EVeto'+proj],'EVeto'+proj)
    if 'EDS'+proj in h:        myPrint(h['EDS'+proj],'EDS'+proj)
 # summary plot of residuals
    h['gResiduals'], h['gSigma'] = ROOT.TGraphErrors(), ROOT.TGraphErrors()
@@ -2731,18 +2782,18 @@ def analyze_EfficiencyAndResiduals(readHists=False,mode='S',local=True,zoom=Fals
        k+=1
    h['gResiduals'].SetLineWidth(2)
    h['gSigma'].SetLineWidth(2)
-   ut.bookCanvas(h,'MufiRes','Mufi residuals',750,750,1,1)
-   tc = h['MufiRes'].cd()
+   ut.bookCanvas(h,'MufiRes'+proj,'Mufi residuals',750,750,1,1)
+   tc = h['MufiRes'+proj].cd()
    h['gResiduals'].SetTitle(';station; offset [mm]')
    h['gResiduals'].Draw("AP")
    ut.bookCanvas(h,'MufiSigm','Mufi sigma',750,750,1,1)
    tc = h['MufiSigm'].cd()
    h['gSigma'].SetTitle(';station; #sigma [cm]')
    h['gSigma'].Draw("AP")
-   myPrint(h['MufiRes'],'MufiResiduals')
-   myPrint(h['MufiSigm'],'MufiSigma')
+   myPrint(h['MufiRes'+proj],'MufiResiduals'+proj)
+   myPrint(h['MufiSigm'],'MufiSigma'+proj)
 
-  ut.bookCanvas(h,'TVE','',800,900,1,2)
+  ut.bookCanvas(h,'TVE','',800,900,1,nVeto)
   ut.bookCanvas(h,'TUS','',800,2000,1,5)
   ut.bookCanvas(h,'TDS','',800,1200,1,3)
   latex.SetTextColor(ROOT.kRed)
@@ -2753,6 +2804,9 @@ def analyze_EfficiencyAndResiduals(readHists=False,mode='S',local=True,zoom=Fals
     tname = S[s]
     k=1
     for plane in range(systemAndPlanes[s]):
+     if s==1 and proj=="X" and plane<2: continue
+     if s==1 and plane==2: 
+        if proj=="Y": continue# vertical Veto3
      if s==3 and proj=="X" and (plane%2==0 and plane<5): continue
      if s==3 and proj=="Y" and (plane%2==1 or plane==6): continue
      tc = h[tname].cd(k)
@@ -2830,8 +2884,9 @@ def analyze_EfficiencyAndResiduals(readHists=False,mode='S',local=True,zoom=Fals
 #for VETO
   ut.bookCanvas(h,'veto','',800,1600,1,7)
   s=1
-  for plane in [0,1]:
-    hname = 'resBarY_'+sdict[s]+str(s*10+plane)
+  for plane in range(systemAndPlanes[s]):
+    if plane<2: hname = 'resBarY_'+sdict[s]+str(s*10+plane)
+    elif plane==2: hname = 'resBarX_'+sdict[s]+str(s*10+plane)
     for nbar in range(1,h[hname].GetNbinsY()+1):
         vname = 'veto'+str(s*10+plane)+'_'+str(nbar)
         h[vname] = h[hname].ProjectionX(vname,nbar+1,nbar+1)
@@ -3544,10 +3599,13 @@ def Scifi_residuals(Nev=options.nEvents,NbinsRes=100,xmin=-2000.,alignPar=False,
 
 # analysis and plots 
     P = {'':'','X':'colz','Y':'colz','C':'colz'}
-    Par = {'mean':1,'sigma':2}
     h['globalPos'] = {'meanH':ROOT.TGraphErrors(),'sigmaH':ROOT.TGraphErrors(),'meanV':ROOT.TGraphErrors(),'sigmaV':ROOT.TGraphErrors()}
     h['globalPosM'] = {'meanH':ROOT.TGraphErrors(),'sigmaH':ROOT.TGraphErrors(),'meanV':ROOT.TGraphErrors(),'sigmaV':ROOT.TGraphErrors()}
     globalPos = h['globalPos']
+    # params for the double symmetrical Crystal Ball - symetric core and tails 
+    x = ROOT.RooRealVar("x", "residual [cm]", xmin, xmax)
+    a1 = ROOT.RooRealVar("alpha", "alpha", 2, 1e-3, 10.)
+    p1 = ROOT.RooRealVar("n", "n", 1, 1e-3, 10.)
     for proj in P:
       ut.bookCanvas(h,'scifiRes'+proj,'',1600,1900,2,5)
       k=1
@@ -3560,31 +3618,41 @@ def Scifi_residuals(Nev=options.nEvents,NbinsRes=100,xmin=-2000.,alignPar=False,
             hname = 'res'+proj+projs[o]+'_Scifi'+str(so)
             h[hname].Draw(P[proj])
             if proj == '':
-                rc = h[hname].Fit('gaus','SQ')
-                fitResult = rc.Get()
-                tc.Update()
-                stats = h[hname].FindObject('stats')
-                stats.SetOptFit(1111111)
-                stats.SetX1NDC(0.76)
-                stats.SetY1NDC(0.30)
-                stats.SetX2NDC(0.98)
-                stats.SetY2NDC(0.92)
-                h[hname].Draw()
+                #fit using a double sided CB shape with symmetric tails
+                mu = ROOT.RooRealVar("mu", "mu", h[hname].GetMean(), h[hname].GetMean()-200, h[hname].GetMean()+200)
+                width = ROOT.RooRealVar("width", "width",  h[hname].GetRMS(), 1e-5,  h[hname].GetRMS()+1e+3)
+                Par = {'mean':mu,'sigma':width}
+                dcbPdf = ROOT.RooCrystalBall("dcbPdf", "DoubleSidedCB", x, mu, width, a1, p1, True)
+                roofit_hist = ROOT.RooDataHist("roofit_hist", "roofit_hist", ROOT.RooArgList(x), ROOT.RooFit.Import(h[hname]))
+                fitResult = dcbPdf.fitTo(roofit_hist, ROOT.RooFit.PrintLevel(-1), ROOT.RooFit.Save(True))
+                pl = x.frame()
+                roofit_hist.plotOn(pl)
+                dcbPdf.plotOn(pl)
+                pl.Draw()
+                latex.DrawLatexNDC(0.13,0.8, "#mu = {:.3f} +/- {:.3f}".format(mu.getVal(), mu.getError()))
+                latex.DrawLatexNDC(0.13,0.7,"#sigma = {:.3f} +/- {:.3f}".format(width.getVal(), width.getError()))
                 tc.Update()
                 for p in Par:
-                   globalPos[p+projs[o]].SetPoint(s-1,s,fitResult.Parameter(Par[p]))
-                   globalPos[p+projs[o]].SetPointError(s-1,0.5,fitResult.ParError(1))
+                   globalPos[p+projs[o]].SetPoint(s-1,s,Par[p].getVal())
+                   globalPos[p+projs[o]].SetPointError(s-1,0.5,Par[p].getError())
                 globalPos[p+projs[o]].SetMarkerStyle(21)
                 globalPos[p+projs[o]].SetMarkerColor(ROOT.kBlue)
             if proj == 'C':
                 for m in range(nMats):
                      h[hname+str(m)] = h[hname].ProjectionX(hname+str(m),m*512,m*512+512)
-                     rc = h[hname+str(m)].Fit('gaus','SQ0')
-                     fitResult = rc.Get()
+                     mu = ROOT.RooRealVar("mu", "residual [cm]", h[hname+str(m)].GetMean(), h[hname+str(m)].GetMean()-200, h[hname+str(m)].GetMean()+200)
+                     width = ROOT.RooRealVar("width", "width", h[hname+str(m)].GetRMS(), 1e-5,  h[hname+str(m)].GetRMS()+1e+3)
+                     dcbPdf = ROOT.RooCrystalBall("dcbPdf", "DoubleSidedCB", x, mu, width, a1, p1, True)
+                     roofit_hist = ROOT.RooDataHist("roofit_hist", "roofit_hist", ROOT.RooArgList(x), ROOT.RooFit.Import(h[hname+str(m)]))
+                     fitResult = dcbPdf.fitTo(roofit_hist, ROOT.RooFit.PrintLevel(-1), ROOT.RooFit.Save(True))
                      if not fitResult: continue
+                     pl = x.frame()
+                     roofit_hist.plotOn(pl)
+                     dcbPdf.plotOn(pl)
+                     pl.Draw()                    
                      for p in Par:
-                        h['globalPosM'][p+projs[o]].SetPoint(j[o], s*10+m,   fitResult.Parameter(Par[p]))
-                        h['globalPosM'][p+projs[o]].SetPointError(j[o],0.5,fitResult.ParError(1))
+                        h['globalPosM'][p+projs[o]].SetPoint(j[o], s*10+m,Par[p].getVal())
+                        h['globalPosM'][p+projs[o]].SetPointError(j[o],0.5,Par[p].getError())
                      j[o]+=1
                      h['globalPosM'][p+projs[o]].SetMarkerStyle(21)
                      h['globalPosM'][p+projs[o]].SetMarkerColor(ROOT.kBlue)

@@ -8,16 +8,10 @@
 #include <TRandom.h>
 #include <iomanip> 
 
-Float_t sndScifiHit::MeanAndRMS(Double_t ly, Float_t nphe_max){
-     Double_t mean = 0.274572+0.980999*ly
-                       -0.00435048*ly*ly + 1.0901e-05*pow(ly,3)
-                        -1.47437e-08*pow(ly,4) + 8.28684e-12*pow(ly,5);
-     Double_t RMS = -0.00055223   + 0.0667554*ly
-                       -0.000478245*ly*ly + 1.48809e-06*pow(ly,3)
-                       -2.26064e-09*pow(ly,4) + 1.35786e-12*pow(ly,5);
-     Float_t r = gRandom->Gaus(mean, RMS);
-     Float_t signal = std::min(nphe_max,r);
-     return signal;
+namespace {
+     //parameters for simulating the digitized information
+     const Float_t ly_loss_params[4] = {20., 300.}; //x_0, lambda
+     const Float_t npix_to_qdc_params[4] = {0.172, -1.31, 0.006, 0.33}; // A, B, sigma_A, sigma_B
 }
 
 // -----   Default constructor   -------------------------------------------
@@ -49,7 +43,7 @@ sndScifiHit::sndScifiHit (int SiPMChan, std::vector<ScifiPoint*> V, std::vector<
      }
 
      fDetectorID  = SiPMChan;
-     Float_t signalTotal    = 0;
+     Float_t ly_total = 0;
      Float_t earliestToA   = 1E20;
      for( int i = 0; i <V.size();i++) {
         
@@ -73,16 +67,26 @@ sndScifiHit::sndScifiHit (int SiPMChan, std::vector<ScifiPoint*> V, std::vector<
 	  distance = (impact - a).Mag();
 	}
 
-	signalTotal+= signal*ly_loss_mean(distance,ly_loss_params);
+	// convert energy deposit to light yield (here Np.e. == avg. N fired pixels)
+        Float_t ly = signal*1E+6*0.16; //0.16 p.e per 1 keV
+        // account for the light attenuation in the fibers
+        ly*= ly_loss(distance);
+	ly_total+= ly;
 	
 	// for the timing, find earliest light to arrive at SiPM and smear with time resolution
 	Float_t arrival_time = V[i]->GetTime() + distance/signalSpeed;
 	if (arrival_time < earliestToA){earliestToA = arrival_time;}
 	
      }
-     Float_t ly = signalTotal/0.180*1000.*20.; // 20 p.e. per 180 keV
-     signals[0] =MeanAndRMS(ly,nphe_max);
-     if (ly >nphe_min){   // nominal threshold at 3.5 p.e.
+     // smear the total light yield using Poisson distribution
+     ly_total= gRandom->Poisson(ly_total);
+
+     // account for limited SiPM dyn. range
+     Float_t Npix = sipm_saturation(ly_total,nphe_max);
+     // convert Npix to QDC
+     signals[0] = npix_to_qdc(Npix);
+     
+     if (ly_total > nphe_min){   // nominal threshold at 3.5 p.e.
             flag=true;
       }else{
             flag=false;
@@ -103,10 +107,22 @@ Float_t sndScifiHit::GetEnergy()
   return signals[0];
 }
 
-Float_t sndScifiHit::ly_loss_mean(Float_t distance, Float_t* params){
-//	It returns the light yield depending on the distance to SiPM
-	Double_t att = params[0] * TMath::Exp(params[1] * distance / 100.) + params[2] * TMath::Exp(params[3] * distance / 100.);
-	return att/(params[0]+params[2]);
+Float_t sndScifiHit::ly_loss(Float_t distance){
+//	It returns the light yield attenuation depending on the distance to SiPM
+	return TMath::Exp(-(distance-ly_loss_params[0])/ly_loss_params[1]);
+}
+
+Float_t sndScifiHit::sipm_saturation(Float_t ly, Float_t nphe_max){
+//	It returns the number of fired pixels per channel
+        Float_t factor = 1 - TMath::Exp(-ly/nphe_max);
+	return nphe_max*factor;
+}
+
+Float_t sndScifiHit::npix_to_qdc(Float_t npix){
+//	It returns QDC per channel after Gaussian smearing of the parameters
+        Float_t A = gRandom->Gaus(npix_to_qdc_params[0], npix_to_qdc_params[2]);
+        Float_t B = gRandom->Gaus(npix_to_qdc_params[1], npix_to_qdc_params[3]);
+        return A*npix + B;
 }
 
 // -----   Public method Print   -------------------------------------------
