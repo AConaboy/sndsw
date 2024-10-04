@@ -99,15 +99,13 @@ class TimeWalk(ROOT.FairTask):
                         'showerprofiles':'corrected', 
                         'numusignalevents':'corrected',
                         'tds0-studies':'uncorrected',
-                        'extendedreconstruction':'corrected'}
+                        'extendedreconstruction':'corrected', 'struckquark':'corrected'}
             
             self.state=statedict[self.mode]
             
             self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)                
             
             if options.debug: self.trackevents=[]
-            
-            self.getaverage=lambda d, key, i:sum( [(d[key][i]) for k in range(2) ])/len(d)        
 
             if not options.CorrectionType: self.CorrectionType=4
             else: self.CorrectionType=options.CorrectionType
@@ -162,11 +160,14 @@ class TimeWalk(ROOT.FairTask):
         elif self.mode.find('extendedreconstruction')>-1:
             from extendedmuonreconstruction import ExtendedMuonReconstruction as ExtendedMuonReconstruction
             self.emr = ExtendedMuonReconstruction(options, self)
+        elif self.mode=='struckquark':
+            from extendedmuonreconstruction import QuarkVectorExtrapolation as QuarkVectorExtrapolation
+            self.qve = QuarkVectorExtrapolation(options, self)
 
         with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
             self.histformatting=json.load(x)  
 
-        self.notInDS=0            
+        self.notInDS=0
 
         self.trackRequired=True if self.mode in('c0', 'tof', 'tw', 'res', 'systemalignment', 'reconstructmuonposition') else False
 
@@ -253,6 +254,10 @@ class TimeWalk(ROOT.FairTask):
         
         elif self.mode.find('extendedreconstruction')>-1:
             self.emr.ExtendReconstruction(hits)
+            return
+        
+        elif self.mode == 'struckquark': 
+            self.qve.StruckQuarkExtrapolation(hits)
             return
         
         elif self.mode == 'reconstructmuonposition':
@@ -555,6 +560,9 @@ class TimeWalk(ROOT.FairTask):
 
         elif self.mode.find('extendedreconstruction')>-1:
             self.emr.WriteOutHistograms()
+
+        elif self.mode.find('struckquark')>-1:
+            self.qve.WriteOutHistograms()            
         
         elif self.mode == 'tds0-studies':
             outfilename=f'{self.outpath}/splitfiles/run{self.runNr}/tds0-studies.root'

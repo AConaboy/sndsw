@@ -178,7 +178,7 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
           signal=signalRight;
         }    
 
-        signals[j] = signal/float(nSiPMs) * SiPMcalibrationConstant;   // most simplest model, divide signal individually. Small SiPMS special
+        signals[j] = signal/float(nSiPMs) * SiPMcalibrationConstant;  // most simplest model, divide signal individually. Small SiPMS special
         times[j] = gRandom->Gaus(aligned_time, timeResol);
      }
 

@@ -5,6 +5,8 @@
 #include "SNDLHCEventHeader.h"
 #include "TChain.h"
 
+#include <iostream>
+
 namespace snd::analysis_cuts {
 
   SNDLHCEventHeader * EventHeaderBaseCut::header = 0;

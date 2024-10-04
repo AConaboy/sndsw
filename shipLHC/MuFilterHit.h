@@ -54,6 +54,7 @@ class MuFilterHit : public SndlhcHit
        The unit is clock cycles same as for the SndlhcHit's
        times[16] data member */
     Float_t fTimesHelper[16];
+    void OptForTimeCorrections(Bool_t mask, Bool_t apply, Double_t SipmDistance);    
 
     ClassDef(MuFilterHit,6);
     

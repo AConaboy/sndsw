@@ -9,7 +9,7 @@
 
 namespace snd::analysis_cuts {
 
-  DSActivityCut::DSActivityCut(TChain * ch) : MuFilterBaseCut(ch) {
+  DSActivityCut::DSActivityCut(TChain * tree) : MuFilterBaseCut(tree) {
     cutName = "If there are DS hits, all US planes must be hit";
     
     shortName = "NUSPlanesHitIfDSHit";

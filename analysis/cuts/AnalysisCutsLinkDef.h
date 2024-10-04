@@ -24,5 +24,9 @@
 #pragma link C++ class snd::analysis_cuts::USQDCCut+;
 #pragma link C++ class snd::analysis_cuts::vetoCut+;
 #pragma link C++ class snd::analysis_cuts::DSVetoCut+;
+#pragma link C++ class snd::analysis_cuts::ip1Cut+;
+#pragma link C++ class snd::analysis_cuts::sciFiContinuity+;
+#pragma link C++ class snd::analysis_cuts::stableBeamsCut+;
+#pragma link C++ class snd::analysis_cuts::USPlanesHit+;
 
 #endif

@@ -386,7 +386,8 @@ class Tracking(ROOT.FairTask):
        hitDict = {}
        for k in range(self.event.Digi_MuFilterHits.GetEntries()):
             d = self.event.Digi_MuFilterHits[k]
-            if (d.GetDetectorID()//10000)<3 or (not d.isValid()): continue
+            # if (d.GetDetectorID()//10000)<3 or (not d.isValid()): continue
+            if (d.GetDetectorID()//10000)<3: continue
             hitDict[d.GetDetectorID()] = k
        hitList = list(hitDict.keys())
        if len(hitList)>0:

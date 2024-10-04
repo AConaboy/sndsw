@@ -53,6 +53,7 @@ def add_arguments(parser):
     parser.add_argument('--simulation', dest='simulation', action='store_true')
     parser.add_argument('--simMode', dest='simMode', type=str)
     parser.add_argument('--simTest', dest='simTest', action='store_true')
+    parser.add_argument('--OutgoingMuon', dest='OutgoingMuon', type=str, default='all')
     parser.add_argument('--allFiles', dest='allFiles', action='store_true')
 
     parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)

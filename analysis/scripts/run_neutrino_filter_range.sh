@@ -45,8 +45,9 @@ do
 	if [ -z ${SNDSW_ROOT+x} ]
 	then
 	    echo "Setting up SNDSW"
-    	    SNDBUILD_DIR=/eos/user/c/cvilela/SND_Dec16/sw/
-    	    source /cvmfs/sndlhc.cern.ch/SNDLHC-2022/July14/setUp.sh
+    	    # SNDBUILD_DIR=/eos/user/c/cvilela/SND_Dec16/sw/
+			SNDBUILD_DIR=/afs/cern.ch/user/a/aconsnd/sw/
+    	    source /cvmfs/sndlhc.cern.ch/SNDLHC-2024/June25/setUp.sh
     	    eval `alienv load -w $SNDBUILD_DIR --no-refresh sndsw/latest-feature-second_stage_nu_filter-release`
 	    export EOSSHIP=root://eosuser.cern.ch/
 	fi
@@ -78,8 +79,10 @@ do
 	then
 	    echo "Setting up SNDSW"
 #    	    SNDBUILD_DIR=/eos/user/c/cvilela/SND_Dec16/sw/
-    	    SNDBUILD_DIR=/eos/user/c/cvilela/SND_153f764/sw/ # For PRL analysis use this version for RECO only
-    	    source /cvmfs/sndlhc.cern.ch/SNDLHC-2022/July14/setUp.sh
+    	    # SNDBUILD_DIR=/eos/user/c/cvilela/SND_153f764/sw/ # For PRL analysis use this version for RECO only
+    	    # source /cvmfs/sndlhc.cern.ch/SNDLHC-2022/July14/setUp.sh
+			SNDBUILD_DIR=/afs/cern.ch/user/a/aconsnd/sw/
+    	    source /cvmfs/sndlhc.cern.ch/SNDLHC-2024/June25/setUp.sh			
     	    eval `alienv load -w $SNDBUILD_DIR --no-refresh sndsw/latest`
 	    export EOSSHIP=root://eosuser.cern.ch/
 	fi
@@ -108,8 +111,10 @@ do
 	if [ -z ${SNDSW_ROOT+x} ]
 	then
 	    echo "Setting up SNDSW"
-    	    SNDBUILD_DIR=/eos/user/c/cvilela/SND_Dec16/sw/
-    	    source /cvmfs/sndlhc.cern.ch/SNDLHC-2022/July14/setUp.sh
+    	    # SNDBUILD_DIR=/eos/user/c/cvilela/SND_Dec16/sw/
+    	    # source /cvmfs/sndlhc.cern.ch/SNDLHC-2022/July14/setUp.sh
+			SNDBUILD_DIR=/afs/cern.ch/user/a/aconsnd/sw/
+    	    source /cvmfs/sndlhc.cern.ch/SNDLHC-2024/June25/setUp.sh			
     	    eval `alienv load -w $SNDBUILD_DIR --no-refresh sndsw/latest`
 	    export EOSSHIP=root://eosuser.cern.ch/
 	fi

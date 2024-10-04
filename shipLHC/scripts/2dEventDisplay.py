@@ -183,7 +183,7 @@ def userProcessing(event,mode):
 
          barycentres=muAna.GetBarycentres(event.Digi_MuFilterHits, MuFilter=geo.modules['MuFilter'], hasTrack=False)
          x_barycentres=muAna.GetOverallXBarycentre(barycentres, mode='relQDC')
-         DrawBarycentres(barycentres, x_barycentres, mode='all-xBs')
+         DrawBarycentres(barycentres, x_barycentres, mode='overall-xB')
     return    
 
 def bunchXtype():
@@ -328,13 +328,18 @@ def loopEvents(
     OT.Reco_MuonTracks = ROOT.TObjArray(10)
     
     ### Only display events that contain a muon
+    if abs(event.MCTrack[1].GetPdgCode()) == 13: hasMuon=True 
+    else: hasMuon=False
+
     if outgoingMuon:
       if not mc: 
          print(f'Cannot use mode "outgoingMuon" with data')
          return
-      if abs(event.MCTrack[1].GetPdgCode()) != 13: 
+      if not hasMuon: 
          print(f'No muon')
          continue
+    elif not outgoingMuon and hasMuon: print(f'Event has muon')
+    elif not outgoingMuon and not hasMuon: print(f'Event does NOT have muon')
 
     if withHoughTrack > 0:
        rc = source.GetInTree().GetEvent(N)
@@ -506,7 +511,6 @@ def loopEvents(
     k = 1
     moreEventInfo = []
 
-
     for collection in ['hitCollectionX','hitCollectionY']:
        h['simpleDisplay'].cd(k)
        drawInfo(h['simpleDisplay'], k, runId, N, T)
@@ -563,13 +567,22 @@ def loopEvents(
     if verbose>0: dumpChannels()
     if HCALbarycentres: userProcessing(event, 'HCALbarycentres')
 
-    if save: h['simpleDisplay'].Print('{:0>2d}-event_{:04d}'.format(runId,N)+'.png')
+   #  if save: h['simpleDisplay'].Print('{:0>2d}-event_{:04d}'.format(runId,N)+'.png')
+    if save:
+      if mc: 
+         simMode, filename = options.inputFile.split('/')[-2:]
+         filekey=filename.replace('.root','').split('_')[1]
+         h['simpleDisplay'].Print(f"/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/{simMode}_{filekey}_{N}.png")
     if auto:
         h['simpleDisplay'].Print(options.storePic+str(runId)+'-event_'+str(event.EventHeader.GetEventNumber())+'.png')
     if not auto:
        rc = input("hit return for next event or p for print or q for quit: ")
        if rc=='p': 
-             h['simpleDisplay'].Print(options.storePic+str(runId)+'-event_'+str(event.EventHeader.GetEventNumber())+'.png')
+         if mc: 
+            simMode, filename = options.inputFile.split('/')[-2:]
+            filekey=filename.replace('.root','').split('_')[1]
+            h['simpleDisplay'].Print(f"/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/{simMode}_{filekey}_{N}.png")         
+            #  h['simpleDisplay'].Print(options.storePic+str(runId)+'-event_'+str(event.EventHeader.GetEventNumber())+'.png')
        elif rc == 'q':
           break
        else:
@@ -634,7 +647,7 @@ def DrawBarycentres(barycentres, x_barycentres, mode='all-xBs'):
                   b=barycentres[i]['y-barycentre']['yB']
 
             h['barycentre_gs'][p][0].SetPoint(tmp, z, b)
-            print(f'proj {p.lower()}z point {(z,b)}')
+            # print(f'proj {p.lower()}z point {(z,b)}')
             tmp+=1
 
    proj={'X':0, 'Y':1}

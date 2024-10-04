@@ -283,11 +283,11 @@ class Analysis(object):
 
 		# Group hits by plane
 		for hit in hits:
-			if not hit.isValid(): continue
 
 			detID = hit.GetDetectorID()
 			s,p,b = self.parseDetID(detID)
-			if not s==2 or not hit.isValid(): continue
+			if not s==2: continue
+			# if not hit.isValid(): continue
 
 			# muAna knows the reference time needed to apply for !simulation
 			if not self.simulation: alignedtimes=self.GetCorrectedTimes(hit, mode='aligned')
@@ -350,7 +350,7 @@ class Analysis(object):
 				dxLphys_err, dxRphys_err = self.Getxuncertainty(detID, pdata[detID],'left'),self.Getxuncertainty(detID, pdata[detID],'right')
 
 				x_barycentre = 0.5*(dxLphys + dxRphys)
-				lambda_x = 0.5*(dxRphys - dxLphys)
+				lambda_x = (dxRphys - dxLphys)
 
 				if trackInBar:
 
@@ -378,12 +378,10 @@ class Analysis(object):
 					}
 
 			y_barycentre=sum(weighted_ys) 
-			if len(pdata)==1:
-				print(f'1 fired bar in plane {plane}: y_B = {y_barycentre}')
 				
 			mufilter.GetPosition(max(pdata.keys()), self.A, self.B)
 			max_y = 0.5*(self.A.y() + self.B.y())
-			mufilter.GetPosition(max(pdata.keys()), self.A, self.B)
+			mufilter.GetPosition(min(pdata.keys()), self.A, self.B)
 			min_y = 0.5*(self.A.y() + self.B.y())
 			lambda_y = max_y - min_y
 			
@@ -395,45 +393,6 @@ class Analysis(object):
 			barycentres[plane] = {'x-barycentres':x_barycentres, "y-barycentre":y_barycentres}				
 
 		return barycentres
-
-			# 	# if trackInBar and abs(x_barycentre-xEx) < 5: 
-			# 	if trackInBar:
-
-			# 		self.task.MuFilter.GetPosition(detID, self.A, self.B) # A is left, B is right
-					
-			# 		"""
-			# 		The side whose measurement of x-position most agrees with the extrapolated track
-			# 		will be the side that the track passes closest to, and thus produces the photons
-			# 		which set that side's time. Thus the other side from this must be closer to
-			# 		the shower, and thus the times from this side contain information about the 
-			# 		position of the shower in x. 
-			# 		"""
-					
-			# 		fired_bars = sorted(pdata.keys())
-
-			# 		current_streak, max_streak = 0, 0
-			# 		for i in range(1, len(fired_bars)):
-			# 			if fired_bars[i-1] == fired_bars[i]:
-			# 				current_streak+=1
-			# 			else: 
-			# 				max_streak = max(current_streak, max_streak)
-			# 				current_streak=1
-			# 		max_streak = max(current_streak, max_streak)
-			# 		lambda_x = max_streak/2*6
-
-			# 		x_barycentre = x_shower + max_streak*6 # 6 cm is from MuFilter.GetConfParF('MuFilter/UpstreamBarY')
-			# 		dx = self.GetXBarycentreWidthUncertainties(detID, pdata[detID], trackInBar, shower_side)
-
-			# 		x_barycentres[detID] = {
-			# 			'xL':dxLphys,
-			# 			'xR':dxRphys,
-			# 			'xB':x_barycentre,
-			# 			'lambda_x':lambda_x,
-			# 			'relQDC':barQDC/planeQDC,
-			# 			'dx':dx,
-			# 			"trackInBar":trackInBar
-			# 			}					
-
 	
 	def GetOverallXBarycentre(self, barycentres, mode):
 		xs = {p:{} for p in barycentres.keys()} 
