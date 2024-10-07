@@ -30,15 +30,18 @@ parser.add_argument('--nStart',dest="nStart",type = int,default=0)
 parser.add_argument('--nEvents', dest="nEvents",type = int,default=10)
 parser.add_argument('--Energy',dest="Energy",type = int,default=100)  
 parser.add_argument('--Merged',dest="merged",type = bool,default=True)  
-parser.add_argument("--genie",dest="genie",type=bool,default=False)
+# parser.add_argument("--genie",dest="genie",type=bool,default=False)
 parser.add_argument('--inputfile',dest="inputfile",type=str,default=None,help='GENIE input file for convert_script.C')
 parser.add_argument('-C', "--HTCondor", dest="HTCondor",action='store_true')
 # parser.add_argument("--muonDIS", type=str, default=None)
+parser.add_argument('--genie', action='store_true', help='flag to indicate neutrino interaction')
+parser.add_argument('--quarkdata', action='store_true', help='flag to indicate quark data')
 parser.add_argument('--muonDIS', action='store_true', help='flag to indicate muon DIS')
 parser.add_argument('--muonPassing', action='store_true', help='flag to indicate passing muons')
 # parser.add_argument("--muonPassing", type=str, default=None)
 parser.add_argument('--neutralhadrons', action='store_true', help='flag to indicate neutral hadrons')
 # parser.add_argument("--neutralhadrons", type=str, default=None)
+parser.add_argument('--multimuon', action='store_true', help='flag to indicate multi muon data')
 
 # Set eos outpath
 eos_paths = {'tismith':'/eos/user/t/tismith/SWAN_projects/genie_ana_output/' , 'aconsnd':'/eos/user/a/aconsnd/SWAN_projects/Simulation/data/'} # can add Eduard
@@ -156,17 +159,19 @@ def read_convert_script_output(output_file):
                     continue
 
             tokens = line.split()
-
-            event_number = int(tokens[0])
-            hit_id = int(tokens[1])
+            if output_file == "output_file_1":
+                event_number = int(tokens[0])
+            else:
+                event_number = int(tokens[0])
+            # hit_id = int(tokens[1])
             pdg = int(tokens[2])
-            first_mother = int(tokens[3])
-            name = tokens[4]
+            # first_mother = int(tokens[3])
+            # name = tokens[4]
             px = float(tokens[5])
             py = float(tokens[6])
             pz = float(tokens[7])
             energy = float(tokens[8])
-            is_stable = bool(int(tokens[9]))
+            # is_stable = bool(int(tokens[9]))
             vx = float(tokens[10])
             vy = float(tokens[11])
             vz = float(tokens[12])
@@ -177,15 +182,15 @@ def read_convert_script_output(output_file):
 
             # Append the particle information to the event entry
             data[event_number].append({
-                'hit_id': hit_id,
+                # 'hit_id': hit_id,
                 'pdg': pdg,
-                'first_mother': first_mother,
-                'name': name,
+                # 'first_mother': first_mother,
+                # 'name': name,
                 'px': px,
                 'py': py,
                 'pz': pz,
                 'energy': energy,
-                'is_stable': is_stable,
+                # 'is_stable': is_stable,
                 'vx': vx,
                 'vy': vy,
                 'vz': vz
@@ -200,32 +205,35 @@ def read_convert_script_output(output_file):
         for event_number in data:
             while len(data[event_number]) < max_length:
                 data[event_number].append({
-                    'hit_id': None,
+                    # 'hit_id': None,
                     'pdg': None,
-                    'first_mother': None,
-                    'name': None,
+                    # 'first_mother': None,
+                    # 'name': None,
                     'px': None,
                     'py': None,
                     'pz': None,
                     'energy': None,
-                    'is_stable': None,
+                    # 'is_stable': None,
                     'vx': None,
                     'vy': None,
                     'vz': None
                 })
     return data
 
-def GetInteractionWall(x, y, z):
-    nav = r.gGeoManager.GetCurrentNavigator()
-    node = nav.FindNode(x, y, z)
-    volume = node.GetVolume()
+# def GetInteractionWall(x, y, z):
+#     nav = r.gGeoManager.GetCurrentNavigator()
+#     node = nav.FindNode(x, y, z)
+#     volume = node.GetVolume()
 
-    return volume.GetName()
+#     return volume.GetName()
 
 def extract_us_signal(ch, N):
-    us_points = {"Wall": [], "start_pos" : [], "MotherID" : [], "Process": [], "TrackID" : [], "track_px": [], 
+    us_points = {"start_pos" : [], "MotherID" : [], "Process": [], "TrackID" : [], "track_px": [], 
     "track_py": [], "track_pz": [], "Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], 
-    "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": [], "w": [], "rapidity": []}
+    "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+    
+    if args.genie or args.quarkdata:
+        us_points.update({"FLUKA_weight": []})
 
     for hit in ch.MuFilterPoint:   
         us_points["detectorID"].append(hit.GetDetectorID())
@@ -251,8 +259,15 @@ def extract_us_signal(ch, N):
             us_points["MotherID"].append(mother_pdg)
             us_points["Process"].append(mctrack.GetProcName())
             us_points["start_pos"].append(mctrack.GetStartZ())
-            us_points["w"].append(mctrack.GetPx())
-            us_points["rapidity"].append(mctrack.GetPx())
+            # us_points["w"].append(mctrack.GetWeight())
+            # us_points["start_vertex"].append(mctrack.GetStartVertex())
+            # for x, y, z in zip(us_points["coordX"], us_points["coordY"], us_points["coordZ"]):
+            #     us_points["start_vertex"].append(mctrack.GetStartVertex(x, y, z))
+            # start_vertex = r.TVector3()
+            # mctrack.GetStartVertex(start_vertex)
+            # us_points["start_vertex"].append((start_vertex.X(), start_vertex.Y(), start_vertex.Z()))
+            # if trackID == 0:
+            #     print(mctrack.GetStartZ())
                     
         elif trackID < 0:
             us_points["track_px"].append(0)
@@ -261,26 +276,35 @@ def extract_us_signal(ch, N):
             us_points["MotherID"].append(0)
             us_points["Process"].append(0)
             us_points["start_pos"].append(0)
+            # us_points["w"].append(0)
+            # us_points["start_vertex"].append(0)
 
-    nav = r.gGeoManager.GetCurrentNavigator()
-    for x, y, z in zip(us_points["coordX"], us_points["coordY"], us_points["coordZ"]):
-        node = nav.FindNode(x, y, z)
-        volume = node.GetVolume()
-        us_points["Wall"].append(volume.GetName())
+    # nav = r.gGeoManager.GetCurrentNavigator()
+    # for x, y, z in zip(us_points["coordX"], us_points["coordY"], us_points["coordZ"]):
+    #     node = nav.FindNode(x, y, z)
+    #     volume = node.GetVolume()
+    #     us_points["Wall"].append(volume.GetName())
 
+    if args.genie or args.quarkdata:
+        ch.GetEntry(N)
+        fluka_weight = ch.GetBranch("gst.FLUKA_weight").GetLeaf("FLUKA_weight").GetValue()
+        for _ in ch.MuFilterPoint:
+            us_points["FLUKA_weight"].append(fluka_weight)
     return us_points
 
 def extract_scifi_signal(ch, N):
     signal_sum = 0
-    scifi_points = {"Eventnumber": [], "time": [], "coordX": [], "coordY": [], "coordZ": [], "TrackID": [], "px": [], "py": [], "pz": [], "detectorID": [], "pdg_code": [], "Energy_loss": []}
+    scifi_points = {"Eventnumber": [], "time": [], "start_pos": [], "coordX": [], "coordY": [], "coordZ": [], "TrackID": [], 
+    "px": [], "py": [], "pz": [], "detectorID": [], "pdg_code": [], "Energy_loss": []}
     for hit in ch.ScifiPoint:   
         station = int(hit.GetDetectorID()/1000000)
         if station == 0:
             print(station)
 
         signal_sum += hit.GetEnergyLoss() 
+        trackID = hit.GetTrackID()
         scifi_points["detectorID"].append(hit.GetDetectorID())
-        scifi_points["TrackID"].append(hit.GetTrackID())
+        scifi_points["TrackID"].append(trackID)
         scifi_points["pdg_code"].append(hit.PdgCode())
         scifi_points["Eventnumber"].append(N)
         scifi_points["Energy_loss"].append(hit.GetEnergyLoss())
@@ -291,6 +315,13 @@ def extract_scifi_signal(ch, N):
         scifi_points["coordX"].append(hit.GetX())
         scifi_points["coordY"].append(hit.GetY())
         scifi_points["coordZ"].append(hit.GetZ())
+
+        if trackID >= 0:
+            mctrack = ch.MCTrack[trackID]
+            scifi_points["start_pos"].append(mctrack.GetStartZ())
+
+        elif trackID < 0:
+            scifi_points["start_pos"].append(0)
 
     return scifi_points      
 
@@ -346,7 +377,25 @@ def getMuonData(ntuple):
     return df_Muon_points
 
 def get_background_data(ch):
-    data_points = {"Eventnumber": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+    data_points = {"Eventnumber": [], "TrackID": [], "px": [], "py": [], "pz": [], "Process": [], "detectorID": [], "time": [], 
+    "start_pos": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": [], "w": [], "MotherID": []}
+    # data_points = {"Eventnumber": [], "TrackID": [], "px": [], "py": [], "pz": [], "Process": [], "detectorID": [], "time": [], 
+    # "start_pos": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": [], "w": [], "start_vertex": []}
+    scifi_points = {"Eventnumber": [], "TrackID": [], "px": [], "py": [], "pz": [], "detectorID": [], "time": [], 
+    "start_pos": [], "pdg_code": [], "Energy_loss": [], "coordX": [], "coordY": [], "coordZ": []}
+
+    if args.muonDIS:
+        import ROOT
+        file = ROOT.TFile("/eos/experiment/sndlhc/MonteCarlo/Pythia6/MuonDIS/muDIScrossSec.root")
+        h = {}
+        h["g_13"] = file.Get("g_13")   # For muons (PID 13)
+        h["g_-13"] = file.Get("g_-13") # For antimuons (PID -13)
+
+        # Ensure the graphs are loaded correctly
+        if not h["g_13"] or not h["g_-13"]:
+            print("Error loading cross-section graphs from the ROOT file")
+        else:
+            print("Cross-section graphs loaded successfully")
 
     start, end = 0, ch.GetEntries() 
     for N in range(start, end):
@@ -354,65 +403,159 @@ def get_background_data(ch):
         if N % 1000 == 0:
             print(f"Event {N}")
 
-    #for event in ch:
         for hit in ch.MuFilterPoint:    
-            data_points["Eventnumber"].append(N)
-            data_points["detectorID"].append(hit.GetDetectorID())
-            data_points["px"].append(hit.GetPx())
-            data_points["py"].append(hit.GetPy())
-            data_points["pz"].append(hit.GetPz())
-            data_points["time"].append(hit.GetTime())
-            data_points["pdg_code"].append(hit.PdgCode())
-            data_points["Energy_loss"].append(hit.GetEnergyLoss())
-            data_points["coordX"].append(hit.GetX())
-            data_points["coordY"].append(hit.GetY())
-            data_points["coordZ"].append(hit.GetZ())
+            trackID = hit.GetTrackID()
+
+            process = 0
+            start_pos = 0
+            weight = 0
+            mother_pdg = 0
+            ProcID = 0
+            
+            if trackID > 0:
+                mctrack = ch.MCTrack[trackID]
+                mother_pdg = ch.MCTrack[ch.MCTrack[trackID].GetMotherId()].GetPdgCode()
+                if args.muonPassing:
+                    data_points.update({"ProcID": []})
+                    ProcID = mctrack.GetProcID()
+            
+                    # if ProcID in [23, 13, 25, 24, 26, 27, 46]: # determine if there is a DIS event in the passing muon file
+                    #     pass
+                    # else:
+                    process = mctrack.GetProcName()
+                    start_pos = mctrack.GetStartZ()
+                    weight = mctrack.GetWeight()
+                elif args.muonDIS:
+                    W = 8e8/2e8*ch.MCTrack[0].GetWeight()
+                    wLHC = W/10/2. # I am using the same FLUKA sample twice, mu->p & mu->n
+                    wInter = ch.MCTrack[2].GetWeight()
+                    PID = ch.MCTrack[0].GetPdgCode()
+                    wDIS = 0.6E-3*h["g_"+str(PID)].Eval(ch.MCTrack[0].GetEnergy())
+                    weight = wLHC*wInter*wDIS*1E5
+
+                    process = mctrack.GetProcName()
+                    start_pos = mctrack.GetStartZ()
+                else:
+                    process = mctrack.GetProcName()
+                    start_pos = mctrack.GetStartZ()
+                    weight = mctrack.GetWeight()
+
+                data_points["Process"].append(process)
+                data_points["start_pos"].append(start_pos)
+                data_points["w"].append(weight)
+                data_points["MotherID"].append(mother_pdg)
+                if args.muonPassing:
+                    data_points["ProcID"].append(ProcID)
+
+                data_points["Eventnumber"].append(N)
+                data_points["TrackID"].append(trackID)
+                data_points["detectorID"].append(hit.GetDetectorID())
+                data_points["px"].append(hit.GetPx())
+                data_points["py"].append(hit.GetPy())
+                data_points["pz"].append(hit.GetPz())
+                data_points["time"].append(hit.GetTime())
+                data_points["pdg_code"].append(hit.PdgCode())
+                data_points["Energy_loss"].append(hit.GetEnergyLoss())
+                data_points["coordX"].append(hit.GetX())
+                data_points["coordY"].append(hit.GetY())
+                data_points["coordZ"].append(hit.GetZ())
+
+        for hit in ch.ScifiPoint:   
+            trackID = hit.GetTrackID()
+            scifi_points["detectorID"].append(hit.GetDetectorID())
+            scifi_points["TrackID"].append(trackID)
+            scifi_points["pdg_code"].append(hit.PdgCode())
+            scifi_points["Eventnumber"].append(N)
+            scifi_points["Energy_loss"].append(hit.GetEnergyLoss())
+            scifi_points["px"].append(hit.GetPx())
+            scifi_points["py"].append(hit.GetPy())
+            scifi_points["pz"].append(hit.GetPz())
+            scifi_points["time"].append(hit.GetTime())
+            scifi_points["coordX"].append(hit.GetX())
+            scifi_points["coordY"].append(hit.GetY())
+            scifi_points["coordZ"].append(hit.GetZ())
+
+            if trackID >= 0:
+                mctrack = ch.MCTrack[trackID]
+                scifi_points["start_pos"].append(mctrack.GetStartZ())
+
+            elif trackID < 0:
+                scifi_points["start_pos"].append(0) 
+
+    for key, value in data_points.items():
+        print(f"Length of {key}: {len(value)}")   
     
-    data = pd.DataFrame(data_points)
-    return data
+    data_mufilter = pd.DataFrame(data_points)
+    data_scifi = pd.DataFrame(scifi_points)
+    return data_mufilter, data_scifi
+
+def get_multimuon_data(ch):
+    start, end = 0, ch.GetEntries()
+    for N in range(start, end):
+        event = ch.GetEntry(N)
+        if N % 1000 == 0:
+            print(f"Event {N}")
+
+        for hit in ch.MuFilterPoint:    
+            trackID = hit.GetTrackID()
+
+    # branches = ntuple.GetListOfBranches()
+    # for branch in branches:
+    #     branch_name = branch.GetName()
 
 def MakeTChain():
 
-    # f = r.TFile.Open(args.outputfile, 'recreate')
-    # f.cd()
     ch = r.TChain('cbmsim')
     eos = "root://eosuser.cern.ch/"
     basePath = []
-    if args.genie:
+    if args.genie or args.quarkdata:
         if args.inputfile:
             basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/2/sndLHC.Genie-TGeant4.root"]
             #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndlhc_+volTarget_0.781e16_SNDG18_02a_01_000.0.ghep.root"]
         else:
-            for i in range(1, 3):  # Loop over directories 
+            for i in range(1,2):  # Loop over directories 
                 file_path = f"/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/{i}/sndLHC.Genie-TGeant4.root"
                 if os.path.exists(file_path):
                     basePath.append(file_path)
 
         for base in basePath:
-            ch.Add(str(base))    
+            ch.Add(str(base))  
+
+        for base in basePath:
+            ch.AddFriend('gst', str(base))  
 
         snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V0_2022.root")
         scifi, mufilter = snd_geo.modules['Scifi'], snd_geo.modules['MuFilter']
 
-        return ch, scifi, mufilter
+        return ch, scifi, mufilter, basePath
 
     else:
         if args.muonDIS:
-            for i in range(1, 100):  # Loop over directories 
-                file_path = f"/eos/experiment/sndlhc/users/dancc/MuonDIS/ecut1.0_z-7_2.5m_Ioni_latelateFLUKA/muonDis_201/{i}/sndLHC.muonDIS-TGeant4-muonDis_201.root"
-                if os.path.exists(file_path):
-                    basePath.append(file_path)
+            j = 200
+            while j < 511:
+                k = 0
+                for i in range(1, 11):  # Loop over directories 
+                    k = j + i
+                    # print(k)
+                    file_path = f"/eos/experiment/sndlhc/users/dancc/MuonDIS/ecut1.0_z-7_2.5m_Ioni_latelateFLUKA/muonDis_{k}/{i}/sndLHC.muonDIS-TGeant4-muonDis_{k}.root"
+                    # file_path = f"/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muonDis/ecut1.0_z-2.2_5.8m/muonDis_201/{i}/sndLHC.muonDIS-TGeant4-muonDis_201.root"
+                    if os.path.exists(file_path):
+                        basePath.append(file_path)
+                j += 300
             
         if args.muonPassing:
-            for i in range(1, 27):
-                file_path = f"/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muons_up/scoring_2.5/7135377/{i}/sndLHC.Ntuple-TGeant4.root"
-                 # file_path = "/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muons_up/scoring_2.5/7135377/1/sndLHC.Ntuple-TGeant4.root"
-                basePath.append(file_path)
+            folders = [7044662, 7086961, 7117221, 7117239, 7135377]
+            for j in folders:
+                for i in range(1, 27):
+                    file_path = f"/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muons_up/scoring_2.5/{j}/{i}/sndLHC.Ntuple-TGeant4.root"
+                    # file_path = "/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muons_up/scoring_2.5/7135377/1/sndLHC.Ntuple-TGeant4.root"
+                    basePath.append(file_path)
 
         if args.neutralhadrons:
-            for j in (1, 10):
+            for j in (1, 100):
                 file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_5_10/Ntuples/{j}/sndLHC.PG_2112-TGeant4_20240126.root"
-                basePath.append(file_path)
+                if os.path.exists(file_path):
+                    basePath.append(file_path)
 
                 for i in range(10, 90):
                     file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_{i}_{i+10}/Ntuples/{j}/sndLHC.PG_2112-TGeant4_20240126.root"
@@ -420,54 +563,74 @@ def MakeTChain():
                         basePath.append(file_path)
 
                 file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_100_150/Ntuples/{j}/sndLHC.PG_2112-TGeant4.root"
-                basePath.append(file_path)
+                if os.path.exists(file_path):
+                    basePath.append(file_path)
 
                 file_path = f"/eos/experiment/sndlhc/MonteCarlo/NeutralHadrons/QGSP_BERT_HP_PEN/neutrons/neu_150_200/Ntuples/{j}/sndLHC.PG_2112-TGeant4.root"
-                basePath.append(file_path)
+                if os.path.exists(file_path):
+                    basePath.append(file_path)
 
         for base in basePath:
             ch.Add(str(base))    
 
         return ch
 
+# def SaveData(us_data, scifi_data):
 def SaveData(us_data, scifi_data, quark_data):
     scifi_df = pd.DataFrame(scifi_data)
     us_df = pd.DataFrame(us_data)
     quark_df = pd.DataFrame(quark_data)
 
-    quark_df.to_csv(f"{eospath}data_quark_3.csv")
-    print(f'Quark csv written to: {eospath}data_quark_3.csv')
+    quark_df.to_csv(f"{eospath}data_quark.csv")
+    print(f'Quark csv written to: {eospath}data_quark.csv')
 
-    scifi_df.to_csv(f"{eospath}data_scifi_3.csv")
-    print(f'Scifi csv written to: {eospath}data_scifi_3.csv')
+    scifi_df.to_csv(f"{eospath}data_scifi.csv")
+    print(f'Scifi csv written to: {eospath}data_scifi.csv')
 
-    us_df.to_csv(f"{eospath}data_us_3.csv")
-    print(f'HCAL csv written to: {eospath}data_us_3.csv')
+    us_df.to_csv(f"{eospath}data_us.csv")
+    print(f'HCAL csv written to: {eospath}data_us.csv')
 
 #get numu data from file
-if args.genie:
+if args.quarkdata:
     r.FairTask
-    ch, scifi, mufilter = MakeTChain()
+    ch, scifi, mufilter, basepath = MakeTChain()
     output_file = "/afs/cern.ch/user/t/tismith/sndsw/macro/nu_genie/output"
-    if args.inputfile:
-        input_file = args.inputfile
-        run_convert_script(input_file, output_file)
-    else:
-        run_convert_script(ch, output_file)
+    # output_file_1 = "/afs/cern.ch/user/t/tismith/sndsw/macro/nu_genie/output1"
+    # output_file_2 = "/afs/cern.ch/user/t/tismith/sndsw/macro/nu_genie/output2"
+    # for i, base in enumerate(basepath):
+    #     if i == 1:
+    #         run_convert_script(base, output_file_1)
+    #         converted_data = read_convert_script_output(output_file_1)
+    #         print(converted_data)
+    #     else:
+    #         run_convert_script(base, output_file_2)
+    #         converted_data = read_convert_script_output(output_file_2)
+    run_convert_script(ch, output_file)
     converted_data = read_convert_script_output(output_file)
+    # print(converted_data)
     us_data, scifi_data = EventLoop()
     SaveData(us_data, scifi_data, converted_data)
 
 #get data from background file
 if args.muonPassing or args.muonDIS or args.neutralhadrons:
     ch = MakeTChain()
-    data = get_background_data(ch)
-    filename = "PassingMuons_new.csv2"
-    # filename = "MuonDIS_100.csv"
-    # filename = "NeutralHadrons_largerdataset.csv"
+    data_HCAL, data_scifi = get_background_data(ch)
+    if args.muonPassing:
+        filename1 = "PassingMuons_temp.csv"
+        filename2 = "PassingMuons_scifi_temp.csv"
+    if args.muonDIS:
+        # filename1 = "MuonDIS_3_startvertex.csv"
+        filename1 = "MuonDIS_all_weights.csv"
+        filename2 = "MuonDIS_all_scifi_weights.csv"
+    if args.neutralhadrons:
+        filename1 = "NeutralHadrons_large.csv"
+        filename2 = "NeutralHadrons_scifi_large.csv"
 
-    data.to_csv(f"{eospath}{filename}")
-    print(f'csv written to: {eospath}{filename}')
+    data_HCAL.to_csv(f"{eospath}{filename1}")
+    print(f'csv written to: {eospath}{filename1}')
+
+    data_scifi.to_csv(f"{eospath}{filename2}")
+    print(f'csv written to: {eospath}{filename2}')
 
     # muonfile = r.TFile.Open(args.muonPassing, "READ")
     #file = ROOT.TFile.Open("root://eospublic.cern.ch//eos/experiment/sndlhc/MonteCarlo/FLUKA/muons_up/version1/unit30_Nm.root")
@@ -483,9 +646,23 @@ if args.muonPassing or args.muonDIS or args.neutralhadrons:
 
     # DISfile.Close()
 
-if args.HTCondor:
-    ch, scifi, mufilter = MakeTChain()
+if args.genie:
+    ch, scifi, mufilter, basepath = MakeTChain()
+    us_data, scifi_data = EventLoop()
+    # print(us_data["Eventnumber"].nunique())
     us_signal, scifi_signal = GetData(ch, N)
     SaveData(us_data, scifi_data)
 
+if args.multimuon:
+    ch = r.TChain('cbmout')
+    eos = "root://eosuser.cern.ch/"
+    basePath = []
+    file_path = "/eos/user/o/onur/multi_muon_search/4541/mu3_search_run_004541_0037.root"
+    if os.path.exists(file_path):
+        basePath.append(file_path)
+
+    for base in basePath:
+        ch.Add(str(base))   
+
+    # return ch
 

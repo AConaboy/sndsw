@@ -8,7 +8,7 @@
 #include "TClonesArray.h"
 #include "TH1D.h"
 
-#include "ShipMCTrack.h"
+#include "ShipMCTrack.h" 
 
 // Cuts
 #include "sndBaseCut.h"
@@ -21,7 +21,7 @@
 #include "sndEventDeltat.h"
 #include "sndAvgSciFiFiducialCut.h"
 #include "sndAvgDSFiducialCut.h"
-#include "sndDSVetoCut.h"
+#include "sndDSVetoCut.h" 
 
 // Alternatice sets of cuts.
 enum Cutset { stage1cuts, novetocuts, FVsideband, allowWalls2and5, stage1cutsVetoFirst, nueFilter} ;
