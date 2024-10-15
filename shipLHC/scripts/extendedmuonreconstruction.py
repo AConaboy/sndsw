@@ -2,6 +2,7 @@
 import ROOT, csv, os, pickle
 import numpy as np
 from pathlib import Path
+ROOT.gInterpreter.ProcessLine('#include "/afs/cern.ch/user/a/aconsnd/sndsw/analysis/tools/sndSciFiTools.h"')
 
 class ExtendedMuonReconstruction(object):
 
@@ -68,13 +69,23 @@ class ExtendedMuonReconstruction(object):
             self.keynamedict = {'wMuon':'with muon', 'woMuon': 'w/o muon', 'allEvents':'all events'}
 
             self.datafilename=d+f'extendedreconstruction_{key}.csv'
-            column_names=['hasMuon','DSmult0x','DSmult0y','DSmult1x','DSmult1y','USmult3','USmult4','dx3','dy3','dx4','dy4','lambdax3','lambdax4', 'lambday3', 'lambday4']
+            self.column_names=['filekey', 'EventNumber','hasMuon','interactionWall',
+            'scifi_median_x','scifi_median_y',
+            'scifi_residual_x','scifi_residual_y',
+            'dx0','dx1','dx2','dx3','dx4',
+            'dy0','dy1','dy2','dy3','dy4',
+            'x0','x1','x2','x3','x4',
+            'y0','y1','y2','y3','y4',
+            'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
+            'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
+            'HCAL5bars'
+            ]
 
             with open(self.datafilename, 'w') as f:
                 writer=csv.writer(f)
-                writer.writerow(column_names)
+                writer.writerow(self.column_names)
 
-    def ExtendReconstruction(self, hits):
+    def ExtendReconstruction(self, hits, scifi_hits):
         # Here I want to get the points in space from the DS hits, and see if a US hit aligns with these
         # If they do then I can plot the doca between the line formed between these DS hits and the US hit
         # if self.options.OutgoingMuon=='yes' and not eventHasMuon: return
@@ -119,16 +130,17 @@ class ExtendedMuonReconstruction(object):
                 self.hists[histname] = ROOT.TH1F(histname, title, 6, 0, 6)
             self.hists[histname].Fill(len(self.combinations[p]))
 
-        if len(self.combinations)>0: self.RecordEventNr()
-        else: return 
-
         # Count HCAL hits in each plane
         self.GetMultiplicity(hits)
+
+        self.interactionWall = self.GetInteractionWall(scifi_hits)
+        self.Get_interaction_median_positions(scifi_hits)
 
         # If 2 fired planes in the DS, I can connect the space points in each combination together and look for a hit in the US
         
         if len(fired_planes)==2:
-            self.xy_residuals = {plane:{'x':False, 'y':False} for plane in range(5)}
+            self.xy_residuals = {plane:{'x':np.nan, 'y':np.nan} for plane in range(5)}
+            self.xy_residuals['intWall']={'x':np.nan, 'y':np.nan}
 
             for idx, proj in enumerate(['x', 'y']):
                 
@@ -149,17 +161,22 @@ class ExtendedMuonReconstruction(object):
                 if len(residuals)==0: continue
 
                 # Define best combination in each projection as the one with the lowest residual. Projections are orthogonal so no issue.
-                best_residual  = min(residuals, key=lambda d:d[4])
+                best_residual  = min(residuals, key=lambda d:d['intWall'])
 
                 for plane in best_residual:
+                    # if plane=='intWall':continue
                     # Update value for each projection if there are suitable combinations
                     self.xy_residuals[plane][proj] = best_residual[plane]
+ 
+            # Require that the xy_residual is defined for the 4th and 5th plane
+            if list(self.xy_residuals[4].values()) == [np.nan, np.nan]: return 
+            if list(self.xy_residuals[3].values()) == [np.nan, np.nan]: return
 
-            self.lambda_x_dict = {i:None for i in range(5)}
-            self.lambda_y_dict = {i:None for i in range(5)}
+            self.lambda_x_dict = {i:np.nan for i in range(5)}
+            self.lambda_y_dict = {i:np.nan for i in range(5)}
 
             for plane in self.xy_residuals:
-
+                if plane=='intWall':continue
                 lambda_x = abs(self.xbarycentres[plane]['lambda_x'])
                 self.lambda_x_dict[plane] = lambda_x
                 lambda_y = self.barycentres[plane]['y-barycentre']['lambda_y']
@@ -168,24 +185,51 @@ class ExtendedMuonReconstruction(object):
                 if len(self.xy_residuals[plane])==2:
 
                     self.xyresiduals_hists(plane)
-                    # self.USmultvrr_hists(plane)
+                    # self.USmultvds_hists(plane)
 
                 self.lambda_hists(plane)
 
-                self.ResultantResidual_hists(plane)
+                self.ds_hists(plane)
+
+                self.GetHCAL5barscode(hits)
 
             self.writedata()
 
         elif len(fired_planes)==1:
             pass
+        else: pass
 
     def writedata(self):
 
-        output_line = self.filekey,self.tw.M.EventNumber,self.eventHasMuon,self.multiplicity_dict[3][0],self.multiplicity_dict[3][1],self.multiplicity_dict[3][2],self.multiplicity_dict[3][3],self.multiplicity_dict[2][3],self.multiplicity_dict[2][4],self.xy_residuals[3]['x'],self.xy_residuals[3]['y'],self.xy_residuals[4]['x'],self.xy_residuals[4]['y'],self.lambda_x_dict[3], self.lambda_x_dict[4],self.lambda_y_dict[3], self.lambda_y_dict[4]
+        xbarycentre_list = [round(self.xbarycentres[p]['dxB'],3) for p in range(5)]
+        ybarycentre_list = [round(self.barycentres[p]['y-barycentre']['yB'],3) for p in range(5)]
+        x_residuals_list = [round(self.xy_residuals[p]['x'], 3) for p in range(5)]
+        y_residuals_list = [round(self.xy_residuals[p]['y'], 3) for p in range(5)]
+        scifi_residual = [round(self.xy_residuals['intWall']['x'],3),round(self.xy_residuals['intWall']['y'],3)]
+
+        output_line = self.filekey,self.tw.M.EventNumber,self.eventHasMuon,self.interactionWall,round(self.intWall_median_x,3), round(self.intWall_median_y,3),*scifi_residual,*x_residuals_list,*y_residuals_list,*xbarycentre_list,*ybarycentre_list,*[round(i,3) for i in self.lambda_x_dict.values()],*[round(i,3) for i in self.lambda_y_dict.values()],self.HCAL5barscode
+
+        if not len(output_line) == len(self.column_names):
+            print(f'len output line = {len(output_line)}, n cols = {len(self.column_names)}')
 
         with open(self.datafilename, 'a', newline='') as f:
             writer=csv.writer(f)
             writer.writerow(output_line)
+
+    def GetHCAL5barscode(self, hits):
+        c=[False]*10 
+        US_detID_list = [i.GetDetectorID() for i in hits if all([self.muAna.parseDetID(i.GetDetectorID())[0]==2, self.muAna.parseDetID(i.GetDetectorID())[1]==4])]
+        for detID in US_detID_list:
+            bar=self.muAna.parseDetID(detID)[2]
+            c[bar]=True 
+        
+        self.HCAL5barscode=''.join(['1' if state else '0' for state in c])
+
+    def GetInteractionWall(self, scifi_hits):
+        filtered_hits = ROOT.snd.analysis_tools.filterScifiHits(scifi_hits, 0, "TI18")
+        interactionWall = ROOT.snd.analysis_tools.showerInteractionWall(filtered_hits, 0, "TI18")
+        print(f'Event number: {self.tw.M.EventNumber}, interaction in wall {interactionWall+1}')
+        return interactionWall+1
 
     def OutgoingMuon(self):
         ### Return true for events with an outgoing muon
@@ -196,7 +240,7 @@ class ExtendedMuonReconstruction(object):
         else: return False
 
     def xyresiduals_hists(self, plane):
-            
+
         for key in ('wMuon', 'woMuon', 'allEvents'):
             histname=f'xyresidual_{key}_plane{plane}'
             if not histname in self.hists:
@@ -232,7 +276,7 @@ class ExtendedMuonReconstruction(object):
             self.hists[histname].Fill(lambda_y)
             self.hists[f'lambday_allEvents_plane{plane}'].Fill(lambda_y)
 
-    def ResultantResidual_hists(self, plane):
+    def ds_hists(self, plane):
 
         for key in ('wMuon', 'woMuon', 'allEvents'):
 
@@ -369,6 +413,7 @@ class ExtendedMuonReconstruction(object):
     def USresidual(self, line, proj):
 
         res_dict={}
+
         for plane in range(5):
     
             # Get barycentre 
@@ -382,6 +427,20 @@ class ExtendedMuonReconstruction(object):
             ext = line(HCAL_z) 
             residual = ext-b
             res_dict[plane]=residual
+        
+        # if self.interactionWall==0: i=1 # Having some problems with the scifi tool predicting an interaction pre-target
+        # else: i=self.interactionWall
+        if self.interactionWall==5: i=4
+        i=self.interactionWall
+
+        dummy_detID=int(1e6*i + 1e5*0 + 1e4 + 1e3 + 1)
+        print(f'Getting Scifi position for detID {dummy_detID}')
+        self.tw.Scifi.GetPosition(dummy_detID, self.A, self.B)
+        scifi_intwall_z = 0.5*(self.A.z() + self.B.z())
+        
+        ext = line(scifi_intwall_z)
+        residual = ext-b
+        res_dict['intWall']=residual
             
         return res_dict
 
@@ -435,6 +494,26 @@ class ExtendedMuonReconstruction(object):
         elif not self.eventHasMuon: self.hists[f'USmultiplicity_woMuon_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
         self.hists[f'USmultiplicity_allEvents_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
         
+    def Get_interaction_median_positions(self, scifi_hits):
+        scifi=self.tw.Scifi
+
+        if self.interactionWall==5: i=4
+        i=self.interactionWall
+        
+        scifi_hitDict = {i.GetDetectorID():i for i in scifi_hits if i.GetDetectorID()//1000000==i} 
+
+        positions = {'x':[], 'y':[]}
+        for detID, hit in scifi_hitDict.items():
+            self.tw.M.Scifi.GetSiPMPosition(detID, self.A,self.B)
+            if hit.isVertical():
+                pos = 0.5*(self.A[0] + self.B[0])
+                positions['x'].append(pos)
+            else:
+                pos = 0.5*(self.A[1] + self.B[1]) 
+                positions['y'].append(pos)
+        
+        self.intWall_median_x, self.intWall_median_y = np.median(positions['x']),np.median(positions['y'])
+
     def RecordEventNr(self):
         fired_planes=list(self.DS_points.keys())
         event_data = [self.options.fname, self.tw.M.EventNumber, len(fired_planes)]
@@ -701,7 +780,6 @@ class QuarkVectorExtrapolation(object):
                 self.hists[histname] = ROOT.TH2F(histname, title, 120, -60, 60, 120, -60, 60)
             self.hists[histname].Fill(residual_x, residual_y)            
             
-
     def ExtrapolateStruckQuark(self, plane, pos, mom):
         # Load in z pos of plane 
         self.tw.MuFilter.GetPosition(20000+1000*plane, self.A, self.B)

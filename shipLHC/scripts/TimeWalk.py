@@ -253,7 +253,7 @@ class TimeWalk(ROOT.FairTask):
             return
         
         elif self.mode.find('extendedreconstruction')>-1:
-            self.emr.ExtendReconstruction(hits)
+            self.emr.ExtendReconstruction(hits, scifi_hits)
             return
         
         elif self.mode == 'struckquark': 

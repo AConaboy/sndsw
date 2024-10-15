@@ -177,13 +177,24 @@ def goodEvent(event):
 
 def userProcessing(event,mode):
     
-    if mode=='HCALbarycentres':
+    if mode.find('HCALbarycentres')>-1:
          
-         muAna = SetUpAnalysisClass()
+      muAna = SetUpAnalysisClass()
 
-         barycentres=muAna.GetBarycentres(event.Digi_MuFilterHits, MuFilter=geo.modules['MuFilter'], hasTrack=False)
-         x_barycentres=muAna.GetOverallXBarycentre(barycentres, mode='relQDC')
-         DrawBarycentres(barycentres, x_barycentres, mode='overall-xB')
+      barycentres=muAna.GetBarycentres(event.Digi_MuFilterHits, MuFilter=geo.modules['MuFilter'], hasTrack=False)
+      x_barycentres=muAna.GetOverallXBarycentre(barycentres, mode='relQDC')
+      DrawBarycentres(barycentres, x_barycentres, mode='overall-xB')
+
+    if mode.find('drawmuon')>-1:
+      
+      track = event.MCTrack[1]
+
+      if not abs(track.GetPdgCode())==13:
+         print(f'mctrack[1] not a muon')
+         return 
+
+      DrawMuon(event)
+
     return    
 
 def bunchXtype():
@@ -565,7 +576,7 @@ def loopEvents(
           if not rc: rc = twoTrackEvent(sMin=10,dClMin=7,minDistance=0.5,sepDistance=3.0)
 
     if verbose>0: dumpChannels()
-    if HCALbarycentres: userProcessing(event, 'HCALbarycentres')
+    if HCALbarycentres: userProcessing(event, 'HCALbarycentres-drawmuon')
 
    #  if save: h['simpleDisplay'].Print('{:0>2d}-event_{:04d}'.format(runId,N)+'.png')
     if save:
@@ -588,6 +599,30 @@ def loopEvents(
        else:
           eventComment[f"{runId}-event_{event.EventHeader.GetEventNumber()}"] = rc
  if save: os.system("convert -delay 60 -loop 0 event*.png animated.gif")
+
+def DrawMuon(event):
+
+   track = event.MCTrack[1]
+
+   start_x, start_y, start_z = track.GetStartX(),track.GetStartY(),track.GetStartZ()
+   
+   track_pz = track.GetPz()
+   z_target = 550 # Extrapolate track to last DS stations! 
+   dz = z_target - start_z
+
+   x_ex = track.GetStartX() + track.GetPx()/track_pz * dz
+   y_ex = track.GetStartY() + track.GetPy()/track_pz * dz 
+
+   h['muontrack'] = {'X':ROOT.TLine(start_z, start_x, z_target, x_ex), 'Y':ROOT.TLine(start_z, start_y, z_target, y_ex)}
+
+   proj={'X':0, 'Y':1}
+   for p in proj: 
+      c=proj[p]
+      c=h['simpleDisplay'].cd(c+1)
+      h['muontrack'][p].Draw('P same')
+      c.Update()
+   h['simpleDisplay'].Update()   
+
 
 def DrawBarycentres(barycentres, x_barycentres, mode='all-xBs'):
    colour=ROOT.TColor.GetColorTransparent(ROOT.kBlue, 0.5)

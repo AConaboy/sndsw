@@ -237,6 +237,8 @@ class Analysis(object):
 				if len(times[station+1]) == 0 or len(times[station]) == 0: continue
 				res[f'scifi-delta{station+1}{station}'] = sum(times[station+1])/len(times[station+1]) - sum(times[station])/len(times[station])
 			return res
+
+	# def GetScifiBarycentre(self, scifi, scifi_hits):
 			
 	def GetScifiTrackAverageTime(self, scifi, scifihits):
 

@@ -123,8 +123,9 @@ class Numusignaleventtiming(object):
             self.MakeSignalPartitions()
         options.numuStudy=True
 
-    def MakeSignalPartitions(self):
-        numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
+    def MakeSignalPartitions(self, mode='numu'):
+        if mode=='numu': signalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
+        elif mode=='nue': signalevent_filepath = '/afs/cern.ch/work/a/aconsnd/nuesignalevents.csv'
         self.nu_mu_events={}
         with open(numusignalevent_filepath, 'r') as f:
             reader=csv.reader(f)
