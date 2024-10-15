@@ -1,4 +1,5 @@
 import ROOT as r
+import json
 import shipunit as u
 from ShipGeoConfig import AttrDict, ConfigRegistry
 
@@ -321,6 +322,34 @@ with ConfigRegistry.register_config("basic") as c:
         c.MuFilter.timeResol = 150.*u.picosecond
         c.MuFilter.VandUpPropSpeed    = 12.5*u.cm/u.nanosecond
         c.MuFilter.DsPropSpeed        = 14.3*u.cm/u.nanosecond
+
+        ### Adding time resolutions, timing cross-talk and signal speeds from data
+        ### Add these files into /eos/experiment/sndlhc/calibration/
+        timing_calibration_files = {'timeresolution':'/afs/cern.ch/work/a/aconsnd/Timing-physics2022/Results/run005408/run005408_timeresolution_corrected.json',
+                                'signalspeed':'/afs/cern.ch/work/a/aconsnd/Timing-physics2022/Results/run005408/run005408_cscint_corrected.json',
+                                'timingxt':'/afs/cern.ch/work/a/aconsnd/Timing-physics2022/TimingCovariance/run005408/run005408_truncatedcovariance.json'
+                                }
+
+        for idx,param in enumerate(timing_calibration_files):
+                with open(timing_calibration_files[param], 'r') as tf:
+                        datadict = json.load(tf)
+                
+                # Set units
+                if idx==0: unit=u.nanosecond
+                elif idx==1: unit=u.cm/u.nanosecond
+                elif idx==2: unit=u.nanosecond*u.nanosecond
+
+                for k,v in datadict.items():
+                        if idx==0 or idx==1: 
+                                detID, SiPM = k.split('_')
+                                if not len(v)==2:
+                                        print(f'{k} missing either val or error for {idx}!')
+                                        exit()
+                                setattr(c.MuFilter, f"US_{param}_{k}", float(v[0])*unit)
+
+                        else: 
+                                detID, SiPMs = k.split('_')[1], k.split('_')[-1].replace('SiPMs', '').split('-')
+                                setattr(c.MuFilter, f"US_{param}_{detID}_{SiPMs[0]}_{SiPMs[1]}", float(v)*unit)        
 
         c.Floor = AttrDict(z=48000.*u.cm) # to place tunnel in SND_@LHC coordinate system
         c.Floor.DX = 1.0*u.cm 

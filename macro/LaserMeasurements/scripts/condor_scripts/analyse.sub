@@ -1,0 +1,18 @@
+executable = /afs/cern.ch/user/a/aconsnd/LaserMeasurements/scripts/condor_scripts/analyse.sh
+arguments = $(run)
+
+should_transfer_files = NO
+
+output = /afs/cern.ch/work/a/aconsnd/HTCondor/output/LaserAnalyser.$(run).$(ClusterId).$(ProcId).out
+log = /afs/cern.ch/work/a/aconsnd/HTCondor/log/LaserAnalyser.$(run).$(ClusterId).$(ProcId).log
+error = /afs/cern.ch/work/a/aconsnd/HTCondor/error/LaserAnalyser.$(run).$(ClusterId).$(ProcId).err
+
+request_memory = 2 GB
+request_disk = 2 GB
+
++JobFlavour = "espresso"
+#+JobFlavour = "microcentury"
+#+JobFlavour = "longlunch"
+#+JobFlavour = "workday"
+#+JobFlavour = "tomorrow"
+queue run from /afs/cern.ch/user/a/aconsnd/LaserMeasurements/configuration/GoodRuns.txt

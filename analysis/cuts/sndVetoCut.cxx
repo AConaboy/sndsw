@@ -6,7 +6,7 @@
 
 namespace snd::analysis_cuts {
 
-  vetoCut::vetoCut(TChain * ch) : MuFilterBaseCut(ch) {
+  vetoCut::vetoCut(TChain * tree) : MuFilterBaseCut(tree) {
     cutName = "No hits in veto";
 
     shortName = "NoVetoHits";

@@ -91,7 +91,7 @@ class Tracking(ROOT.FairTask):
  def FinishEvent(self):
   pass
 
- def ExecuteTask(self,option='ScifiDS'):
+ def ExecuteTask(self,nPlanes=3, option='ScifiDS'):
     self.trackCandidates = {}
     if not option.find('DS')<0:
            self.clusMufi.Delete()
@@ -106,8 +106,10 @@ class Tracking(ROOT.FairTask):
       for aTrack in self.trackCandidates[x]:
            rc = self.fitTrack(aTrack)
            if type(rc)==type(1):
+                # rc==-2: not converged, rc==-1 not consistent
                 print('trackfit failed',rc,aTrack)
            else:
+               #  print('track fitted apparently')
                 i_muon += 1
                 if x=='DS':   rc.SetUniqueID(3)
                 if x=='Scifi': rc.SetUniqueID(1)
@@ -151,8 +153,8 @@ class Tracking(ROOT.FairTask):
     for aCl in clusters:
          k+=1
          detID = aCl.GetFirst()
-         if detID//10000 < 3: continue
-         p = (detID//1000)%10
+         if detID//10000 < 3: continue # only work with DS hits
+         p = (detID//1000)%10 
          bar = detID%1000
          plane = s*10+p
          if bar<60: 
@@ -163,7 +165,7 @@ class Tracking(ROOT.FairTask):
          clusPerStation[plane] +=1
     for p in clusPerStation:
        if clusPerStation[p]>0:
-          planesPerProjection[p%2]+=1
+          planesPerProjection[p%2]+=1 # Count number of horizontal (p%2==0) and vertical (p%2==1) hits
 
     failed = False
     if planesPerProjection[1]<self.DSnPlanes or planesPerProjection[0]<self.DSnPlanes: return trackCandidates
@@ -183,10 +185,10 @@ class Tracking(ROOT.FairTask):
     for p in clusPerStation:
          if clusPerStation[p]>self.DSnHits: return trackCandidates
 
-# require one plane with 1 cluster as seed
+   # require one plane with 1 cluster as seed
 
-# proj = 0, horizontal, max 3 planes
-# proj = 1, vertex,     max 4 planes
+   # proj = 0, horizontal, max 3 planes
+   # proj = 1, vertex,     max 4 planes
     seed = -1
     combinations = {}
     hitlist = {}
@@ -194,7 +196,7 @@ class Tracking(ROOT.FairTask):
       for plane in range(self.systemAndPlanes[s]+1):
           if not plane%2==proj: continue
           if clusPerStation[s*10+plane]==1:
-             seed = s*10+plane
+             seed = s*10+plane # seed defined as the lowest z-position plane to have 1 cluster! 
              break
       if seed < 0: return trackCandidates
       combinations[proj] = {}
@@ -332,7 +334,7 @@ class Tracking(ROOT.FairTask):
               trackCandidates.append(hitlist)
         return trackCandidates
 
- def scifiCluster(self):
+ def scifiCluster(self, withQDC=False):
        clusters = []
        self.DetID2Key.clear()
        hitDict = {}
@@ -360,7 +362,7 @@ class Tracking(ROOT.FairTask):
                         N = len(tmp)
                         hitvector.clear()
                         for aHit in tmp: hitvector.push_back( self.event.Digi_ScifiHits[hitDict[aHit]])
-                        aCluster = ROOT.sndCluster(first,N,hitvector,self.scifiDet,False)
+                        aCluster = ROOT.sndCluster(first, N, hitvector, self.scifiDet, withQDC)
                         clusters.append(aCluster)
                         if c!=hitList[last]:
                              ncl+=1
@@ -384,25 +386,26 @@ class Tracking(ROOT.FairTask):
        hitDict = {}
        for k in range(self.event.Digi_MuFilterHits.GetEntries()):
             d = self.event.Digi_MuFilterHits[k]
-            if (d.GetDetectorID()//10000)<3 or (not d.isValid()): continue
+            # if (d.GetDetectorID()//10000)<3 or (not d.isValid()): continue
+            if (d.GetDetectorID()//10000)<3: continue
             hitDict[d.GetDetectorID()] = k
        hitList = list(hitDict.keys())
        if len(hitList)>0:
-              hitList.sort()
-              tmp = [ hitList[0] ]
+              hitList.sort() # Smallest detID first: sorted low z to high z.
+              tmp = [ hitList[0] ] 
               cprev = hitList[0]
               ncl = 0
               last = len(hitList)-1
               hitvector = ROOT.std.vector("MuFilterHit*")()
               for i in range(len(hitList)):
-                   if i==0 and len(hitList)>1: continue
-                   c=hitList[i]
+                   if i==0 and len(hitList)>1: continue # tmp is the 1st hit, so start from the 2nd
+                   c=hitList[i] # position of hit in the Digi_MuFilterHits array (k in 1st loop)
                    neighbour = False
-                   if (c-cprev)==1 or (c-cprev)==2:    # allow for one missing channel
-                        neighbour = True
-                        tmp.append(c)
-                   if not neighbour  or c==hitList[last] or c%1000==59:
-                        first = tmp[0]
+                   if (c-cprev)==1 or (c-cprev)==2:    
+                        neighbour = True    # allow for one missing channel to be classed as neighbour
+                        tmp.append(c) 
+                   if not neighbour  or c==hitList[last] or c%1000==59: # if not neighbour, if last horizontal scintillator in plane
+                        first = tmp[0] 
                         N = len(tmp)
                         hitvector.clear()
                         for aHit in tmp: hitvector.push_back( self.event.Digi_MuFilterHits[hitDict[aHit]])
@@ -460,19 +463,10 @@ class Tracking(ROOT.FairTask):
 
 # approximate covariance
     covM = ROOT.TMatrixDSym(6)
-    for k in hitlist:
-      aCl = hitlist[k]
-      if hasattr(aCl,"GetFirst"):
-        detID = aCl.GetFirst()
-      else:
-        detID = aCl.GetDetectorID()
-      if detID<40000: res = self.sigmaMufiDS_spatial
-      else:  res = self.sigmaScifi_spatial
-      break
-
-    for  i in range(3):   covM[i][i] = res*res
+    res = self.sigmaScifi_spatial # Should this not be Scifi/MufiDS depending on track type?
+    for  i in range(3):   covM[i][i] = res*res 
     for  i in range(3,6): covM[i][i] = ROOT.TMath.Power(res / (4.*2.) / ROOT.TMath.Sqrt(3), 2)
-    rep = ROOT.genfit.RKTrackRep(13)
+    rep = ROOT.genfit.RKTrackRep(13) # Runge-Kutta track representation(q/p, u', v', u, v). q/p:charge/mom, u', v': direction tangents, u,v: positions on a genfit.DetPlane. What is/why 13?
 
 # start state
     state = ROOT.genfit.MeasuredStateOnPlane(rep)
@@ -492,9 +486,9 @@ class Tracking(ROOT.FairTask):
         aCl = hitlist[k]
         if hasattr(aCl,"GetFirst"):
             detID = aCl.GetFirst()
-            aCl.GetPosition(A,B)
+            aCl.GetPosition(A,B) # Fill vectors A and B
             detSys  = 1
-            if detID<40000: detSys=3
+            if detID>50000: detSys=3 # Never True?
         else:
             detID = aCl.GetDetectorID()
             detSys  = 1
@@ -507,10 +501,10 @@ class Tracking(ROOT.FairTask):
     sorted_z=list(unSortedList.keys())
     sorted_z.sort()
     for z in sorted_z:
-        tp = ROOT.genfit.TrackPoint() # note how the point is told which track it belongs to
+        tp = ROOT.genfit.TrackPoint() 
         hitCov = ROOT.TMatrixDSym(7)
         detSys = unSortedList[z][3]
-        if detSys==3:      
+        if detSys==3:
               res = self.sigmaMufiDS_spatial
               maxDis = 1.0
         elif detSys==2:  
@@ -531,7 +525,14 @@ class Tracking(ROOT.FairTask):
         theTrack.Delete()
         return -2
 # do the fit
-    self.fitter.processTrack(theTrack) # processTrackWithRep(theTrack,rep,True)
+    self.fitter.processTrack(theTrack) # resortHits bool=False by default.
+    # processTrack(theTrack) is inherited from genfit::AbsFitter. 
+    # Uses genfit.processTrackWithRep(track, trackRep, false) with all hits
+    # processTrack(theTrack) starts with the cardinalRep (lowest chi2?) then proceeds to others without sorting.
+    # How is cardinal rep chosen? Does it matter?
+    # From Thomas: processTrackWithRep(theTrack,rep,True)... from Andrew: bool resortHits cannot be passed as True? 
+    # Andrew: according to https://eic.github.io/doxygen/d0/dba/classgenfit_1_1AbsFitter.html#a03e279c67ca889f5fe6480eb8a1691cf)
+    
     fitStatus   = theTrack.getFitStatus()
     if self.Debug: print("Fit result: converged chi2 Ndf",fitStatus.isFitConverged(),fitStatus.getChi2(),fitStatus.getNdf())
     if not fitStatus.isFitConverged() and 0>1:

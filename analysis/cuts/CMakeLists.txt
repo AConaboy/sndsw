@@ -23,6 +23,13 @@ sndEventDeltat.cxx
 sndAvgSciFiFiducialCut.cxx
 sndAvgDSFiducialCut.cxx
 sndDSVetoCut.cxx
+sndSciFiContinuity.cxx
+sndUSPlanesHit.cxx
+sndUSBarsVeto.cxx
+sndSciFiAngle.cxx
+sndStableBeams.cxx
+sndIP1.cxx
+sndPrescale.cxx
 )
 
 set(LINK_DIRECTORIES
@@ -34,6 +41,6 @@ link_directories( ${LINK_DIRECTORIES})
 Set(HEADERS )
 Set(LINKDEF AnalysisCutsLinkDef.h)
 Set(LIBRARY_NAME snd_analysis_cuts)
-Set(DEPENDENCIES snd_analysis_tools shipLHC veto)
+Set(DEPENDENCIES snd_analysis_tools shipLHC veto -lROOTTPython)
 
 GENERATE_LIBRARY()

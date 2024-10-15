@@ -11,7 +11,7 @@
 
 namespace snd::analysis_cuts {
 
-  USQDCCut::USQDCCut(float threshold, TChain * ch) : MuFilterBaseCut(ch) {
+  USQDCCut::USQDCCut(float threshold, TChain * tree) : MuFilterBaseCut(tree) {
     qdc_threshold = threshold;
     cutName = "Total US QDC > "+std::to_string(qdc_threshold);
 
@@ -32,6 +32,7 @@ namespace snd::analysis_cuts {
     std::vector<bool> us = std::vector<bool>(5, false); 
     
     while ( (hit = (MuFilterHit*) hitIterator.Next()) ){
+      if (!hit->isValid()) continue;
       if (hit->GetSystem() == 2) {
 	for (const auto& [key, value] : hit->GetAllSignals()) {
 	  totQDC += value;

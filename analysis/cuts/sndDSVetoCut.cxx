@@ -9,7 +9,7 @@
 
 namespace snd::analysis_cuts {
 
-  DSVetoCut::DSVetoCut(TChain * ch) : MuFilterBaseCut(ch) {
+  DSVetoCut::DSVetoCut(TChain * tree) : MuFilterBaseCut(tree) {
     cutName = "Remove events with hits in the last (hor) and two last (ver) DS planes";
     
     shortName = "DSVetoCut";
@@ -32,8 +32,10 @@ namespace snd::analysis_cuts {
     bool ret = true;
     
     while ( (hit = (MuFilterHit*) hitIterator.Next()) ){
+      if (! hit->isValid()) continue;
+
       if (hit->GetSystem() == 3) { // DS
-	if (hit->GetPlane() >= 3) {
+	if (hit->GetPlane() >= 2) {
 	  ret = false; 
 	  n_hits+=1;
 	}

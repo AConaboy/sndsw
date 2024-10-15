@@ -58,3 +58,5 @@ lcgenv.sh
 # CDB
 conditionsDatabase/**/.cache/
 
+macro/LaserMeasurements/analysis-plots/
+SiPM number,Linear fit

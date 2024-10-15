@@ -51,24 +51,6 @@ using std::to_string;
 using std::string;
 using namespace ShipUnit;
 
-MuFilter::MuFilter()
-: FairDetector("MuonFilter", "",kTRUE),
-  fTrackID(-1),
-fVolumeID(-1),
-fPos(),
-fMom(),
-fTime(-1.),
-fLength(-1.),
-fELoss(-1),
-eventHeader(0),
-last_run_time(-1),
-last_run_pos(-1),
-last_time_alignment_tag(""),
-alignment_init(false),
-fMuFilterPointCollection(new TClonesArray("MuFilterPoint"))
-{
-}
-
 MuFilter::MuFilter(const char* name, Bool_t Active,const char* Title)
 : FairDetector(name, true, kMuFilter),
   fTrackID(-1),
@@ -268,8 +250,7 @@ void MuFilter::ConstructGeometry()
 				 new TGeoTranslation(displacement.X()-dx_bar,displacement.Y(),displacement.Z())); // detID of type 12xxx
 	     }
 	  }// Veto plane 3
-	}
-	
+	}		
 		//adding to detector volume
 	top->AddNode(volVeto, 1,new TGeoTranslation(fVetoShiftX,fVetoShiftY,fVetoShiftZ)) ;
 
@@ -323,6 +304,7 @@ void MuFilter::ConstructGeometry()
 	Double_t dz = 0;
 	//Upstream Detector planes definition
 	Double_t fUpstreamDetZ =  conf_floats["MuFilter/UpstreamDetZ"];
+
 
 	// local position of bottom horizontal bar to survey edge
 	TVector3 LocBarUS = TVector3(
@@ -575,14 +557,20 @@ void MuFilter::GetLocalPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vR
   vRight.SetXYZ(locB[0],locB[1],locB[2]);
 }
 
-Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t rawTime, Double_t L){
+// Calculate the time walk correction
+Float_t MuFilter::GetTimeWalk(Int_t fDetectorID, Int_t channel, Float_t qdc, TString tag){
+   std::vector<float> vec = conf_vectors["MuFilter/TW_DSa_"+std::to_string(fDetectorID)
+                                                           +"_"+std::to_string(channel)+tag];
+   /* A = vec[0]; B = vec[1]; C = vec[2];
+      D = vec[3]; E = vec[4]; F = vec[5]; */
+   Float_t Q = qdc-vec[0];
+   return vec[3]*Q/(vec[1]+vec[2]*pow(Q,2)) + vec[4]*Q + vec[5];
+}
+
+Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t rawTime, Double_t L, Float_t qdc){
 /* expect time in u.ns  and  path length to sipm u.cm */
-/* calibration implemented only for DS! */
-/* channel 0 left or top, channel 1 right */
-	if (fDetectorID<30000){
-		LOG(ERROR) << "MuFilter::GetCorrectedTime: not yet implemented for Veto and DS, no correction applied" ;
-		return rawTime;
-	}
+/* returns the time in u.ns  */
+/* for DS: channel 0 left or top, channel 1 right */
 	TString tag = "";
 	if (eventHeader){
 		Int_t fRunNumber = eventHeader->GetRunId();
@@ -614,6 +602,12 @@ Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t ra
 		  last_time_alignment_tag = tag;
 		}
 	}
+	if (fDetectorID<30000){
+	   return rawTime + GetTimeWalk(fDetectorID, channel, qdc, last_time_alignment_tag)
+	                  + conf_vectors["MuFilter/TW_DSa_"
+	                                 +std::to_string(fDetectorID)+"_"+std::to_string(channel)
+	                                 +last_time_alignment_tag].back();
+	}	
 	Float_t cor = rawTime;
 	int l = (fDetectorID-30000)/1000;
 	int ichannel60 = fDetectorID%1000;
@@ -635,12 +629,107 @@ Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t ra
 	return cor;
 }
 
-void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
+Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 {
+	Int_t N=0;
+	Float_t sum_signalspeeds=0, signalspeed=0;
+	TString fixed_ch;
 
-  int subsystem     = floor(fDetectorID/10000);
-  int plane             = floor(fDetectorID/1000) - 10*subsystem;
-  int bar_number   = fDetectorID%1000;
+	Int_t start=0, end=0;
+	if (side=="left") {
+		start=0;
+		end=8;
+	}
+	else if (side=="right") {
+		start=8;
+		end=16;	
+	}
+	else { 
+		std::cout << "Invalid value for side passed to function" << std::endl;
+		return 0; }
+
+	for ( Int_t i=start;i<end;i++ ){
+		
+		// Skip small channels
+		if (i%8==2 || i%8==5){continue;}
+
+		// Get signal speed for SiPM i
+		fixed_ch = to_string(detID)+"_"+to_string(i);
+		signalspeed = conf_floats["MuFilter/US_signalspeed_"+fixed_ch]; 
+		// std::cout << fixed_ch << " : " << to_string(signalspeed) << std::endl;
+		sum_signalspeeds += signalspeed;
+		++N;
+	}
+	// std::cout << "N: " << to_string(N) <<std::endl;
+	if (N != 0) {return sum_signalspeeds/N;}
+	else {return 0.0;}
+}
+
+Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
+{
+	Float_t sum_sigmat_sq=0, sum_covariance=0, SiPM_resolution=0, xt=0, result=0;
+	Int_t N=0;
+	TString fixed_ch;
+
+	Int_t start=0, end=0;
+	if (side=="left") {
+		start=0;
+		end=8;
+	}
+	else if (side=="right") {
+		start=8;
+		end=16;	
+	}	
+		
+	for ( Int_t i=start;i<end;i++ ){
+		// Skip small channels
+		if (i%8==2 || i%8==5){continue;}
+
+		// Get SiPM time resolutions squared
+		fixed_ch = to_string(detID)+"_"+to_string(i);
+
+		// Check that SiPM constant is found
+		if (conf_floats.find(fixed_ch) != conf_floats.end()){
+			std::cout << "detID: " << to_string(detID) << " SiPM "<< to_string(i) << " not found!";
+			continue;
+		}
+
+		SiPM_resolution = conf_floats["MuFilter/US_timeresolution_"+fixed_ch];
+		// std::cout << fixed_ch << " : " << to_string(SiPM_resolution) << std::endl;
+
+		sum_sigmat_sq += std::pow(SiPM_resolution,2);
+
+		// Get covariance contributions
+		for ( Int_t j=i+1;j<end;j++  ){
+
+			// Skip small channels
+			if (i%8==2 || i%8==5){continue;}
+
+			// Check that XT constant is found
+			if (conf_floats.find(fixed_ch) != conf_floats.end()){
+				std::cout << "detID: " << to_string(detID) << " SiPM "<< to_string(i) << "-" << to_string(j) << " XT component not found!";
+				continue;
+			}
+
+			xt = conf_floats["MuFilter/US_timingxt_"+to_string(detID)+"_"+to_string(i)+"_"+to_string(j)];
+			sum_covariance += 2*xt;
+		}
+		N++;
+	}
+
+	// Float_t result=0;
+	if (N==0) {return result;}
+	else {
+		result = 1/std::pow(N,2) * ( sum_sigmat_sq + sum_covariance );
+		return result;
+	}
+}
+
+void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight){
+
+  int subsystem = floor(fDetectorID/10000);
+  int plane = floor(fDetectorID/1000) - 10*subsystem;
+  int bar_number = fDetectorID%1000;
 
   TString path = "/cave_1/Detector_0/";
   TString barName;
@@ -654,7 +743,7 @@ void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
       barName = "/volVetoBar_";
       // the third Veto plane is vertical
       if (plane>=2) barName+="ver_";
-      shift = conf_floats["MuFilter/Veto"+std::to_string(plane+1)+"ShiftX"];
+      shift = conf_floats["MuFilter/Veto"+std::to_string(plane+1)+"ShiftY"];
       break;
   case 2: 
       path+="volMuFilter_1/volMuUpstreamDet_"+std::to_string(plane)+"_"
@@ -704,25 +793,25 @@ void MuFilter::GetPosition(Int_t fDetectorID, TVector3& vLeft, TVector3& vRight)
     }
 }
 
-   Int_t MuFilter::GetnSiPMs(Int_t detID){
-       int subsystem     = floor(detID/10000)-1;
-       if (subsystem==0){return conf_ints["MuFilter/VetonSiPMs"];}
-       if (subsystem==1){return conf_ints["MuFilter/UpstreamnSiPMs"];}
-       return conf_ints["MuFilter/DownstreamnSiPMs"];
+Int_t MuFilter::GetnSiPMs(Int_t detID){
+	int subsystem     = floor(detID/10000)-1;
+	if (subsystem==0){return conf_ints["MuFilter/VetonSiPMs"];}
+	if (subsystem==1){return conf_ints["MuFilter/UpstreamnSiPMs"];}
+	return conf_ints["MuFilter/DownstreamnSiPMs"];
+}
 
-   }
-   Int_t MuFilter::GetnSides(Int_t detID){
-       int subsystem     = floor(detID/10000)-1;
-       if (subsystem==0){
-         // vertical Veto 3 has the readout on the top only
-         if (detID>=12000) return conf_ints["MuFilter/VetonSides"]-1;
-         else {return conf_ints["MuFilter/VetonSides"];}
-       }
-       if (subsystem==1){return conf_ints["MuFilter/UpstreamnSides"];}
-       if (subsystem==2){
-          if (detID%1000>59) return conf_ints["MuFilter/DownstreamnSides"]-1;
-          else {return conf_ints["MuFilter/DownstreamnSides"];}
-       }
-  }
+Int_t MuFilter::GetnSides(Int_t detID){
+	int subsystem     = floor(detID/10000)-1;
+	if (subsystem==0){
+		// vertical Veto 3 has the readout on the top only
+		if (detID>=12000) return conf_ints["MuFilter/VetonSides"]-1;
+		else {return conf_ints["MuFilter/VetonSides"];}
+	}
+	else if (subsystem==1){return conf_ints["MuFilter/UpstreamnSides"];}
+	else {
+		if (detID%1000>59) return conf_ints["MuFilter/DownstreamnSides"]-1;
+		else {return conf_ints["MuFilter/DownstreamnSides"];}
+	}
+}
 
 ClassImp(MuFilter)

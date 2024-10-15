@@ -1,0 +1,12 @@
+{
+    "small":{
+        "area":9,
+        "PDE":0.5,
+        "pixels":14331
+    },
+    "large":{
+        "area":36,
+        "PDE":0.5,
+        "pixels":3531
+    }
+}

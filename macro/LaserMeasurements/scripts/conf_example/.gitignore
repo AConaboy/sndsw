@@ -1,0 +1,6 @@
+*
+!.gitignore
+!board_mapping.toml
+!configuration.toml
+!*/channels.csv
+!*/board.toml

@@ -1,0 +1,1650 @@
+RunNumber,SiPM number,SiPM size,Laser intensity (%),Pulse frequency (kHz),Trigger phase (cc),Run Length (s),Trigger type,Optics set up,Run date,Run status
+0,76,large,,1,,,Internal,N/A,26.09.2023,Test
+1,76,large,,1,,,Internal,N/A,26.09.2023,Test
+2,76,large,,1,,,Internal,N/A,26.09.2023,Test
+3,76,large,,1,,,Internal,N/A,26.09.2023,Test
+4,76,large,2,1,,10,Internal,n=24 + 1500 DG,26.09.2023,Test
+5,76,large,2,1,,10,Internal,n=12 + 1500 DG,26.09.2023,Test
+6,76,large,,1,,,Internal,,26.09.2023,Test
+7,76,large,,1,,,Internal,,26.09.2023,Test
+8,76,large,,1,,,Internal,,26.09.2023,Test
+9,76,large,,1,,,Internal,,26.09.2023,Test
+10,76,large,,1,,,Internal,,26.09.2023,Test
+Recalibration,,,,,,,,,,
+29,76,large,2,1,,10,Internal,n=2 + 1500 DG,27.09,Test
+30,76,large,50,1,,10,Internal,n=2 + 1500 DG,27.09,Test
+31,76,large,50,1,,10,Internal,n=2 + 2100 DG,27.09,Test
+32,76,large,100,1,,10,Internal,n=2 + 1620 DG,27.09,Test
+33,76,large,,1,,,Internal,,27.09,Test
+34,76,large,100,1,,10,Internal,n=2 + 1620 DG,27.09,Test
+35,76,large,1,1,,10,Internal,n=1 + 1500 DG,,
+,,,,,,,,,,
+36,76,large,,1,,,Internal,,,
+37,76,large,2,1,,10,Internal,n=1.5 + 1500 DG,,
+38,76,large,,1,,,Internal,,,
+39,76,large,,1,,,Internal,,,
+40,76,large,2,1,,10,Internal,,27.09.,Test
+41,76,large,,1,,,Internal,,27.09.,
+42,76,large,2,1,,10,Internal,n=1.7 + 1500+ DG,27.09.,Test
+43,76,large,,1,,,Internal,n=1.8 + 1500+ DG,27.09.,Test
+44,76,large,,1,,,Internal,,27.09.,Test
+45,76,large,,1,,,Internal,,27.09.,Test
+46,76,large,2,,,10,Internal,n=1.8 + 1840 DG ,27.09.,Test
+47,76,large,20,1,,10,Internal,n=1.8 + 1840 DG ,27.09.,Test
+48,76,large,40,1,,10,Internal,n=1.8 + 1840 DG ,27.09.,Test
+49,76,large,60,1,,10,Internal,n=1.8 + 1840 DG ,27.09.,Test
+50,76,large,80,1,,10,Internal,n=1.8 + 1840 DG ,27.09.,Test
+51,76,large,100,1,,10,Internal,n=1.8 + 1840 DG ,27.09.,Test
+52,76,large,2,1,,10,Internal,n=1.8 + 1840 DG ,27.09.,Test
+53,76,large,,1,,,Internal,,,
+Grounding added,,,,,,,Internal,,,
+54,76,large,2,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Good
+55,76,large,20,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Good
+56,76,large,40,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Good
+57,76,large,60,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Good
+58,76,large,80,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Good
+59,76,large,100,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Good
+Try low intensity again,,,,,,,Internal,,,
+60,76,large,2,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Test
+Grounding improved,,,,,,,Internal,,,
+61,76,large,0,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,Test
+Still issues,,,,,,,Internal,,,
+Recalibrating,,,,,,,Internal,,,
+63,80,large,2,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,SHIT
+65,80,large,2,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,good
+66,79,large,2,1,,10,Internal,n=1.8 + 1840 DG ,28.09.,SHIT
+67,79,large,100,10,,,Internal,,,
+,,,,,,,Internal,,,
+69,79,large,2,10,,2,Internal,n=1.5 + 220 DG,28.09.,
+70,79,large,2,10,,2,Internal,n=1.5 + 220 DG,28.09.,
+71,79,large,2,10,,4,Internal,n=2.1 + 220 DG,28.09.,
+72,79,large,2,10,,4,Internal,n=4.5 + 220 DG,28.09.,SHIT
+73,79,large,2,10,,4,Internal,n=3.5 + 220 DG,28.09.,SHIT
+74,79,large,2,10,,4,Internal,n=3 + 220 DG,28.09.,SHIT
+75,79,large,2,10,,4,Internal,n=2.5 + 220 DG,28.09.,SHIT
+76,79,large,2,10,,4,Internal,n=2.5 + 220 DG,28.09.,SHIT
+77,79,large,2,10,,4,Internal,n=2.5 + 220 DG,28.09.,
+78,79,large,2,10,,4,Internal,n=2.7 + 220 DG,28.09.,
+79,79,large,2,10,,4,Internal,n=2.8 + 220 DG,28.09.,
+80,79,large,100,10,,4,Internal,n=2.8 + 220 DG,28.09.,
+Going back to,,,,,,,Internal,,,
+81,79,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+82,79,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+83,79,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+84,79,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+85,79,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+86,79,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+Change SiPM,,,,,,,Internal,,,
+86,77,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+87,77,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+89,77,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+90,77,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+91,77,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot!
+92,77,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot!
+AC turned on,,,,,,,Internal,,,
+93,77,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+94,77,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,"Okay, MPV=3.2"
+Change SiPM,,,,,,,Internal,,,
+95,76,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+96,76,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+97,76,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+98,76,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,"Good, but hot"
+99,76,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,"Good, but hot"
+100,76,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,"Good, but hot"
+101,76,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,hot
+103,76,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+Change SiPM,,,,,,,Internal,,,
+Set AC to 20 C,,,,,,,Internal,,,
+104,76,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+105,76,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+106,76,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+107,76,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+108,76,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+109,76,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+110,76,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+111,76,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+Change SiPM,,,,,,,Internal,,,
+112,78,small,100,10,,5,Internal,n=1.8 + 1840 DG,,Small SiPM
+Change SiPM,,,,,,,Internal,,,
+113,80,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+114,80,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+115,80,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+116,80,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+117,80,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+118,80,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+120,80,large,2,10,,5,Internal,n=1.8 + 1840 DG,02.10.,Good
+121,80,large,20,10,,5,Internal,n=1.8 + 1840 DG,02.10.,Good
+122,80,large,40,10,,5,Internal,n=1.8 + 1840 DG,02.10.,Good
+123,80,large,60,10,,5,Internal,n=1.8 + 1840 DG,02.10.,Good
+124,80,large,80,10,,5,Internal,n=1.8 + 1840 DG,02.10.,Good
+125,80,large,100,10,,5,Internal,n=1.8 + 1840 DG,02.10.,Bit hot
+Change SiPM,,,,,,,Internal,,,
+126,74,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot
+127,74,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot
+128,74,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Good
+129,74,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot
+130,74,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot
+131,74,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot
+132,74,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot
+133,74,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Bit hot
+Change SiPM,,,,,,,Internal,,,
+134,73,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+135, ,large,,,,,Internal,,,Test
+136,,large,,,,,Internal,,,Test
+137,,large,,,,,Internal,,,Test
+138,,large,,,,,Internal,,,Test
+139,73,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+140,73,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+141,73,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+142,73,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+143,73,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Hot
+144,73,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,"hot, signal smeared with noise peak"
+Change SiPM,,,,,,,Internal,,,
+145,72,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+146,72,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+147,72,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+148,72,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+149,72,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+150,72,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+Change SiPM,,,,,,,Internal,,,
+151,71,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,Test after removing DAQ board earth ground
+Re-set thr,,,,,,,Internal,,,
+Re-connect DAQ-earth ground,,,,,,,Internal,,,
+153,71,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+154,71,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+155,71,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+156,71,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+157,71,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+158,71,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+Change SiPM,,,,,,,Internal,,,
+160,69,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+161,69,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+162,69,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+163,69,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+164,69,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+165,69,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+Change SiPM,,,,,,,Internal,,,
+167,68,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+168,68,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+169,68,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+170,68,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+171,68,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+172,68,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+Change SiPM,,,,,,,Internal,,,
+173,66,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+174,66,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+175,66,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+176,66,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+177,66,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+178,66,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+Change SiPM,,,,,,,Internal,,,
+179,65,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+180,65,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,good
+181,65,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,slightly hot
+182,65,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,slightly hot
+183,65,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,slightly hot
+184,65,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,"slightly hot, seems fine"
+Change SiPM,,,,,,,Internal,,,
+185,64,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+186,64,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+187,64,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+188,64,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+189,64,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+190,64,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+Change SiPM,,,,,,,Internal,,,
+192,63,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+193,63,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+194,63,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+195,63,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+196,63,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+197,63,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+Change SiPM,,,,,,,Internal,,,
+198,61,large,100,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+199,61,large,80,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+200,61,large,60,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+201,61,large,40,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+202,61,large,20,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+203,61,large,2,10,,5,Internal,n=1.8 + 1840 DG,29.09.,
+Change SiPM,,,,,,,Internal,,,
+Whole lot of testing,,,,,,,Internal,,03.09.,
+213,80,large,100,10,5,5,External,n=1.8 + 1840 DG,03.09.,
+Reconfiguring optics,,,,,,,,,,
+220,80,large,100,10,5,5,External,"n=5.5, 1500 DG",,
+221,80,large,100,10,5,5,External,"n=5, 1500 DG",,
+222,80,large,100,10,5,5,External,"n=3,5, 1500 DG",,
+223,80,large,100,10,5,5,External,"n=2.5, 1500 DG",,
+Testing,,,,,,,,,,
+229,80,large,100,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+230,80,large,80,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+231,80,large,60,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+233,80,large,40,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+234,80,large,20,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+235,80,large,2,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+236,80,large,5,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+237,80,large,10,10,5,5,External,"n=1.7, 1500H + 220DG",03.09.,
+238,80,large,5,10,5,5,External,"n=1.3, 1500H + 220DG",03.09.,
+239,80,large,5,10,5,5,External,"n=1.0, 1500H + 220DG",03.09.,
+240,80,large,5,10,5,5,External,"n=1.0, 1500H + 220DG",04.09.,good
+241,80,large,10,10,5,5,External,"n=1.0, 1500H + 220DG",04.09.,good
+242,80,large,20,10,5,5,External,"n=1.0, 1500H + 220DG",04.09.,good
+243,80,large,40,10,5,5,External,"n=1.0, 1500H + 220DG",04.09.,Saturation
+244,80,large,2,10,5,5,External,"n=1.5, 1500H + 220DG",04.09.,
+245,80,large,2,10,5,5,External,"n=1.5, 1500H + 220DG",04.09.,
+246,80,large,2,10,5,5,External,"n=1.5, 1720DG",04.09.,
+247,80,large,5,10,5,5,External,"n=1.5, 1720DG",04.09.,
+248,80,large,2,10,5,5,External,"n=1.2, 1720DG",04.09.,
+249,80,large,5,10,5,5,External,"n=1.2, 1720DG",04.09.,good
+250,80,large,10,10,5,5,External,"n=1.2, 1720DG",04.09.,
+251,80,large,20,10,5,5,External,"n=1.2, 1720DG",04.09.,
+252,80,large,40,10,5,5,External,"n=1.2, 1720DG",04.09.,Saturates
+253,80,large,4,10,5,5,External,"n=1.2, 1720DG",04.09.,
+254,80,large,6,10,5,5,External,"n=1.2, 1720DG",04.09.,
+255,80,large,8,10,5,5,External,"n=1.2, 1720DG",04.09.,
+257,80,large,10,10,5,5,External,"n=1.2, 1720DG",04.09.,
+258,80,large,5,10,5,5,External,"n=1.2, 2320DG",04.09.,
+259,80,large,10,10,5,5,External,"n=1.2, 2320DG",04.09.,
+260,80,large,5,10,5,5,External,"n=1.7, 2320DG",04.09.,
+261,80,large,10,10,5,5,External,"n=1.7, 2320DG",04.09.,
+262,80,large,100,10,5,5,External,"n=1.7, 2320DG",04.09.,
+263,80,large,2,10,5,5,External,"n=2.2, 2320DG",04.09.,
+264,80,large,5,10,5,5,External,"n=2.2, 2320DG",04.09.,
+265,80,large,10,10,5,5,External,"n=2.2, 2320DG",04.09.,Good
+266,80,large,100,10,5,5,External,"n=2.2, 2320DG",04.09.,Good
+267,80,large,20,10,5,5,External,"n=2.2, 2320DG",04.09.,Good
+268,80,large,40,10,5,5,External,"n=2.2, 2320DG",04.09.,Good
+269,80,large,60,10,5,5,External,"n=2.2, 2320DG",04.09.,Good
+270,80,large,80,10,5,5,External,"n=2.2, 2320DG",04.09.,Good
+Change SiPM,,,,,,,,,,
+271,79,large,100,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+272,79,large,80,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+273,79,large,60,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+274,79,large,40,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+275,79,large,20,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+276,79,large,0,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+277,79,large,10,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+278,,,,,5,,,,,shite
+279,79,large,10,10,5,5,External,"n=2.2, 2320DG",04.09.,shite
+Change SiPM,,,,,,,,,,
+284,78,small,100,10,5,5,External,2320DG,04.09.,shite
+285,78,small,100,10,5,5,External,2120DG,04.09.,shite
+286,78,small,100,10,5,5,External,1720DG,04.09.,shite
+287,78,small,100,10,5,5,External,0,04.09.,shite
+288,78,small,100,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+Change SiPM,,,,,,,,,,
+289,80,large,50,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+290,80,large,50,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+291,80,large,25,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+292,80,large,5,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+292,80,large,7,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+Testing,,,,,5,,,,,shite
+304,80,large,8.5,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+305,80,large,10,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+306,80,large,9,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+307,80,large,8.7,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+308,80,large,9.5,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+309,80,large,12,10,5,5,External,"n=1.5, 1720DG",04.09.,shite
+Change SiPM,,,,,,,,,,
+310,79,large,8.5,10,5,5,External,"n=1.5, 1720DG",04.09.,Bad
+311,79,large,8.7,10,5,5,External,"n=1.5, 1720DG",04.09.,Bad
+313,79,large,9,10,5,5,External,"n=1.5, 1720DG",04.09.,Bad
+314,79,large,9.5,10,5,5,External,"n=1.5, 1720DG",04.09.,Bad
+315,79,large,10,10,5,5,External,"n=1.5, 1720DG",04.09.,Bad
+316,79,large,12,10,5,5,External,"n=1.5, 1720DG",04.09.,Bad
+Change SiPM,,,,,,,,,,
+318,80,large,14,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+Change SiPM,,,,,,,,,,
+319,79,large,14,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+320,79,large,8.5,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+Change SiPM,,,,,,,,,,
+321,78,small,14,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+322,78,small,100,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+323,78,small,90,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+324,78,small,80,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+325,78,small,70,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+326,78,small,60,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+327,78,small,50,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+328,78,small,40,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+329,78,small,30,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+330,78,small,20,10,5,5,External,"n=1.5, 1720DG",5.09,Shit
+Change SiPM,,,,,,,,,,
+331,77,large,8.5,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+332,77,large,8.5,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+333,77,large,8.7,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+334,77,large,9,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+335,77,large,9.5,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+336,77,large,10,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+337,77,large,12,10,5,5,External,"n=1.5, 1720DG",5.09,shite
+Change SiPM,,,,,,,,,,
+338,77,large,8.5,10,10,5,External,"n=1.5, 1720DG",6.09,Bad
+339,77,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,shite
+340,80,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+341,80,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+342,80,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+343,80,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+344,80,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+345,80,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+346,80,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+347,79,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+348,79,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+349,79,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+350,79,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+351,79,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+352,79,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+353,79,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+360,78,small,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+361,78,small,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+362,78,small,60,10,100,5,External,"n=1.5, 1720DG",6.09,
+363,78,small,80,10,100,5,External,"n=1.5, 1720DG",6.09,
+364,78,small,100,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+365,77,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+366,77,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+367,77,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+368,77,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+369,77,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+370,77,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+371,77,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+372,76,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+373,76,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+374,76,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+375,76,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+376,76,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+377,76,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+378,76,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,shite
+379,76,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+380,75,small,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+384,75,small,15,10,100,5,External,"n=1.5, 1720DG",6.09,
+381,75,small,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+382,75,small,25,10,100,5,External,"n=1.5, 1720DG",6.09,
+383,75,small,30,10,100,5,External,"n=1.5, 1720DG",6.09,
+385,75,small,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+386,75,small,60,10,100,5,External,"n=1.5, 1720DG",6.09,
+387,75,small,80,10,100,5,External,"n=1.5, 1720DG",6.09,
+388,75,small,100,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+389,74,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+390,74,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+391,74,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+392,74,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+393,74,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+394,74,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+395,74,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+396,73,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+397,73,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+398,73,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+399,73,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+400,73,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+401,73,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+402,73,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+403,72,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+404,72,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+405,72,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+406,72,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+407,72,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+408,72,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+409,72,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+410,71,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+411,71,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+412,71,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+413,71,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+414,71,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+415,71,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+416,71,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+417,70,small,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+418,70,small,15,10,100,5,External,"n=1.5, 1720DG",6.09,
+419,70,small,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+420,70,small,25,10,100,5,External,"n=1.5, 1720DG",6.09,
+421,70,small,30,10,100,5,External,"n=1.5, 1720DG",6.09,
+422,70,small,35,10,100,5,External,"n=1.5, 1720DG",6.09,
+423,70,small,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+424,70,small,60,10,100,5,External,"n=1.5, 1720DG",6.09,
+425,70,small,80,10,100,5,External,"n=1.5, 1720DG",6.09,
+426,70,small,100,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+427,69,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+428,69,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+429,69,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+430,69,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+431,69,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+432,69,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+433,69,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+435,68,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+436,68,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+437,68,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+438,68,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+439,68,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+440,68,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+441,68,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+442,67,small,15,10,100,5,External,"n=1.5, 1720DG",6.09,
+443,67,small,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+444,67,small,25,10,100,5,External,"n=1.5, 1720DG",6.09,
+445,67,small,30,10,100,5,External,"n=1.5, 1720DG",6.09,
+446,67,small,35,10,100,5,External,"n=1.5, 1720DG",6.09,
+447,67,small,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+448,67,small,60,10,100,5,External,"n=1.5, 1720DG",6.09,
+449,67,small,80,10,100,5,External,"n=1.5, 1720DG",6.09,
+450,67,small,100,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+451,66,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+452,66,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+453,66,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+454,66,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+455,66,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+456,66,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+457,66,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+458,66,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+459,66,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+460,66,large,60,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+461,65,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+462,65,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+463,65,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+464,65,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+465,65,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+466,65,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+467,65,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+468,65,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+469,65,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+470,64,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+471,64,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+472,64,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+473,64,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+474,64,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+475,64,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+476,64,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+477,64,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+478,64,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+479,63,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+480,63,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+481,63,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+482,63,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+483,63,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+484,63,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+485,63,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+486,63,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+487,63,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+488,62,small,15,10,100,5,External,"n=1.5, 1720DG",6.09,
+489,62,small,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+490,62,small,25,10,100,5,External,"n=1.5, 1720DG",6.09,
+491,62,small,30,10,100,5,External,"n=1.5, 1720DG",6.09,
+492,62,small,35,10,100,5,External,"n=1.5, 1720DG",6.09,
+493,62,small,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+494,62,small,60,10,100,5,External,"n=1.5, 1720DG",6.09,
+495,62,small,80,10,100,5,External,"n=1.5, 1720DG",6.09,
+496,62,small,100,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+497,61,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+498,61,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+499,61,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+500,61,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+501,61,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+502,61,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+503,61,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+504,61,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+505,61,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+506,60,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+507,60,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+508,60,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+509,60,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+510,60,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+511,60,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+512,60,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+513,60,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+514,60,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+515,59,small,15,10,100,5,External,"n=1.5, 1720DG",6.09,
+516,59,small,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+517,59,small,25,10,100,5,External,"n=1.5, 1720DG",6.09,
+518,59,small,30,10,100,5,External,"n=1.5, 1720DG",6.09,
+519,59,small,35,10,100,5,External,"n=1.5, 1720DG",6.09,
+520,59,small,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+521,59,small,60,10,100,5,External,"n=1.5, 1720DG",6.09,
+522,59,small,80,10,100,5,External,"n=1.5, 1720DG",6.09,
+523,59,small,100,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+524,58,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+525,58,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+526,58,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+527,58,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+528,58,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+529,58,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+530,58,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+531,58,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+532,58,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+533,57,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+534,57,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+535,57,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+536,57,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+537,57,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+538,57,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+539,57,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+540,57,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+541,57,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+Change SiPM,,,,,,,,,,
+542,56,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+543,56,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+544,56,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+545,56,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+546,56,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+547,56,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+548,56,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+549,56,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+550,56,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+Change SiPM,,,,,,,,,,
+551,56,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+552,56,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+553,56,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+554,56,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+555,56,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,fucked it
+556,56,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+557,56,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+558,56,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+559,56,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,SiPMs off
+560,56,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+561,56,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+562,56,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+563,56,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+564,56,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+565,56,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+566,56,large,14,10,100,5,External,"n=1.5, 1720DG",6.09,
+567,56,large,20,10,100,5,External,"n=1.5, 1720DG",6.09,
+568,56,large,40,10,100,5,External,"n=1.5, 1720DG",6.09,
+Change SiPM,,,,,,,,,,
+569,55,large,8.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+570,55,large,8.7,10,100,5,External,"n=1.5, 1720DG",6.09,
+571,55,large,9,10,100,5,External,"n=1.5, 1720DG",6.09,
+572,55,large,9.5,10,100,5,External,"n=1.5, 1720DG",6.09,
+573,55,large,10,10,100,5,External,"n=1.5, 1720DG",6.09,
+574,55,large,12,10,100,5,External,"n=1.5, 1720DG",6.09,
+575,55,large,14,10,100,5,External,"n=1.5, 1720DG",8.09,
+576,55,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+577,55,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+Change SiPM,,,,,,,,,,
+578,54,small,15,10,100,5,External,"n=1.5, 1720DG",8.09,
+579,54,small,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+580,54,small,25,10,100,5,External,"n=1.5, 1720DG",8.09,
+581,54,small,30,10,100,5,External,"n=1.5, 1720DG",8.09,
+582,54,small,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+583,54,small,35,10,100,5,External,"n=1.5, 1720DG",8.09,
+584,54,small,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+585,54,small,80,10,100,5,External,"n=1.5, 1720DG",8.09,
+586,54,small,100,10,100,5,External,"n=1.5, 1720DG",8.09,
+Change SiPM,,,,,,,,,,
+587,53,large,8.5,10,100,5,External,"n=1.5, 1720DG",8.09,
+588,53,large,8.7,10,100,5,External,"n=1.5, 1720DG",8.09,
+589,53,large,9,10,100,5,External,"n=1.5, 1720DG",8.09,
+590,53,large,9.5,10,100,5,External,"n=1.5, 1720DG",8.09,
+591,53,large,10,10,100,5,External,"n=1.5, 1720DG",8.09,
+592,53,large,12,10,100,5,External,"n=1.5, 1720DG",8.09,
+593,53,large,14,10,100,5,External,"n=1.5, 1720DG",8.09,
+594,53,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+595,53,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+Change SiPM,,,,,,,,,,
+587,52,large,8.5,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+588,52,large,8.7,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+589,52,large,9,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+590,52,large,9.5,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+591,52,large,10,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+592,52,large,12,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+593,52,large,14,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+594,52,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+595,52,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+596,52,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+Change SiPM,,,,,,,,,,
+597,51,small,15,10,100,5,External,"n=1.5, 1720DG",8.09,
+598,51,small,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+599,51,small,25,10,100,5,External,"n=1.5, 1720DG",8.09,
+600,51,small,30,10,100,5,External,"n=1.5, 1720DG",8.09,
+601,51,small,35,10,100,5,External,"n=1.5, 1720DG",8.09,
+602,51,small,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+603,51,small,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+604,51,small,80,10,100,5,External,"n=1.5, 1720DG",8.09,
+605,51,small,100,10,100,5,External,"n=1.5, 1720DG",8.09,
+Change SiPM,,,,,,,,,,
+606,50,large,8.5,10,100,5,External,"n=1.5, 1720DG",8.09,
+607,50,large,8.7,10,100,5,External,"n=1.5, 1720DG",8.09,
+608,50,large,9,10,100,5,External,"n=1.5, 1720DG",8.09,
+609,50,large,9.5,10,100,5,External,"n=1.5, 1720DG",8.09,
+610,50,large,10,10,100,5,External,"n=1.5, 1720DG",8.09,
+611,50,large,12,10,100,5,External,"n=1.5, 1720DG",8.09,
+612,50,large,14,10,100,5,External,"n=1.5, 1720DG",8.09,
+613,50,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+614,50,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+615,50,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+Taking extra measurements before moving PCB fixture,,,,,,,,,,
+616,52,large,8.5,10,100,5,External,"n=1.5, 1720DG",8.09,
+617,52,large,8.7,10,100,5,External,"n=1.5, 1720DG",8.09,
+618,52,large,9,10,100,5,External,"n=1.5, 1720DG",8.09,
+619,52,large,9.5,10,100,5,External,"n=1.5, 1720DG",8.09,
+620,52,large,10,10,100,5,External,"n=1.5, 1720DG",8.09,
+621,52,large,12,10,100,5,External,"n=1.5, 1720DG",8.09,
+622,52,large,14,10,100,5,External,"n=1.5, 1720DG",8.09,
+623,52,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+624,52,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+625,52,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+Taking missing intensity measurements,,,,,,,,,,
+626,80,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+627,80,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+628,80,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+629,79,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+630,79,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+631,79,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+632,78,small,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+633,78,small,15,10,100,5,External,"n=1.5, 1720DG",8.09,
+634,78,small,25,10,100,5,External,"n=1.5, 1720DG",8.09,
+635,78,small,30,10,100,5,External,"n=1.5, 1720DG",8.09,
+636,78,small,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+637,77,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+638,77,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+639,77,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+640,76,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+641,76,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+642,76,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+643,74,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+644,74,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+645,74,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+646,73,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+647,73,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+648,73,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+649,73,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+650,73,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+651,73,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,
+652,69,large,20,10,100,5,External,"n=1.5, 1720DG",8.09,
+653,69,large,40,10,100,5,External,"n=1.5, 1720DG",8.09,
+654,71,large,60,10,100,5,External,"n=1.5, 1720DG",8.09,fucked it
+655,71,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+656,71,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+657,71,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+658,69,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+659,68,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+660,68,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+661,68,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+662,65,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+663,64,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+664,63,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+665,61,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,shite
+666,61,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+667,60,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+668,58,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+669,57,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+670,56,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+671,55,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+672,53,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+673,72,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+674,72,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+675,72,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+676,57,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+677,57,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+678,57,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+679,57,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+680,57,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+681,57,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+682,57,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+683,57,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+684,57,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+Retaking data from realy noisy runs,,,,,,,,,,
+685,57,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+686,57,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+687,57,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+688,57,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+689,56,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+690,56,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+691,56,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+692,56,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+693,56,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+694,56,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+695,56,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+696,56,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+697,56,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+698,56,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+699,55,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+700,55,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+701,55,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+702,76,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+703,76,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+704,76,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+705,76,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+706,76,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+707,76,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+708,76,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+709,76,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+710,76,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+711,76,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+712,74,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+713,74,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+714,74,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+715,74,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+716,74,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+717,74,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+718,74,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+719,74,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+720,74,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+721,74,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+722,64,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+723,64,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+724,60,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+725,60,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+726,60,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+727,52,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+728,52,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+729,52,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+730,52,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+731,52,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+732,52,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+733,52,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+734,52,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+735,52,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+736,52,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+Move stage,,,,,,,,,,
+738,49,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+739,49,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+740,49,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+741,49,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+742,49,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+743,49,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+744,49,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+745,49,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+746,49,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+747,49,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+748,49,large,80,10,100,5,External,"n=1.5, 1720DG",10.09,
+749,49,large,100,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+750,48,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+751,48,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+752,48,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+753,48,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+754,48,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+755,48,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+756,48,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+757,48,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+758,48,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+759,48,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+760,48,large,80,10,100,5,External,"n=1.5, 1720DG",10.09,
+761,48,large,100,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+762,47,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+763,47,large,8.7,10,100,5,External,"n=1.5, 1720DG",10.09,
+764,47,large,9,10,100,5,External,"n=1.5, 1720DG",10.09,
+765,47,large,9.5,10,100,5,External,"n=1.5, 1720DG",10.09,
+766,47,large,10,10,100,5,External,"n=1.5, 1720DG",10.09,
+767,47,large,12,10,100,5,External,"n=1.5, 1720DG",10.09,
+768,47,large,14,10,100,5,External,"n=1.5, 1720DG",10.09,
+769,47,large,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+770,47,large,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+771,47,large,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+772,46,small,15,10,100,5,External,"n=1.5, 1720DG",10.09,
+773,46,small,20,10,100,5,External,"n=1.5, 1720DG",10.09,
+774,46,small,25,10,100,5,External,"n=1.5, 1720DG",10.09,
+775,46,small,30,10,100,5,External,"n=1.5, 1720DG",10.09,
+776,46,small,35,10,100,5,External,"n=1.5, 1720DG",10.09,
+777,46,small,40,10,100,5,External,"n=1.5, 1720DG",10.09,
+778,46,small,60,10,100,5,External,"n=1.5, 1720DG",10.09,
+779,46,small,80,10,100,5,External,"n=1.5, 1720DG",10.09,
+780,46,small,100,10,100,5,External,"n=1.5, 1720DG",10.09,
+Change SiPM,,,,,,,,,,
+781,45,large,8.5,10,100,5,External,"n=1.5, 1720DG",10.09,last run of day
+782,45,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+783,45,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+784,45,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+785,45,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+786,45,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+787,45,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+788,45,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+789,45,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+790,45,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+791,44,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+792,44,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+793,44,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+794,44,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+795,44,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+796,44,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+797,44,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+798,44,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+799,44,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+800,44,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+801,43,small,15,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+802,43,small,20,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+803,43,small,25,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+804,43,small,30,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+805,43,small,35,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+806,43,small,40,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+807,43,small,15,10,100,5,External,"n=1.5, 1720DG",11.09,
+808,43,small,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+809,43,small,25,10,100,5,External,"n=1.5, 1720DG",11.09,
+810,43,small,30,10,100,5,External,"n=1.5, 1720DG",11.09,
+811,43,small,35,10,100,5,External,"n=1.5, 1720DG",11.09,
+812,43,small,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+813,43,small,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+814,43,small,80,10,100,5,External,"n=1.5, 1720DG",11.09,
+815,43,small,100,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+816,42,large,0,10,100,5,External,"n=1.5, 1720DG",11.09,
+817,42,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+818,42,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+819,42,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+820,42,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+821,42,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+822,42,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+823,42,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+824,42,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+825,42,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+826,42,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+827,41,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+828,41,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+829,41,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+830,41,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+831,41,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+832,41,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+833,41,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+834,41,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+835,41,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+836,41,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+837,41,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+838,40,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+839,40,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+840,40,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+841,40,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+842,40,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+843,40,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+844,40,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+845,40,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+846,40,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+847,40,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+848,39,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+849,39,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+850,39,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+851,39,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+852,39,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+853,39,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+854,39,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+855,39,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+856,39,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+857,39,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+858,38,small,15,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+859,38,small,20,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+860,38,small,25,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+861,38,small,30,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+862,38,small,35,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+863,38,small,40,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+864,38,small,60,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+865,38,small,80,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+866,38,small,100,10,100,5,External,"n=1.5, 1720DG",11.09,no SiPM
+Change SiPM,,,,,,,,,,
+867,37,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+868,37,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+869,37,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+870,37,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+871,37,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+872,37,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+873,37,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+874,37,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+875,37,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+876,37,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+877,36,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+878,36,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+879,36,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+880,36,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+881,36,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+882,36,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+883,36,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+884,36,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+885,36,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+886,36,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+887,35,small,15,10,100,5,External,"n=1.5, 1720DG",11.09,
+888,35,small,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+889,35,small,25,10,100,5,External,"n=1.5, 1720DG",11.09,
+890,35,small,30,10,100,5,External,"n=1.5, 1720DG",11.09,
+891,35,small,35,10,100,5,External,"n=1.5, 1720DG",11.09,
+892,35,small,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+893,35,small,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+894,35,small,80,10,100,5,External,"n=1.5, 1720DG",11.09,
+895,35,small,100,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+896,34,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+897,34,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+898,34,large,8.9,10,100,5,External,"n=1.5, 1720DG",11.09,
+899,34,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+900,34,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+901,34,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+902,34,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+903,34,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+904,34,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+905,34,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+906,34,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+907,33,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+908,33,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+909,33,large,8.9,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+910,33,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+911,33,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+912,33,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+913,33,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+914,33,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+915,33,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+916,33,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+917,33,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+918,33,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+919,33,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+920,33,large,8.9,10,100,5,External,"n=1.5, 1720DG",11.09,
+921,33,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+922,33,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+923,33,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+924,33,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+925,33,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+926,33,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+927,33,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,fucked it
+928,33,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+929,33,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+930,33,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+931,33,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+932,33,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+933,33,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+934,33,large,8.9,10,100,5,External,"n=1.5, 1720DG",11.09,
+935,33,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+936,33,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+937,33,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+938,33,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,bad
+Change SiPM,,,,,,,,,,
+939,32,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+940,32,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+941,32,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+942,32,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+943,32,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+944,32,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+945,32,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+946,32,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,
+947,32,large,40,10,100,5,External,"n=1.5, 1720DG",11.09,
+948,32,large,60,10,100,5,External,"n=1.5, 1720DG",11.09,
+Change SiPM,,,,,,,,,,
+949,31,large,8.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+950,31,large,8.7,10,100,5,External,"n=1.5, 1720DG",11.09,
+951,31,large,9,10,100,5,External,"n=1.5, 1720DG",11.09,
+952,31,large,9.5,10,100,5,External,"n=1.5, 1720DG",11.09,
+953,31,large,10,10,100,5,External,"n=1.5, 1720DG",11.09,
+954,31,large,12,10,100,5,External,"n=1.5, 1720DG",11.09,
+955,31,large,14,10,100,5,External,"n=1.5, 1720DG",11.09,
+956,31,large,20,10,100,5,External,"n=1.5, 1720DG",11.09,last run of day
+957,31,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+958,31,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+959,30,small,15,10,100,5,External,"n=1.5, 1720DG",12.09,
+960,30,small,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+961,30,small,25,10,100,5,External,"n=1.5, 1720DG",12.09,
+962,30,small,30,10,100,5,External,"n=1.5, 1720DG",12.09,
+963,30,small,35,10,100,5,External,"n=1.5, 1720DG",12.09,
+964,30,small,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+965,30,small,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+966,30,small,80,10,100,5,External,"n=1.5, 1720DG",12.09,
+967,30,small,100,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+968,29,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+969,29,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+970,29,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+971,29,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+972,29,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+973,29,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+974,29,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+975,29,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+976,29,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+977,29,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+978,29,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+979,28,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+980,28,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+981,28,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+982,28,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+983,28,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+984,28,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+985,28,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+986,28,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+987,28,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+988,28,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+989,27,small,15,10,100,5,External,"n=1.5, 1720DG",12.09,
+990,27,small,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+991,27,small,25,10,100,5,External,"n=1.5, 1720DG",12.09,
+992,27,small,30,10,100,5,External,"n=1.5, 1720DG",12.09,
+993,27,small,35,10,100,5,External,"n=1.5, 1720DG",12.09,
+994,27,small,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+995,27,small,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+996,27,small,80,10,100,5,External,"n=1.5, 1720DG",12.09,
+997,27,small,100,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+998,26,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+999,26,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1000,26,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1001,26,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1002,26,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1003,26,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1004,26,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1005,26,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1006,26,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1007,26,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1008,25,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1009,25,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1010,25,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1011,25,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1012,25,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1013,25,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1014,25,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1015,25,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1016,25,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1017,25,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1018,24,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1019,24,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1020,24,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1021,24,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1022,24,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1023,24,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1024,24,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1025,24,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1026,24,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1027,24,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1028,23,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1029,23,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1030,23,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1031,23,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1032,23,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1033,23,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1034,23,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1035,23,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1036,23,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1037,23,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1038,22,small,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,fuck
+1039,22,small,15,10,100,5,External,"n=1.5, 1720DG",12.09,
+1040,22,small,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1041,22,small,25,10,100,5,External,"n=1.5, 1720DG",12.09,
+1042,22,small,30,10,100,5,External,"n=1.5, 1720DG",12.09,
+1043,22,small,35,10,100,5,External,"n=1.5, 1720DG",12.09,
+1044,22,small,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1045,22,small,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+1046,22,small,80,10,100,5,External,"n=1.5, 1720DG",12.09,
+1047,22,small,100,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1048,21,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1049,21,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1050,21,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1051,21,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1052,21,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1053,21,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1054,21,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1055,21,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1056,21,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1057,21,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1058,20,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1059,20,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1060,20,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1061,20,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1062,20,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1063,20,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1064,20,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1065,20,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1066,20,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1067,20,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1068,19,small,15,10,100,5,External,"n=1.5, 1720DG",12.09,
+1069,19,small,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1070,19,small,25,10,100,5,External,"n=1.5, 1720DG",12.09,
+1071,19,small,30,10,100,5,External,"n=1.5, 1720DG",12.09,
+1072,19,small,35,10,100,5,External,"n=1.5, 1720DG",12.09,
+1073,19,small,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1074,19,small,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+1075,19,small,80,10,100,5,External,"n=1.5, 1720DG",12.09,
+1076,19,small,100,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1077,18,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1078,18,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1079,18,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1080,18,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1081,18,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1082,18,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1083,18,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1084,18,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1085,18,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1086,18,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1087,17,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1088,17,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1089,17,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1090,17,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1091,17,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1092,17,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1093,17,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1094,17,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1095,17,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1096,17,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1097,16,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+1098,16,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1099,16,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1100,16,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1101,16,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1102,16,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1103,16,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1104,16,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1105,16,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1106,16,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1107,15,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1108,15,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1109,15,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1110,15,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1111,15,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1112,15,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1113,15,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1114,15,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1115,15,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1116,15,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1117,14,small,15,10,100,5,External,"n=1.5, 1720DG",12.09,
+1118,14,small,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1119,14,small,25,10,100,5,External,"n=1.5, 1720DG",12.09,
+1120,14,small,30,10,100,5,External,"n=1.5, 1720DG",12.09,
+1121,14,small,35,10,100,5,External,"n=1.5, 1720DG",12.09,
+1122,14,small,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1123,14,small,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+1124,14,small,80,10,100,5,External,"n=1.5, 1720DG",12.09,
+1125,14,small,100,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1126,13,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1127,13,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1128,13,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1129,13,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1130,13,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1131,13,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1132,13,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1133,13,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1134,13,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1135,13,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1136,12,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1137,12,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1138,12,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1139,12,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1140,12,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1141,12,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1142,12,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1143,12,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1144,12,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1145,12,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1146,11,small,15,10,100,5,External,"n=1.5, 1720DG",12.09,
+1147,11,small,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1148,11,small,25,10,100,5,External,"n=1.5, 1720DG",12.09,
+1149,11,small,30,10,100,5,External,"n=1.5, 1720DG",12.09,
+1150,11,small,35,10,100,5,External,"n=1.5, 1720DG",12.09,
+1151,11,small,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1152,11,small,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+1153,11,small,80,10,100,5,External,"n=1.5, 1720DG",12.09,
+1154,11,small,100,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1155,10,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1156,10,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1157,10,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1158,10,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1159,10,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1160,10,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1161,10,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1162,10,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1163,10,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1164,10,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1165,9,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,fucked it
+1166,9,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1167,9,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1168,9,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1169,9,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1170,9,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1171,9,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1172,9,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1173,9,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1174,9,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1175,9,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+1176,9,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1177,8,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1178,8,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1179,8,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1180,8,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1181,8,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1182,8,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1183,8,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1184,8,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1185,8,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1186,8,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1187,7,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1188,7,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1189,7,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1190,7,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1191,7,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1192,7,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1193,7,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1194,7,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1195,7,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1196,7,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1197,6,small,15,10,100,5,External,"n=1.5, 1720DG",12.09,
+1198,6,small,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1199,6,small,25,10,100,5,External,"n=1.5, 1720DG",12.09,
+1200,6,small,30,10,100,5,External,"n=1.5, 1720DG",12.09,
+1201,6,small,35,10,100,5,External,"n=1.5, 1720DG",12.09,
+1202,6,small,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1203,6,small,60,10,100,5,External,"n=1.5, 1720DG",12.09,
+1204,6,small,80,10,100,5,External,"n=1.5, 1720DG",12.09,
+1205,6,small,100,10,100,5,External,"n=1.5, 1720DG",12.09,
+Change SiPM,,,,,,,,,,
+1206,5,large,8.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1207,5,large,8.7,10,100,5,External,"n=1.5, 1720DG",12.09,
+1208,5,large,9,10,100,5,External,"n=1.5, 1720DG",12.09,
+1209,5,large,9.5,10,100,5,External,"n=1.5, 1720DG",12.09,
+1210,5,large,10,10,100,5,External,"n=1.5, 1720DG",12.09,
+1211,5,large,12,10,100,5,External,"n=1.5, 1720DG",12.09,
+1212,5,large,14,10,100,5,External,"n=1.5, 1720DG",12.09,
+1213,5,large,20,10,100,5,External,"n=1.5, 1720DG",12.09,
+1214,5,large,40,10,100,5,External,"n=1.5, 1720DG",12.09,
+1215,5,large,60,10,100,5,External,"n=1.5, 1720DG",12.09,last run of day
+Change SiPM,,,,,,,,,,
+1216,4,large,8.5,10,100,5,External,"n=1.5, 1720DG",13.09,
+1217,4,large,8.7,10,100,5,External,"n=1.5, 1720DG",13.09,
+1218,4,large,9,10,100,5,External,"n=1.5, 1720DG",13.09,
+1219,4,large,9.5,10,100,5,External,"n=1.5, 1720DG",13.09,
+1220,4,large,10,10,100,5,External,"n=1.5, 1720DG",13.09,
+1221,4,large,12,10,100,5,External,"n=1.5, 1720DG",13.09,
+1222,4,large,14,10,100,5,External,"n=1.5, 1720DG",13.09,
+1223,4,large,20,10,100,5,External,"n=1.5, 1720DG",13.09,
+1224,4,large,40,10,100,5,External,"n=1.5, 1720DG",13.09,
+1225,4,large,60,10,100,5,External,"n=1.5, 1720DG",13.09,
+Change SiPM,,,,,,,,,,
+1226,3,small,15,10,100,5,External,"n=1.5, 1720DG",13.09,
+1227,3,small,20,10,100,5,External,"n=1.5, 1720DG",13.09,
+1228,3,small,25,10,100,5,External,"n=1.5, 1720DG",13.09,
+1229,3,small,30,10,100,5,External,"n=1.5, 1720DG",13.09,
+1230,3,small,35,10,100,5,External,"n=1.5, 1720DG",13.09,
+1231,3,small,40,10,100,5,External,"n=1.5, 1720DG",13.09,
+1232,3,small,60,10,100,5,External,"n=1.5, 1720DG",13.09,
+1233,3,small,80,10,100,5,External,"n=1.5, 1720DG",13.09,
+1234,3,small,100,10,100,5,External,"n=1.5, 1720DG",13.09,
+Change SiPM,,,,,,,,,,
+1235,2,large,8.5,10,100,5,External,"n=1.5, 1720DG",13.09,
+1236,2,large,8.7,10,100,5,External,"n=1.5, 1720DG",13.09,
+1237,2,large,9,10,100,5,External,"n=1.5, 1720DG",13.09,
+1238,2,large,9.5,10,100,5,External,"n=1.5, 1720DG",13.09,
+1239,2,large,10,10,100,5,External,"n=1.5, 1720DG",13.09,
+1240,2,large,12,10,100,5,External,"n=1.5, 1720DG",13.09,
+1241,2,large,14,10,100,5,External,"n=1.5, 1720DG",13.09,
+1242,2,large,20,10,100,5,External,"n=1.5, 1720DG",13.09,
+1243,2,large,40,10,100,5,External,"n=1.5, 1720DG",13.09,
+1244,2,large,60,10,100,5,External,"n=1.5, 1720DG",13.09,
+Change SiPM,,,,,,,,,,
+1245,1,large,8.5,10,100,5,External,"n=1.5, 1720DG",13.09,
+1246,1,large,8.7,10,100,5,External,"n=1.5, 1720DG",13.09,
+1247,1,large,9,10,100,5,External,"n=1.5, 1720DG",13.09,
+1248,1,large,9.5,10,100,5,External,"n=1.5, 1720DG",13.09,
+1249,1,large,10,10,100,5,External,"n=1.5, 1720DG",13.09,
+1250,1,large,12,10,100,5,External,"n=1.5, 1720DG",13.09,
+1251,1,large,14,10,100,5,External,"n=1.5, 1720DG",13.09,
+1252,1,large,20,10,100,5,External,"n=1.5, 1720DG",13.09,
+1253,1,large,40,10,100,5,External,"n=1.5, 1720DG",13.09,
+1254,1,large,60,10,100,5,External,"n=1.5, 1720DG",13.09,
+Retaking bad runs,,,,,,,,,,
+1255,4,large,8.5,10,100,5,External,"n=1.5, 1720DG",13.09,dead
+1256,4,large,8.7,10,100,5,External,"n=1.5, 1720DG",13.09,dead
+1257,4,large,60,10,100,5,External,"n=1.5, 1720DG",13.09,dead
+Change SiPM,,,,,,,,,,
+1258,1,large,80,10,100,5,External,"n=1.5, 1720DG",13.09,
+Change SiPM,,,,,,,,,,
+1259,36,large,60,10,100,5,External,"n=1.5, 1720DG",13.09,fucked it
+1260,36,large,55,10,100,5,External,"n=1.5, 1720DG",13.09,
+1261,36,large,60,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+Change SiPM,,,,,,,,,,
+1262,37,large,60,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1263,37,large,8.5,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1264,37,large,8.7,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1265,37,large,9,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1266,37,large,9.5,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1267,37,large,10,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1268,37,large,12,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1269,37,large,14,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1270,37,large,20,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1271,37,large,40,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+Change SiPM,,,,,,,,,,
+1272,36,large,0,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1273,36,large,8.5,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1274,36,large,8.7,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1275,36,large,9,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1276,36,large,9.5,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1277,36,large,10,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1278,36,large,12,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1279,36,large,14,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1280,36,large,20,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1281,36,large,40,10,10,5,External,"n=1.5, 1720DG",13.09,fucked it
+1282,36,large,8.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1283,36,large,8.7,10,10,5,External,"n=1.5, 1720DG",13.09,
+1284,36,large,9,10,10,5,External,"n=1.5, 1720DG",13.09,
+1285,36,large,9.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1286,36,large,10,10,10,5,External,"n=1.5, 1720DG",13.09,
+1287,36,large,12,10,10,5,External,"n=1.5, 1720DG",13.09,
+1288,36,large,14,10,10,5,External,"n=1.5, 1720DG",13.09,
+1289,36,large,20,10,10,5,External,"n=1.5, 1720DG",13.09,
+1290,36,large,40,10,10,5,External,"n=1.5, 1720DG",13.09,
+1291,36,large,60,10,10,5,External,"n=1.5, 1720DG",13.09,
+Change SiPM,,,,,,,,,,
+1292,37,large,8.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1293,37,large,8.7,10,10,5,External,"n=1.5, 1720DG",13.09,
+1294,37,large,9,10,10,5,External,"n=1.5, 1720DG",13.09,
+1295,37,large,9.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1296,37,large,10,10,10,5,External,"n=1.5, 1720DG",13.09,
+1297,37,large,12,10,10,5,External,"n=1.5, 1720DG",13.09,
+1298,37,large,14,10,10,5,External,"n=1.5, 1720DG",13.09,
+1299,37,large,20,10,10,5,External,"n=1.5, 1720DG",13.09,
+1300,37,large,40,10,10,5,External,"n=1.5, 1720DG",13.09,
+1301,37,large,60,10,10,5,External,"n=1.5, 1720DG",13.09,
+Change SiPM,,,,,,,,,,
+1302,39,large,8.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1303,39,large,8.7,10,10,5,External,"n=1.5, 1720DG",13.09,
+1304,39,large,9,10,10,5,External,"n=1.5, 1720DG",13.09,
+1305,39,large,9.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1306,39,large,10,10,10,5,External,"n=1.5, 1720DG",13.09,
+1307,39,large,12,10,10,5,External,"n=1.5, 1720DG",13.09,
+1308,39,large,14,10,10,5,External,"n=1.5, 1720DG",13.09,
+1309,39,large,20,10,10,5,External,"n=1.5, 1720DG",13.09,
+1310,39,large,40,10,10,5,External,"n=1.5, 1720DG",13.09,
+1311,39,large,60,10,10,5,External,"n=1.5, 1720DG",13.09,
+Change SiPM,,,,,,,,,,
+1312,40,large,8.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1313,40,large,8.7,10,10,5,External,"n=1.5, 1720DG",13.09,
+1314,40,large,9,10,10,5,External,"n=1.5, 1720DG",13.09,
+1315,40,large,9.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1316,40,large,10,10,10,5,External,"n=1.5, 1720DG",13.09,
+1317,40,large,12,10,10,5,External,"n=1.5, 1720DG",13.09,
+1318,40,large,14,10,10,5,External,"n=1.5, 1720DG",13.09,
+1319,40,large,20,10,10,5,External,"n=1.5, 1720DG",13.09,
+1320,40,large,40,10,10,5,External,"n=1.5, 1720DG",13.09,
+1321,40,large,60,10,10,5,External,"n=1.5, 1720DG",13.09,
+First bar measurement,,,,,,,,,,
+1322,6,bar,8.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1323,6,bar,8.7,10,10,5,External,"n=1.5, 1720DG",13.09,
+1324,6,bar,9,10,10,5,External,"n=1.5, 1720DG",13.09,
+1325,6,bar,9.5,10,10,5,External,"n=1.5, 1720DG",13.09,
+1326,6,bar,10,10,10,5,External,"n=1.5, 1720DG",13.09,
+1327,6,bar,12,10,10,5,External,"n=1.5, 1720DG",13.09,
+1328,6,bar,14,10,10,5,External,"n=1.5, 1720DG",13.09,
+1329,6,bar,20,10,10,5,External,"n=1.5, 1720DG",13.09,
+1330,6,bar,40,10,10,5,External,"n=1.5, 1720DG",13.09,
+1331,6,bar,60,10,10,5,External,"n=1.5, 1720DG",13.09,
+Add bar mask,Proof the mask works!,,,,,,,,,
+1332,6,bar,8.5,10,10,5,External,"n=1.5, 1720DG",15.09,
+1333,6,bar,8.7,10,10,5,External,"n=1.5, 1720DG",15.09,
+1334,6,bar,9,10,10,5,External,"n=1.5, 1720DG",15.09,
+1335,6,bar,9.5,10,10,5,External,"n=1.5, 1720DG",15.09,
+1336,6,bar,10,10,10,5,External,"n=1.5, 1720DG",15.09,
+1337,6,bar,12,10,10,5,External,"n=1.5, 1720DG",15.09,
+1338,6,bar,14,10,10,5,External,"n=1.5, 1720DG",15.09,
+1339,6,bar,20,10,10,5,External,"n=1.5, 1720DG",15.09,
+1340,6,bar,40,10,10,5,External,"n=1.5, 1720DG",15.09,
+1341,6,bar,60,10,10,5,External,"n=1.5, 1720DG",15.09,
+Change bar,,,,,,,,,,
+1342,4,bar,8.5,10,10,5,External,"n=1.5, 1720DG",15.09,
+1343,4,bar,8.7,10,10,5,External,"n=1.5, 1720DG",15.09,
+1344,4,bar,9,10,10,5,External,"n=1.5, 1720DG",15.09,
+1345,4,bar,9.5,10,10,5,External,"n=1.5, 1720DG",15.09,
+1346,4,bar,10,10,10,5,External,"n=1.5, 1720DG",15.09,
+1347,4,bar,12,10,10,5,External,"n=1.5, 1720DG",15.09,
+1348,4,bar,14,10,10,5,External,"n=1.5, 1720DG",15.09,
+1349,4,bar,20,10,10,5,External,"n=1.5, 1720DG",15.09,
+1350,4,bar,40,10,10,5,External,"n=1.5, 1720DG",15.09,
+1351,4,bar,60,10,10,5,External,"n=1.5, 1720DG",15.09,
+Multi bar run,,,,,,,,,,
+1352,"3,4",bar,8.5,10,10,5,External,"n=1.5, 1720DG",15.09,
+1353,"3,4",bar,8.7,10,10,5,External,"n=1.5, 1720DG",15.09,
+1354,"3,4",bar,9,10,10,5,External,"n=1.5, 1720DG",15.09,
+1355,"3,4",bar,9.5,10,10,5,External,"n=1.5, 1720DG",15.09,
+1356,"3,4",bar,10,10,10,5,External,"n=1.5, 1720DG",15.09,
+1357,"3,4",bar,12,10,10,5,External,"n=1.5, 1720DG",15.09,
+1358,"3,4",bar,14,10,10,5,External,"n=1.5, 1720DG",15.09,
+1359,"3,4",bar,20,10,10,5,External,"n=1.5, 1720DG",15.09,
+1360,"3,4",bar,40,10,10,5,External,"n=1.5, 1720DG",15.09,
+1361,"3,4",bar,60,10,10,5,External,"n=1.5, 1720DG",15.09,
+Multi bar run,,,,,,,,,,
+1362,"5,6",bar,8.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1363,"5,6",bar,8.7,10,10,5,External,"n=1.5, 1720DG",16.09,
+1364,"5,6",bar,9,10,10,5,External,"n=1.5, 1720DG",16.09,
+1365,"5,6",bar,9.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1366,"5,6",bar,10,10,10,5,External,"n=1.5, 1720DG",16.09,
+1367,"5,6",bar,12,10,10,5,External,"n=1.5, 1720DG",16.09,
+1368,"5,6",bar,14,10,10,5,External,"n=1.5, 1720DG",16.09,
+1369,"5,6",bar,20,10,10,5,External,"n=1.5, 1720DG",16.09,
+1370,"5,6",bar,40,10,10,5,External,"n=1.5, 1720DG",16.09,
+1371,"5,6",bar,60,10,10,5,External,"n=1.5, 1720DG",16.09,
+Single bars,,,,,,,,,,
+1372,10,bar,8.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1373,10,bar,8.7,10,10,5,External,"n=1.5, 1720DG",16.09,
+1374,10,bar,9,10,10,5,External,"n=1.5, 1720DG",16.09,
+1375,10,bar,9.5,10,10,5,External,"n=1.5, 1720DG",16.09,fucked it
+1376,10,bar,10,10,10,5,External,"n=1.5, 1720DG",16.09,fucked it
+1377,10,bar,12,10,10,5,External,"n=1.5, 1720DG",16.09,fucked it
+1378,10,bar,14,10,10,5,External,"n=1.5, 1720DG",16.09,fucked it
+1379,10,bar,20,10,10,5,External,"n=1.5, 1720DG",16.09,fucked it
+1380,10,bar,40,10,10,5,External,"n=1.5, 1720DG",16.09,fucked it
+1381,10,bar,60,10,10,5,External,"n=1.5, 1720DG",16.09,fucked it
+1382,10,bar,9.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1383,10,bar,10,10,10,5,External,"n=1.5, 1720DG",16.09,
+1384,10,bar,12,10,10,5,External,"n=1.5, 1720DG",16.09,
+1385,10,bar,14,10,10,5,External,"n=1.5, 1720DG",16.09,
+1386,10,bar,20,10,10,5,External,"n=1.5, 1720DG",16.09,
+1387,10,bar,40,10,10,5,External,"n=1.5, 1720DG",16.09,
+1388,10,bar,60,10,10,5,External,"n=1.5, 1720DG",16.09,
+Single bars,,,,,,,,,,
+1389,9,bar,8.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1390,9,bar,8.7,10,10,5,External,"n=1.5, 1720DG",16.09,
+1391,9,bar,9,10,10,5,External,"n=1.5, 1720DG",16.09,
+1392,9,bar,9.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1393,9,bar,10,10,10,5,External,"n=1.5, 1720DG",16.09,
+1394,9,bar,12,10,10,5,External,"n=1.5, 1720DG",16.09,
+1395,9,bar,14,10,10,5,External,"n=1.5, 1720DG",16.09,
+1396,9,bar,20,10,10,5,External,"n=1.5, 1720DG",16.09,
+1397,9,bar,40,10,10,5,External,"n=1.5, 1720DG",16.09,
+1398,9,bar,60,10,10,5,External,"n=1.5, 1720DG",16.09,
+DG testing,,,,,,,,,,
+1399,9,bar,8.5,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1400,9,bar,8.7,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1401,9,bar,9,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1402,9,bar,9.5,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1403,9,bar,10,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1404,9,bar,12,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1405,9,bar,14,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1406,9,bar,20,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1407,9,bar,40,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+1408,9,bar,60,10,10,5,External,"n=1.5, 2440DG",16.09,DG test
+Single bars,,,,,,,,,,
+1399,8,bar,8.5,10,10,5,External,"n=1.5, 1720DG",16.09,test
+1400,8,bar,40,10,10,5,External,"n=1.5, 1720DG",16.09,test
+Photodiode work,,,,,,,,,,
+1401,PD,PD,100,10,10,None,External,0,16.09,PD work test
+1402,PD,PD,100,10,10,None,External,0,16.09,PD work
+1403,PD,PD,100,10,10,None,External,0,16.09,PD work
+1404,PD,PD,100,10,10,None,External,0,16.09,PD work
+1405,PD,PD,100,10,10,None,External,0,16.09,PD work
+Single bars,,,,,,,,,,
+1402,8,bar,8.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1403,8,bar,8.7,10,10,5,External,"n=1.5, 1720DG",16.09,
+1404,8,bar,9,10,10,5,External,"n=1.5, 1720DG",16.09,
+1405,8,bar,9.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1406,8,bar,10,10,10,5,External,"n=1.5, 1720DG",16.09,
+1407,8,bar,12,10,10,5,External,"n=1.5, 1720DG",16.09,
+1408,8,bar,14,10,10,5,External,"n=1.5, 1720DG",16.09,
+1409,8,bar,20,10,10,5,External,"n=1.5, 1720DG",16.09,
+1410,8,bar,40,10,10,5,External,"n=1.5, 1720DG",16.09,
+1411,8,bar,60,10,10,5,External,"n=1.5, 1720DG",16.09,
+Single bars,,,,,,,,,,
+1412,7,bar,8.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1413,7,bar,8.7,10,10,5,External,"n=1.5, 1720DG",16.09,
+1414,7,bar,9,10,10,5,External,"n=1.5, 1720DG",16.09,
+1415,7,bar,9.5,10,10,5,External,"n=1.5, 1720DG",16.09,
+1416,7,bar,10,10,10,5,External,"n=1.5, 1720DG",16.09,
+1417,7,bar,12,10,10,5,External,"n=1.5, 1720DG",16.09,
+1418,7,bar,14,10,10,5,External,"n=1.5, 1720DG",16.09,
+1419,7,bar,20,10,10,5,External,"n=1.5, 1720DG",16.09,
+1420,7,bar,40,10,10,5,External,"n=1.5, 1720DG",16.09,
+1421,7,bar,60,10,10,5,External,"n=1.5, 1720DG",16.09,
+Single bars,,,,,,,,,,
+1422,1,bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1423,1,bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1424,1,bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1425,1,bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1426,1,bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1427,1,bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1428,1,bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1429,1,bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1430,1,bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1431,1,bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+Single bars,,,,,,,,,,
+1432,2,bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1433,2,bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1434,2,bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1435,2,bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1436,2,bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1437,2,bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1438,2,bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1439,2,bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1440,2,bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1441,2,bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+Single bars,,,,,,,,,,
+1442,3,bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1443,3,bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1444,3,bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1445,3,bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1446,3,bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1447,3,bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1448,3,bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1449,3,bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1450,3,bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+1451,3,bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,fucked it
+Single bars,,,,,,,,,,
+1452,2,bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1453,2,bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1454,2,bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1455,2,bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1456,2,bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1457,2,bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1458,2,bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1459,2,bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1460,2,bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,fucked
+1461,2,bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1462,2,bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+Single bars,,,,,,,,,,
+1463,3,bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1464,3,bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1465,3,bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1466,3,bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1467,3,bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1468,3,bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1469,3,bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1470,3,bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1471,3,bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1472,3,bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+Single bars,,,,,,,,,,
+1473,5,bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1474,5,bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1475,5,bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1476,5,bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1477,5,bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1478,5,bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1479,5,bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1480,5,bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1481,5,bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1482,5,bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+Multibar runs,,,,,,,,,,
+1483,"1,2",bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1484,"1,2",bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1485,"1,2",bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1486,"1,2",bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1487,"1,2",bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1488,"1,2",bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1489,"1,2",bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1490,"1,2",bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,shite
+1491,"1,2",bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1492,"1,2",bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+1493,"1,2",bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+Multibar runs,,,,,,,,,,
+1494,"9,10",bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1495,"9,10",bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1496,"9,10",bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1497,"9,10",bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1498,"9,10",bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1499,"9,10",bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1500,"9,10",bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1501,"9,10",bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1502,"9,10",bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1503,"9,10",bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+Multibar runs,,,,,,,,,,
+1504,"7,8",bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1505,"7,8",bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1506,"7,8",bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1507,"7,8",bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1508,"7,8",bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1509,"7,8",bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1510,"7,8",bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1511,"7,8",bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1512,"7,8",bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1513,"7,8",bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+Multibar runs,,,,,,,,,,
+1521,"5,6,7",bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1522,"5,6,7",bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1523,"5,6,7",bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1524,"5,6,7",bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1525,"5,6,7",bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1526,"5,6,7",bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1527,"5,6,7",bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1528,"5,6,7",bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1529,"5,6,7",bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1530,"5,6,7",bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,
+Multibar runs,,,,,,,,,,
+1531,"2,3,4",bar,8.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1532,"2,3,4",bar,8.7,10,10,5,External,"n=1.5, 1720DG",17.09,
+1533,"2,3,4",bar,9,10,10,5,External,"n=1.5, 1720DG",17.09,
+1534,"2,3,4",bar,9.5,10,10,5,External,"n=1.5, 1720DG",17.09,
+1535,"2,3,4",bar,10,10,10,5,External,"n=1.5, 1720DG",17.09,
+1536,"2,3,4",bar,12,10,10,5,External,"n=1.5, 1720DG",17.09,
+1537,"2,3,4",bar,14,10,10,5,External,"n=1.5, 1720DG",17.09,
+1538,"2,3,4",bar,20,10,10,5,External,"n=1.5, 1720DG",17.09,
+1539,"2,3,4",bar,40,10,10,5,External,"n=1.5, 1720DG",17.09,
+1540,"2,3,4",bar,60,10,10,5,External,"n=1.5, 1720DG",17.09,

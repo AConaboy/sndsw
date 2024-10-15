@@ -1,5 +1,6 @@
 #include "MuFilterHit.h"
 #include "MuFilter.h"
+#include "ShipUnit.h"
 #include "TROOT.h"
 #include "FairRunSim.h"
 #include "TGeoNavigator.h"
@@ -8,7 +9,11 @@
 #include <TRandom.h>
 #include <iomanip> 
 
-Double_t speedOfLight = TMath::C() *100./1000000000.0 ; // from m/sec to cm/ns
+using std::cout;
+using std::endl;
+using std::to_string;
+using std::string;
+
 // -----   Default constructor   -------------------------------------------
 MuFilterHit::MuFilterHit()
   : SndlhcHit()
@@ -35,87 +40,152 @@ MuFilterHit::MuFilterHit(Int_t detID,Int_t nP,Int_t nS)
    }
 }
 
-
 // -----   constructor from MuFilterPoint   ------------------------------------------
 MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
   : SndlhcHit()
 {
+     Int_t subsystem = floor(detID/10000);
      MuFilter* MuFilterDet = dynamic_cast<MuFilter*> (gROOT->GetListOfGlobals()->FindObject("MuFilter"));
      // get parameters from the MuFilter detector for simulating the digitized information
-     nSiPMs  = MuFilterDet->GetnSiPMs(detID);
+     nSiPMs = MuFilterDet->GetnSiPMs(detID);
      nSides = MuFilterDet->GetnSides(detID);
-
-     Float_t timeResol = MuFilterDet->GetConfParF("MuFilter/timeResol");
-
+     
      Float_t attLength=0;
-     Float_t siPMcalibration=0;
-     Float_t siPMcalibrationS=0;
-     Float_t propspeed =0;
-     if (floor(detID/10000)==3) { 
-              if (nSides==2){attLength = MuFilterDet->GetConfParF("MuFilter/DsAttenuationLength");}
-              else                    {attLength = MuFilterDet->GetConfParF("MuFilter/DsTAttenuationLength");}
-              siPMcalibration = MuFilterDet->GetConfParF("MuFilter/DsSiPMcalibration");
-              propspeed = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+     Float_t SiPMcalibration=0;
+     Float_t SiPMcalibrationS=0;
+     Float_t timeresol_left, timeresol_right;
+     Float_t signalspeed_left, signalspeed_right;
+
+    //  Float_t DSpropspeed =0;
+     if (subsystem==3) { 
+              if (nSides==2){ attLength = MuFilterDet->GetConfParF("MuFilter/DsAttenuationLength"); }
+              else { attLength = MuFilterDet->GetConfParF("MuFilter/DsTAttenuationLength"); }
+              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/DsSiPMcalibration");
+              
+              signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+              signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+
+              timeresol_left = MuFilterDet->GetConfParF("MuFilter/timeResol");
+              timeresol_right = MuFilterDet->GetConfParF("MuFilter/timeResol");
      }
-     else { 
-              if (floor(detID/10000)==1 && nSides==1){
-                 // top readout with mirror on bottom
-                 attLength = 2*MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength");
-              }
-              else {attLength = MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength");}
-              siPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
-              siPMcalibrationS = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibrationS");
-              propspeed = MuFilterDet->GetConfParF("MuFilter/VandUpPropSpeed");
+     else if (subsystem==2) {
+              attLength = MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength");
+              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
+              SiPMcalibrationS = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibrationS");
+              
+              timeresol_left = MuFilterDet->GetBarSideTimeResolution(detID, "left");
+              timeresol_right = MuFilterDet->GetBarSideTimeResolution(detID, "right");
+
+              signalspeed_left = MuFilterDet->GetBarSideSignalSpeed(detID, "left");
+              signalspeed_right = MuFilterDet->GetBarSideSignalSpeed(detID, "right");
+
+     }
+     else { // if detID in veto
+              if (subsystem==1 && nSides==1){ attLength = 2*MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength"); }
+              else { attLength = 2*MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength"); }
+              SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
+
+              signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+              signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+              
+              timeresol_left = MuFilterDet->GetConfParF("MuFilter/timeResol");
+              timeresol_right = MuFilterDet->GetConfParF("MuFilter/timeResol");
      }
 
      for (unsigned int j=0; j<16; ++j){
         signals[j] = -1;
-        times[j]    =-1;
+        times[j] =-1;
      }
      LOG(DEBUG) << "detid "<<detID<< " size "<<nSiPMs<< "  side "<<nSides;
 
      fDetectorID  = detID;
-     Float_t signalLeft    = 0;
-     Float_t signalRight = 0;
-     Float_t earliestToAL = 1E20;
-     Float_t earliestToAR = 1E20;
-     for(auto p = std::begin(V); p!= std::end(V); ++p) {
 
-        Double_t signal = (*p)->GetEnergyLoss();
-     
-      // Find distances from MCPoint centre to ends of bar 
-        TVector3 vLeft,vRight;
+     // Instance a load of floats used in next block
+     Float_t signalLeft = 0, signalRight = 0, signal = 0;
+     Float_t earliestToAL = 1E20, earliestToAR = 1E20;
+     Float_t dxLphys=0, dxRphys=0, dxL=0, dxR=0;
+     TVector3 vLeft,vRight;
+     Float_t distance_Left=0, distance_Right=0;
+
+     // for the timing, find earliest particle and smear with time resolution
+     Float_t t_Left=0, t_Right=0;
+
+     // Load bar positions
+     MuFilterDet->GetPosition(fDetectorID,vLeft, vRight);
+     auto x_ref = 0.5*( vLeft[0] + vRight[0] );
+
+     for (auto p = std::begin(V); p!= std::end(V); ++p) {
+
+        signal = (*p)->GetEnergyLoss();
+
+        // Find distances from MCPoint centre to ends of bar 
         TVector3 impact((*p)->GetX(),(*p)->GetY() ,(*p)->GetZ() );
-        MuFilterDet->GetPosition(fDetectorID,vLeft, vRight);
-        Double_t distance_Left    =  (vLeft-impact).Mag();
-        Double_t distance_Right =  (vRight-impact).Mag();
-        // Simple model: divide signal between nSides
+        distance_Left = (vLeft-impact).Mag();
+        distance_Right = (vRight-impact).Mag();
+
         signalLeft+=signal/nSides*TMath::Exp(-distance_Left/attLength);
         signalRight+=signal/nSides*TMath::Exp(-distance_Right/attLength);
 
-      // for the timing, find earliest particle and smear with time resolution
-        Double_t ptime    = (*p)->GetTime();
-        Double_t t_Left    = ptime + distance_Left/propspeed;
-        Double_t t_Right = ptime + distance_Right/propspeed;
-        if ( t_Left <earliestToAL){earliestToAL = t_Left ;}
-        if ( t_Right <earliestToAR){earliestToAR = t_Right ;}
-     } 
-     // shortSiPM = {3,6,11,14,19,22,27,30,35,38,43,46,51,54,59,62,67,70,75,78}; - counting from 1!
-     // In the SndlhcHit class the 'signals' array starts from 0.
-     for (unsigned int j=0; j<nSiPMs; ++j){
-        if ( floor(detID/10000)==2 && (j==2 or j==5)){                 // only US has small SiPMs
-           signals[j] = signalLeft/float(nSiPMs) * siPMcalibrationS;   // most simplest model, divide signal individually. Small SiPMS special
-           times[j] = gRandom->Gaus(earliestToAL, timeResol);
-        }else{
-           signals[j] = signalLeft/float(nSiPMs) * siPMcalibration;   // most simplest model, divide signal individually. 
-           times[j] = gRandom->Gaus(earliestToAL, timeResol);
+        if (subsystem==3) {
+          signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+          signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
         }
-        if (nSides>1){ 
-            signals[j+nSiPMs] = signalRight/float(nSiPMs) * siPMcalibration;   // most simplest model, divide signal individually.
-            times[j+nSiPMs] = gRandom->Gaus(earliestToAR, timeResol);
+        else if (subsystem==1) {
+          signalspeed_left = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+          signalspeed_right = MuFilterDet->GetConfParF("MuFilter/DsPropSpeed");
+        }        
+        else { // If detID in upstream
+          signalspeed_left = MuFilterDet->GetBarSideSignalSpeed(detID, "left");
+          signalspeed_right = MuFilterDet->GetBarSideSignalSpeed(detID, "right");
         }
+        
+        // Assume earliest arriving photons set the time on each side
+        t_Left = distance_Left/signalspeed_left;
+        t_Right = distance_Right/signalspeed_right;
+
+        if ( t_Left < earliestToAL){
+          earliestToAL = t_Left;
+          dxLphys = impact[0]; // For aligned times in data, they correspond to distances from x=0 in the physics FoR
+          dxL = -1*x_ref + dxLphys; // At the moment, the time alignment in data is done with respect to the bar centre. This quantity is wrt the bar centre 
+          }
+        
+        if ( t_Right < earliestToAR){
+          earliestToAR = t_Right;
+          dxRphys = impact[0];
+          dxR = x_ref - dxRphys; // At the moment, the time alignment in data is done with respect to the bar centre. This quantity is wrt the bar centre
+          }
      }
-     flag = true;
+
+     // In the SndlhcHit class the 'signals' array starts from 0.
+     Float_t timeResol=0, aligned_time=0, SiPMcalibrationConstant=0; 
+     TString side;
+     for (unsigned int j=0; j<nSiPMs*nSides; ++j){
+        
+        // If small SiPM (j==2, 5, 10, 13) in HCAL
+        if ( (subsystem==2) and (j%8==2 or j%8==5) ) { SiPMcalibrationConstant = SiPMcalibrationS;}
+        else { SiPMcalibrationConstant = SiPMcalibration; }
+
+        if ( (subsystem!=3 and j<8) || (subsystem==3 and j==0) ) { // If left-side channel
+          side="left";
+          timeResol=timeresol_left;
+          aligned_time = dxL/signalspeed_left;
+          signal=signalLeft;
+        }
+        else {
+          side="right";
+          timeResol=timeresol_right;
+          aligned_time = dxR/signalspeed_right;          
+          signal=signalRight;
+        }    
+
+        signals[j] = signal/float(nSiPMs) * SiPMcalibrationConstant;  // most simplest model, divide signal individually. Small SiPMS special
+        times[j] = gRandom->Gaus(aligned_time, timeResol);
+     }
+
+     // Hard coding 1 MeV energy cut :sweat_smiling: 
+     if (signalLeft < 0.001 or signalRight < 0.001) {flag=false;}
+     else {flag = true;}
+     
      for (Int_t i=0;i<16;i++){fMasked[i]=kFALSE;}
      LOG(DEBUG) << "signal created";
 }
@@ -137,6 +207,10 @@ Float_t MuFilterHit::GetEnergy()
 }
 
 bool MuFilterHit::isVertical(){
+  if  ( (floor(fDetectorID/10000)==3&&fDetectorID%1000>59) ||
+         (floor(fDetectorID/10000)==1&&int(fDetectorID/1000)%10==2) ) {  
+      return kTRUE;
+  }
   if  ( (floor(fDetectorID/10000)==3&&fDetectorID%1000>59) ||
          (floor(fDetectorID/10000)==1&&int(fDetectorID/1000)%10==2) ) {  
       return kTRUE;
@@ -168,15 +242,16 @@ std::map<Int_t,Float_t> MuFilterHit::GetAllSignals(Bool_t mask,Bool_t positive)
 }
 
 // -----   Public method Get List of time measurements   -------------------------------------------
-std::map<Int_t,Float_t> MuFilterHit::GetAllTimes(Bool_t mask)
+std::map<Int_t,Float_t> MuFilterHit::GetAllTimes(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 {
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
           std::map<Int_t,Float_t> allTimes;
           for (unsigned int s=0; s<nSides; ++s){
               for (unsigned int j=0; j<nSiPMs; ++j){
                unsigned int channel = j+s*nSiPMs;
                if (signals[channel]> 0){
                  if (!fMasked[channel] || !mask){
-                    allTimes[channel] = times[channel];
+                    allTimes[channel] = fTimesHelper[channel];
                     }
                 }
               }
@@ -185,9 +260,10 @@ std::map<Int_t,Float_t> MuFilterHit::GetAllTimes(Bool_t mask)
 }
 
 // -----   Public method Get time difference mean Left - mean Right   -----------------
-Float_t MuFilterHit::GetDeltaT(Bool_t mask)
+Float_t MuFilterHit::GetDeltaT(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 // based on mean TDC measured on Left and Right
 {
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
           Float_t mean[] = {0,0}; 
           Int_t count[] = {0,0}; 
           Float_t dT = -999.;
@@ -196,7 +272,7 @@ Float_t MuFilterHit::GetDeltaT(Bool_t mask)
                unsigned int channel = j+s*nSiPMs;
                if (signals[channel]> 0){
                  if (!fMasked[channel] || !mask){
-                    mean[s] += times[channel];
+                    mean[s] += fTimesHelper[channel];
                     count[s] += 1;
                     }
                 }
@@ -207,9 +283,10 @@ Float_t MuFilterHit::GetDeltaT(Bool_t mask)
           }
           return dT;
 }
-Float_t MuFilterHit::GetFastDeltaT(Bool_t mask)
+Float_t MuFilterHit::GetFastDeltaT(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 // based on fastest (earliest) TDC measured on Left and Right
 {
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
           Float_t first[] = {1E20,1E20}; 
           Float_t dT = -999.;
           for (unsigned int s=0; s<nSides; ++s){
@@ -217,7 +294,7 @@ Float_t MuFilterHit::GetFastDeltaT(Bool_t mask)
                unsigned int channel = j+s*nSiPMs;
                if (signals[channel]> 0){
                  if (!fMasked[channel] || !mask){
-                    if  (times[channel]<first[s]) {first[s] = times[channel];}
+                    if  (times[channel]<first[s]) {first[s] = fTimesHelper[channel];}
                     }
                 }
               }
@@ -230,8 +307,9 @@ Float_t MuFilterHit::GetFastDeltaT(Bool_t mask)
 
 
 // -----   Public method Get mean time  -----------------
-Float_t MuFilterHit::GetImpactT(Bool_t mask)
+Float_t MuFilterHit::GetImpactT(Bool_t mask, Bool_t apply_t_corr, Double_t SiPMDistance)
 {
+          OptForTimeCorrections(mask, apply_t_corr, SiPMDistance);
           Float_t mean[] = {0,0}; 
           Int_t count[] = {0,0}; 
           Float_t dT = -999.;
@@ -249,7 +327,7 @@ Float_t MuFilterHit::GetImpactT(Bool_t mask)
                unsigned int channel = j+s*nSiPMs;
                if (signals[channel]> 0){
                  if (!fMasked[channel] || !mask){
-                    mean[s] += times[channel];
+                    mean[s] += fTimesHelper[channel];
                     count[s] += 1;
                     }
                 }
@@ -319,6 +397,30 @@ void MuFilterHit::Print() const
      }
  }
 std::cout << std::endl;
+}
+
+// -----   Private method to opt for time corrections   -------------------------------------------
+void MuFilterHit::OptForTimeCorrections(Bool_t mask, Bool_t apply, Double_t SiPMDistance)
+{
+          // simply copy the times if no time corrections is required
+          if (apply == kFALSE) memcpy(fTimesHelper, times, sizeof(fTimesHelper));
+          else { // apply the time corrections
+            MuFilter* MuFilterDet = dynamic_cast<MuFilter*> (gROOT->GetListOfGlobals()->FindObject("MuFilter"));
+            for (unsigned int s=0; s<nSides; ++s){
+                for (unsigned int j=0; j<nSiPMs; ++j){
+                 unsigned int channel = j+s*nSiPMs;
+                 if (signals[channel]> 0){
+                   if (!fMasked[channel] || !mask){
+                     fTimesHelper[channel] = (MuFilterDet->GetCorrectedTime(fDetectorID,channel,
+                                                                    times[channel]*6.25,
+                                                                    SiPMDistance,
+                                                                    signals[channel])*6.25);
+                      }
+                 }
+                 else fTimesHelper[channel] = times[channel];
+                }
+            }
+          }
 }
 // -------------------------------------------------------------------------
 
