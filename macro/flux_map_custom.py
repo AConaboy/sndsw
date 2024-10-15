@@ -513,7 +513,7 @@ def MakeTChain():
             basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/2/sndLHC.Genie-TGeant4.root"]
             #basePath = ["/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/1/sndlhc_+volTarget_0.781e16_SNDG18_02a_01_000.0.ghep.root"]
         else:
-            for i in range(1,2):  # Loop over directories 
+            for i in range(1,10):  # Loop over directories 
                 file_path = f"/eos/experiment/sndlhc/MonteCarlo/Neutrinos/Genie/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/{i}/sndLHC.Genie-TGeant4.root"
                 if os.path.exists(file_path):
                     basePath.append(file_path)
@@ -575,20 +575,20 @@ def MakeTChain():
 
         return ch
 
-# def SaveData(us_data, scifi_data):
-def SaveData(us_data, scifi_data, quark_data):
+def SaveData(us_data, scifi_data):
+# def SaveData(us_data, scifi_data, quark_data):
     scifi_df = pd.DataFrame(scifi_data)
     us_df = pd.DataFrame(us_data)
-    quark_df = pd.DataFrame(quark_data)
+    # quark_df = pd.DataFrame(quark_data)
 
-    quark_df.to_csv(f"{eospath}data_quark.csv")
-    print(f'Quark csv written to: {eospath}data_quark.csv')
+    # quark_df.to_csv(f"{eospath}data_quark_10.csv")
+    # print(f'Quark csv written to: {eospath}data_quark_10.csv')
 
-    scifi_df.to_csv(f"{eospath}data_scifi.csv")
-    print(f'Scifi csv written to: {eospath}data_scifi.csv')
+    scifi_df.to_csv(f"{eospath}data_scifi_10.csv")
+    print(f'Scifi csv written to: {eospath}data_scifi_10.csv')
 
-    us_df.to_csv(f"{eospath}data_us.csv")
-    print(f'HCAL csv written to: {eospath}data_us.csv')
+    us_df.to_csv(f"{eospath}data_us_10.csv")
+    print(f'HCAL csv written to: {eospath}data_us_10.csv')
 
 #get numu data from file
 if args.quarkdata:
@@ -650,7 +650,7 @@ if args.genie:
     ch, scifi, mufilter, basepath = MakeTChain()
     us_data, scifi_data = EventLoop()
     # print(us_data["Eventnumber"].nunique())
-    us_signal, scifi_signal = GetData(ch, N)
+    # us_signal, scifi_signal = GetData(ch, N)
     SaveData(us_data, scifi_data)
 
 if args.multimuon:
