@@ -134,9 +134,9 @@ class TimeWalk(ROOT.FairTask):
 
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
             
-            self.muAna.MakeAlignmentParameterDict()
+            # self.muAna.MakeAlignmentParameterDict()
             self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
-            self.muAna.MakeTWCorrectionDict(self.timealignment)
+            # self.muAna.MakeTWCorrectionDict(self.timealignment)
 
         if self.mode == 'systemalignment':
             from systemalignment import SystemAlignment

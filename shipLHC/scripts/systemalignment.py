@@ -54,7 +54,8 @@ class SystemAlignment(object):
     def FillSiPMHists(self, hit):
         detID=hit.GetDetectorID()
 
-        if not self.simulation: correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.Ex.x(), mode='aligned')
+        # if not self.simulation: correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.Ex.x(), mode='aligned')
+        if not self.simulation: correctedtimes = hit.GetAllTimes(True, True)
         else: correctedtimes=hit.GetAllTimes()
 
         for ch in correctedtimes:
@@ -73,7 +74,7 @@ class SystemAlignment(object):
             self.hists[SiPMtime].Fill(time)
 
     def FillBarHists(self, hit):
-        
+
         detID = hit.GetDetectorID()
         nleft, nright = self.muAna.GetnFiredSiPMs(hit)
 
@@ -82,8 +83,9 @@ class SystemAlignment(object):
         x_midpoint = 0.5 * (self.A.x() + self.B.x())        
 
         if not self.simulation:
-            correctedtimes = self.muAna.GetCorrectedTimes(hit, x=0, mode='aligned')
-            tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex.x(), mode='aligned')
+            # correctedtimes = self.muAna.GetCorrectedTimes(hit, x=0, mode='aligned')
+            # tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex.x(), mode='aligned')
+            correctedtimes = hit.GetAllTimes(True, True)
         else: 
             correctedtimes = hit.GetAllTimes()
             tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex.x(), mode='tof')

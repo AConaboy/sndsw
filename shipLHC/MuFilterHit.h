@@ -6,7 +6,6 @@
 #include "TObject.h"
 #include "TVector3.h"
 #include <map>
-#include <variant>
 
 class MuFilterHit : public SndlhcHit
 {
@@ -14,11 +13,9 @@ class MuFilterHit : public SndlhcHit
 
     /** Default constructor **/
     MuFilterHit();
-    explicit MuFilterHit(Int_t detID);
+    MuFilterHit(Int_t detID);
     /** Constructor with detector id, number of SiPMs per side, number of sides **/
     MuFilterHit(Int_t detID,Int_t nP,Int_t nS);
-    MuFilterHit(const MuFilterHit& hit) = default;
-    MuFilterHit& operator=(const MuFilterHit& hit) = default;
 
     // Constructor from MuFilterPoint
     MuFilterHit(Int_t detID,std::vector<MuFilterPoint*>);
@@ -46,6 +43,11 @@ class MuFilterHit : public SndlhcHit
     bool isVertical();
     bool isShort(Int_t);
   private:
+    /** Copy constructor **/
+    MuFilterHit(const MuFilterHit& hit);
+    MuFilterHit operator=(const MuFilterHit& hit);
+    /** Function to set the fTimesHelper array **/
+    void OptForTimeCorrections(Bool_t mask, Bool_t apply, Double_t SipmDistance);
 
     Float_t flag;   ///< flag
     Float_t fMasked[16];  /// masked signal
@@ -54,7 +56,6 @@ class MuFilterHit : public SndlhcHit
        The unit is clock cycles same as for the SndlhcHit's
        times[16] data member */
     Float_t fTimesHelper[16];
-    void OptForTimeCorrections(Bool_t mask, Bool_t apply, Double_t SipmDistance);    
 
     ClassDef(MuFilterHit,6);
     
