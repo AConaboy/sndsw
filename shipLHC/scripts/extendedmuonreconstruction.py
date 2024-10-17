@@ -2,12 +2,13 @@
 import ROOT, csv, os, pickle
 import numpy as np
 from pathlib import Path
+from HCALTools import HCALTools 
 ROOT.gInterpreter.ProcessLine('#include "/afs/cern.ch/user/a/aconsnd/sndsw/analysis/tools/sndSciFiTools.h"')
 
 class ExtendedMuonReconstruction(object):
 
     def __init__(self, options, tw):
-       
+
         self.options=options
         self.tw=tw
         self.simulation=tw.simulation
@@ -34,6 +35,7 @@ class ExtendedMuonReconstruction(object):
         self.cutdists=self.muAna.GetCutDistributions(self.runNr, ('dy', 'timingdiscriminant'))
 
         self.MuFilter = tw.MuFilter
+        self.Scifi = tw.Scifi
         self.barlengths = self.muAna.BuildBarLengths(self.MuFilter)
 
         self.freq=160.316E6
@@ -48,12 +50,19 @@ class ExtendedMuonReconstruction(object):
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
         self.MuFilter.GetPosition(24004, self.B, self.B)
         self.HCAL5z = 0.5*(self.A.z() + self.B.z())
+
+        """
+        Set xy acceptance limits for last target wall
+        this will help balance the dataset passed to the BDT.
+        Not hugely urgent but I should do it.
+        """
+        # dummy_detID=int(1e6*5 + 1e5*1 + 1e4 + 1e3 + 1)
+        # self.Scifi.GetSiPMPosition(, self.B, self.B)
+        # self.HCAL5z = 0.5*(self.A.z() + self.B.z())        
         
         if options.signalpartitions: self.Loadnumuevents()
 
         self.numuStudy=True if options.numuStudy else False 
-
-        self.eventswithcombinations=[]
 
         # Not exact, just rough for rejecting rubbish combinations of DS clusters
         self.acceptancelimits={'x':[-100, 20], 'y':[-10, 100]}
@@ -85,14 +94,40 @@ class ExtendedMuonReconstruction(object):
                 writer=csv.writer(f)
                 writer.writerow(self.column_names)
 
-    def ExtendReconstruction(self, hits, scifi_hits):
+        elif self.options.mode=='nue-extendedreconstruction' and not self.simulation: 
+
+            # d = f'{self.outpath}{self.tw.mode}/'
+            # os.makedirs(d, exist_ok=True)
+
+            # dirkey1, dirkey2, filename = self.options.fname.split('/')
+            # key=filename.replace('.root', '').split('_')[1]
+
+            self.keynamedict = {'wMuon':'with muon', 'woMuon': 'w/o muon', 'allEvents':'all events'}
+
+            # self.datafilename=d+f'extendedreconstruction_{key}.csv'
+            self.column_names=['filekey', 'EventNumber', 'hasMuon', 'interactionWall',
+            'scifi_median_x','scifi_median_y',
+            'scifi_residual_x','scifi_residual_y',
+            'dx0','dx1','dx2','dx3','dx4',
+            'dy0','dy1','dy2','dy3','dy4',
+            'x0','x1','x2','x3','x4',
+            'y0','y1','y2','y3','y4',
+            'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
+            'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
+            'HCAL5bars'
+            ]
+
+        self.hcalTools = HCALTools(self.muAna)
+
+    def ExtendReconstruction(self, hits, scifi_hits, mode='write'):
         # Here I want to get the points in space from the DS hits, and see if a US hit aligns with these
         # If they do then I can plot the doca between the line formed between these DS hits and the US hit
         # if self.options.OutgoingMuon=='yes' and not eventHasMuon: return
         # elif self.options.OutgoingMuon=='no' and eventHasMuon: return
-        self.eventHasMuon=self.OutgoingMuon()
-        if self.eventHasMuon: self.muonhistkey = 'wMuon'
-        elif not self.eventHasMuon: self.muonhistkey = 'woMuon'
+        if self.simulation:
+            self.eventHasMuon=self.OutgoingMuon()
+            if self.eventHasMuon: self.muonhistkey = 'wMuon'
+            elif not self.eventHasMuon: self.muonhistkey = 'woMuon'
 
         self.dsClusters = self.tw.M.trackTask.clusMufi
         if len(self.dsClusters)==0: return
@@ -100,19 +135,19 @@ class ExtendedMuonReconstruction(object):
         self.barycentres = self.muAna.GetBarycentres(hits)
         self.xbarycentres = self.muAna.GetOverallXBarycentre(self.barycentres, mode='maxQDC')
 
-        self.GetDSPoints() # Working with clusters
-        fired_planes=list(self.DS_points.keys())
+        # self.GetDSPoints() # Working with clusters
+        self.hcalTools.GetDSClusterCentroids()
+        fired_planes=list(self.hcalTools.DS_centroids.keys())
         if len(fired_planes)==3: 
             self.RecordEventNr()
             print(f'3 fired DS planes in event {self.tw.M.EventNumber}')
             return        
-        # self.muAna.print_timestamp("Got DSpoints dict") 
 
         histname = 'n_DSclusters'
         if not histname in self.hists:
             title="Number of cluster formed in muon system;# DS clusters;Counts"
             self.hists[histname] = ROOT.TH1F(histname, title, 26, 0, 26)
-        self.hists[histname].Fill(len(self.dsClusters))
+        self.hists[histname].Fill(len(self.hcalTools.DS_centroids))
         
         """
         For each permutation of pairs of x,y fired bars, I can make a straight line
@@ -121,7 +156,7 @@ class ExtendedMuonReconstruction(object):
         In order to know which permutation is successful, I will need to keep track of the detector IDs somehow. 
         """
         
-        self.GetCombinatorics()
+        self.hcalTools.GetCombinatorics()
 
         for p in ('x', 'y'):
             histname=f'n-{p}z-combinations'
@@ -131,7 +166,7 @@ class ExtendedMuonReconstruction(object):
             self.hists[histname].Fill(len(self.combinations[p]))
 
         # Count HCAL hits in each plane
-        self.GetMultiplicity(hits)
+        # if mode=='investigate': self.GetMultiplicity(hits)
 
         self.interactionWall = self.GetInteractionWall(scifi_hits)
         self.Get_interaction_median_positions(scifi_hits)
@@ -148,12 +183,12 @@ class ExtendedMuonReconstruction(object):
                 for combination in self.combinations[proj]:
                     
                     # Make lines for the xz and yz projections that join the points of this pair
-                    line = self.ConnectPoints(combination, proj)
+                    line = self.hcalTools.ConnectPoints(combination, proj)
                     # line == False if the points draw a line out of the acceptance of HCAL plane 5
                     if not line: continue
 
                     # returns a dictionary of the residual in that projection
-                    res = self.USresidual(line, proj) 
+                    res = self.hcalTools.USresidual(line, proj,self.MuFilter) 
                     if not 4 in res and 5 in res: continue
 
                     residuals.append(res)
@@ -187,19 +222,20 @@ class ExtendedMuonReconstruction(object):
                     self.xyresiduals_hists(plane)
                     # self.USmultvds_hists(plane)
 
-                self.lambda_hists(plane)
+                if mode=='write': 
+                    self.lambda_hists(plane)
+                    self.ds_hists(plane)
 
-                self.ds_hists(plane)
+                self.hcalTools.GetHCAL5barscode(hits)
 
-                self.GetHCAL5barscode(hits)
-
-            self.writedata()
+            x=self.hcalTools.getdata(mode='get')
+            return x
 
         elif len(fired_planes)==1:
             pass
         else: pass
 
-    def writedata(self):
+    def getdata(self, mode='write'):
 
         xbarycentre_list = [round(self.xbarycentres[p]['dxB'],3) for p in range(5)]
         ybarycentre_list = [round(self.barycentres[p]['y-barycentre']['yB'],3) for p in range(5)]
@@ -207,14 +243,17 @@ class ExtendedMuonReconstruction(object):
         y_residuals_list = [round(self.xy_residuals[p]['y'], 3) for p in range(5)]
         scifi_residual = [round(self.xy_residuals['intWall']['x'],3),round(self.xy_residuals['intWall']['y'],3)]
 
-        output_line = self.filekey,self.tw.M.EventNumber,self.eventHasMuon,self.interactionWall,round(self.intWall_median_x,3), round(self.intWall_median_y,3),*scifi_residual,*x_residuals_list,*y_residuals_list,*xbarycentre_list,*ybarycentre_list,*[round(i,3) for i in self.lambda_x_dict.values()],*[round(i,3) for i in self.lambda_y_dict.values()],self.HCAL5barscode
+        if self.simulation:
+            output_line = self.filekey,self.tw.M.EventNumber,self.eventHasMuon,self.interactionWall,round(self.intWall_median_x,3), round(self.intWall_median_y,3),*scifi_residual,*x_residuals_list,*y_residuals_list,*xbarycentre_list,*ybarycentre_list,*[round(i,3) for i in self.lambda_x_dict.values()],*[round(i,3) for i in self.lambda_y_dict.values()],self.HCAL5barscode
+        else:
+            output_line = self.filekey,self.tw.M.EventNumber,self.interactionWall,round(self.intWall_median_x,3), round(self.intWall_median_y,3),*scifi_residual,*x_residuals_list,*y_residuals_list,*xbarycentre_list,*ybarycentre_list,*[round(i,3) for i in self.lambda_x_dict.values()],*[round(i,3) for i in self.lambda_y_dict.values()],self.HCAL5barscode
 
-        if not len(output_line) == len(self.column_names):
-            print(f'len output line = {len(output_line)}, n cols = {len(self.column_names)}')
-
-        with open(self.datafilename, 'a', newline='') as f:
-            writer=csv.writer(f)
-            writer.writerow(output_line)
+        if mode=='write':
+            with open(self.datafilename, 'a', newline='') as f:
+                writer=csv.writer(f)
+                writer.writerow(output_line)
+        elif mode=='get':
+            return output_line
 
     def GetHCAL5barscode(self, hits):
         c=[False]*10 
@@ -228,7 +267,7 @@ class ExtendedMuonReconstruction(object):
     def GetInteractionWall(self, scifi_hits):
         filtered_hits = ROOT.snd.analysis_tools.filterScifiHits(scifi_hits, 0, "TI18")
         interactionWall = ROOT.snd.analysis_tools.showerInteractionWall(filtered_hits, 0, "TI18")
-        print(f'Event number: {self.tw.M.EventNumber}, interaction in wall {interactionWall+1}')
+        # print(f'Event number: {self.tw.M.EventNumber}, interaction in wall {interactionWall+1}')
         return interactionWall+1
 
     def OutgoingMuon(self):
@@ -428,20 +467,21 @@ class ExtendedMuonReconstruction(object):
             residual = ext-b
             res_dict[plane]=residual
         
-        # if self.interactionWall==0: i=1 # Having some problems with the scifi tool predicting an interaction pre-target
-        # else: i=self.interactionWall
-        if self.interactionWall==5: i=4
-        i=self.interactionWall
+        if self.interactionWall==6: wall=5
+        else: wall=self.interactionWall
 
-        dummy_detID=int(1e6*i + 1e5*0 + 1e4 + 1e3 + 1)
+        dummy_detID=int(1e6*wall + 1e5*0 + 1e4 + 1e3 + 1)
         print(f'Getting Scifi position for detID {dummy_detID}')
-        self.tw.Scifi.GetPosition(dummy_detID, self.A, self.B)
+        self.tw.Scifi.GetSiPMPosition(dummy_detID, self.A, self.B)
         scifi_intwall_z = 0.5*(self.A.z() + self.B.z())
         
         ext = line(scifi_intwall_z)
-        residual = ext-b
+        if proj=='x': scifi_b = self.intWall_median_x
+        elif proj=='y': scifi_b = self.intWall_median_y
+        
+        residual = ext-scifi_b
         res_dict['intWall']=residual
-            
+
         return res_dict
 
     def GetBarycentre(self, plane, proj):
@@ -489,18 +529,18 @@ class ExtendedMuonReconstruction(object):
                 if not histname in self.hists:
                     title='#splitline{Number of fired bars in HCAL plane '+str(plane+1)+'}{'+self.keynamedict[key]+'};N fired bars;Counts'
                     self.hists[histname]=ROOT.TH1I(histname, title, 11, 0, 11)
-                
-        if self.eventHasMuon: self.hists[f'USmultiplicity_wMuon_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
-        elif not self.eventHasMuon: self.hists[f'USmultiplicity_woMuon_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
+        if self.simulation:                
+            if self.eventHasMuon: self.hists[f'USmultiplicity_wMuon_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
+            elif not self.eventHasMuon: self.hists[f'USmultiplicity_woMuon_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
         self.hists[f'USmultiplicity_allEvents_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
         
     def Get_interaction_median_positions(self, scifi_hits):
         scifi=self.tw.Scifi
 
-        if self.interactionWall==5: i=4
-        i=self.interactionWall
+        if self.interactionWall==6: wall=5
+        else: wall=self.interactionWall
         
-        scifi_hitDict = {i.GetDetectorID():i for i in scifi_hits if i.GetDetectorID()//1000000==i} 
+        scifi_hitDict = {i.GetDetectorID():i for i in scifi_hits if i.GetDetectorID()//1000000==wall} 
 
         positions = {'x':[], 'y':[]}
         for detID, hit in scifi_hitDict.items():

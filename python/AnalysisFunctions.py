@@ -116,7 +116,6 @@ class Analysis(object):
 		
 		self.barlengths={1:Vetobarlength, 2:USbarlength, 3:DSbarlength_hor, 4:DSbarlength_vert}
 		
-
 	def BuildzPos(self, MuFilter, Scifi):
 		A,B=ROOT.TVector3(), ROOT.TVector3()
 		zPos={'MuFilter':{},'Scifi':{}}
@@ -275,8 +274,9 @@ class Analysis(object):
 			mufilter=self.task.MuFilter
 			hasTrack=self.task.hasTrack
 		elif not hasattr(self, "task"):
-			if "MuFilter" in kwargs: mufilter=kwargs.get("MuFilter")
+			mufilter=kwargs.get("MuFilter")
 			if "hasTrack" in kwargs: hasTrack=kwargs.get("hasTrack")
+			else: hasTrack=False
 
 		if not hasattr(self, "barlengths"): self.BuildBarLengths(mufilter)
 
@@ -347,7 +347,6 @@ class Analysis(object):
 				cscint_left, cscint_right = pdata[detID]['cscint-left'], pdata[detID]['cscint-right']
 				atimes_left, atimes_right = pdata[detID]['atimes-left'], pdata[detID]['atimes-right']
 
-				# xL, xR = (x_midpoint-atimes_left*cscint_left), (atimes_right*cscint_right+x_midpoint) # Adding the x_midpoint translates into the physics FoR
 				dxLphys, dxRphys = (x_midpoint+atimes_left*cscint_left[0]), (-atimes_right*cscint_right[0]+x_midpoint) # Adding the x_midpoint translates into the physics FoR
 				dxLphys_err, dxRphys_err = self.Getxuncertainty(detID, pdata[detID],'left'),self.Getxuncertainty(detID, pdata[detID],'right')
 
@@ -1208,7 +1207,7 @@ class Analysis(object):
 				print(f'{fixed_ch} IndexError')
 		return float(data[-2])/int(data[-1])
 
-	def Makecscintdict(self, runNr, state):
+	def Makecscintdict(self, runNr, state='corrected'):
 		d={}
 		for s in (1,2,3):
 			for p in range(self.systemAndPlanes[s]):

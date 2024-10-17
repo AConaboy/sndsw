@@ -80,7 +80,7 @@ class Monitoring():
          self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
 
       self.MuFilter = self.snd_geo.modules['MuFilter']
-      self.Scifi       = self.snd_geo.modules['Scifi']
+      self.Scifi    = self.snd_geo.modules['Scifi']
       self.systemAndPlanes = {1:2,2:5,3:7}
       self.zPos = self.getAverageZpositions()
 

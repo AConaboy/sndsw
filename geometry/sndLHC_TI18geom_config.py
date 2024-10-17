@@ -347,7 +347,6 @@ with ConfigRegistry.register_config("basic") as c:
         c.Floor.DX = 1.0*u.cm 
         c.Floor.DY = -4.5*u.cm #  subtract 4.5cm to avoid overlaps 
         c.Floor.DZ = 0.
-
         
         if year == 2024:
           # Pit on the tunnel floor hosting Veto - using survey coord. system

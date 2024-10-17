@@ -29,7 +29,7 @@ def MakeDf(all_files):
             # Read lines and apply ast.literal_eval to each line
             # data = [ast.literal_eval(line) for line in reader]
             data = [line for line in reader]
-        print(datapath+file)
+        # print(datapath+file)
         # Step 3: Convert the list of tuples into a pandas DataFrame
         df = pd.DataFrame(data, columns=column_names)
         
@@ -42,15 +42,15 @@ def MakeDf(all_files):
 def DfManipulations(df):
 
     # Some columns have bools to show they couldn't be calculated. I want to change to col type to float and the bools to Nans
-    cols_with_bools = ['dx3','dy3','dx4','dy4','lambdax3','lambday3','lambday3','lambday4']
+    cols_with_bools = ['dx0','dy0','dx1','dy1','dx2','dy2','dx3','dy3','dx4','dy4','lambdax3','lambday3','lambday3','lambday4']
 
     for col in df.columns: 
         df[col].fillna(0, inplace=True)
 
     # Calc. the resultant residual 
     for i in range(5):
+        print(f'ds for plane {i}')
         df[f'ds{i}'] = np.sqrt(df[f'dx{i}']**2 + df[f'dy{i}']**2)
-    
 
 def SaveDf(df):
     swan_path = '/eos/home-a/aconsnd/SWAN_projects/Data analysis/total_extendedreconstruction.csv'
@@ -60,7 +60,7 @@ def SaveDf(df):
 def DoAll():
     af=GetFiles()
     df=MakeDf(af)
-    DfManipulations(df)
+    # DfManipulations(df)
     SaveDf(df)
 
 def MakeFalseNegPosDirectories():

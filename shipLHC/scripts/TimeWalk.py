@@ -84,11 +84,10 @@ class TimeWalk(ROOT.FairTask):
         self.TWCorrectionRun=str(5408).zfill(6)            
         
         if self.simulation:
-            self.timealignment='sim'     
+            self.timealignment='sim'
             # self.simMode = self.GetSimEngine()
             self.simMode = options.simMode
             self.cutdists=self.muAna.GetCutDistributions("005408", ('dy'))
-        
 
         elif not self.simulation:
             statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
@@ -103,7 +102,7 @@ class TimeWalk(ROOT.FairTask):
             
             self.state=statedict[self.mode]
             
-            self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)                
+            self.timealignment=self.muAna.GetTimeAlignmentType(runNr=self.runNr)
             
             if options.debug: self.trackevents=[]
 
@@ -129,11 +128,11 @@ class TimeWalk(ROOT.FairTask):
                 if self.timealignment=='old': self.AlignmentRun=str(5097).zfill(6)
                 elif self.timealignment=='new': self.AlignmentRun=str(5408).zfill(6)
                 elif self.timealignment=='new+LHCsynch': self.AlignmentRun=str(5999).zfill(6)
-            
+
             self.muAna.AlignmentRun=self.AlignmentRun
 
             self.cutdists=self.muAna.GetCutDistributions(self.TWCorrectionRun, ('dy', 'timingdiscriminant'))
-            
+
             self.muAna.MakeAlignmentParameterDict()
             self.muAna.Makecscintdict(self.TWCorrectionRun, state=self.state)
             self.muAna.MakeTWCorrectionDict(self.timealignment)
@@ -141,11 +140,11 @@ class TimeWalk(ROOT.FairTask):
         if self.mode == 'systemalignment':
             from systemalignment import SystemAlignment
             self.sa = SystemAlignment(options, self)
-        
+
         if self.mode == 'reconstructmuonposition':
             from systemalignment import SystemAlignment
             self.sa = SystemAlignment(options, self)  
-        
+
         elif self.mode == 'showerprofiles':
             from showerprofiles import ShowerProfiles
             if options.numuStudy: self.numuStudy=True

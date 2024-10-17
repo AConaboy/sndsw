@@ -16,19 +16,58 @@ BASE_FILTERED_DIR = Path("/eos/user/c/cvilela/SND_nue_analysis_May24/")
 ch = ROOT.TChain("rawConv")
 
 import SndlhcGeo
-snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V4_2023.root")
+snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/users/aconsnd/simulation/muonDIS/data/geofile_full.muonDIS-TGeant4-0.root")
 scifiDet = ROOT.gROOT.GetListOfGlobals().FindObject('Scifi')
 muFilterDet = ROOT.gROOT.GetListOfGlobals().FindObject('MuFilter')
 
 from sciFiTools import *
+
+"""
+Hacky way of determining BDT features until I incorportate barycentre determination into the mufilter & mufilter hit code
+
+1. Make sure simulation flag changes
+2. Load in correction and alignment parameters for the data
+3. Make sure the alignment parameters change depending on the time alignment
+
+"""
+import Monitor, TimeWalk, SndlhcTracking, joblib, json
+from args_config import add_arguments
+from argparse import ArgumentParser
+from AnalysisFunctions import Analysis
+
+parser=ArgumentParser()
+add_arguments(parser)
+options = parser.parse_args()
+
+options.path='/eos/experiment/sndlhc/convertedData/physics/2023/'
+options.mode='extendedreconstruction'
+
+muAna = Analysis(options)
+# muAna.
+
+from HCALTools import HCALTools
+hcalTools = HCALTools(muAna, muFilterDet)
+# Load in trained BDT
+hcalTools.model = joblib.load('/eos/home-a/aconsnd/SWAN_projects/Data analysis/bdt_model.pkl')
+hcalTools.filekey=0
+with open('/eos/home-a/aconsnd/SWAN_projects/Data analysis/best_BDTparams.json') as jf:
+    best_BDTparams = json.load(jf)
+hcalTools.BDT_features = best_BDTparams['features']
 
 for this_run in (BASE_FILTERED_DIR / "data_2022_2023").glob("*/filtered_*.root"):
     ch.Add(this_run.as_posix())
 
 N_MC_FILES=400
 
+"""
+For the Monte Carlo, use the MC that has been redigitised with the new timing digitisation that is compatible with data.
+"""
 chMC = ROOT.TChain("cbmsim")
-chMC.Add((BASE_FILTERED_DIR / "nuMC" / "filtered_stage1.root").as_posix())
+# chMC.Add((BASE_FILTERED_DIR / "nuMC" / "filtered_stage1.root").as_posix())
+redigitisedMC_path = '/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/nueFilter/'
+allfiles=os.listdir(redigitisedMC_path)
+for fname in allfiles:
+    if fname.endswith('root'): chMC.Add(redigitisedMC_path+fname)
 
 chNeutral = ROOT.TChain("cbmsim")
 chNeutral.Add("/afs/cern.ch/work/c/cvilela/public/SND_Nov_2023/sndsw/analysis/scripts/neutron_kaon_nue_stage1_noprescale.root")
@@ -101,6 +140,18 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
         if not (isNuMC or isNeutralHad):
             scifiDet.InitEvent(event.EventHeader)
             muFilterDet.InitEvent(event.EventHeader)
+
+        ### Adding BDT cut
+        # Need to make sure tracking task has the event number updated! 
+        if ch.GetName()=='cbmsim':
+            hcalTools.setsimulation(True)
+            hcalTools.eventHasMuon=hcalTools.OutgoingMuon(event)
+        elif ch.GetName()=='rawConv':
+            runNr = event.EventHeader.GetRunId()
+            hcalTools.setsimulation(False, runNr)
+        hcalTools.EventNumber=i_event 
+
+        data=BDT_cut(event, muFilterDet,scifiDet)
 
         weight = 1
 
@@ -205,10 +256,22 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
         
     return (h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens)
 
-plots_data  = makePlots(ch)
-plots_MC = makePlots(chMC, isNuMC = True, name = "_MC")
-plots_hadMC = makePlots(chNeutral, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
+# plots_data  = makePlots(ch)
+# plots_MC = makePlots(chMC, isNuMC = True, name = "_MC")
+# plots_hadMC = makePlots(chNeutral, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
 
+def testing(ch, i):
+    ch.GetEvent(i)
+    hcalTools.EventNumber=i
+    if ch.GetName()=='cbmsim':
+        hcalTools.eventHasMuon=hcalTools.OutgoingMuon(ch)
+        hcalTools.setsimulation(True)
+    elif ch.GetName()=='rawConv':
+        runNr = event.EventHeader.GetRunId()
+        hcalTools.setsimulation(False, runNr)
+
+    data=hcalTools.BDT_cut(ch, muFilterDet, scifiDet)
+    return data
 
 c = []
 def drawDataMC(data, MC):
@@ -259,7 +322,7 @@ def drawDataMC(data, MC):
 #
 #for h in h_summary:
 #    h.Write()
-out_file.Write()
-out_file.Close()
+# out_file.Write()
+# out_file.Close()
 
 #input()
