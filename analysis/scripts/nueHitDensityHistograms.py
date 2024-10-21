@@ -3,8 +3,8 @@ import os
 from array import array
 import random
 from pathlib import Path
-
 from tqdm import tqdm
+
 
 LUMI = 68.551
 
@@ -41,6 +41,7 @@ options = parser.parse_args()
 
 options.path='/eos/experiment/sndlhc/convertedData/physics/2023/'
 options.mode='extendedreconstruction'
+options.referencesystem=1 # Use Scifi alignment
 
 muAna = Analysis(options)
 # muAna.
@@ -53,6 +54,8 @@ hcalTools.filekey=0
 with open('/eos/home-a/aconsnd/SWAN_projects/Data analysis/best_BDTparams.json') as jf:
     best_BDTparams = json.load(jf)
 hcalTools.BDT_features = best_BDTparams['features']
+# Tell muAna to look for reference time in hcalTools
+muAna.SetTask(hcalTools)
 
 for this_run in (BASE_FILTERED_DIR / "data_2022_2023").glob("*/filtered_*.root"):
     ch.Add(this_run.as_posix())
@@ -74,7 +77,7 @@ chNeutral.Add("/afs/cern.ch/work/c/cvilela/public/SND_Nov_2023/sndsw/analysis/sc
 
 out_file = ROOT.TFile("checkDataCuts.root", "RECREATE")
 
-def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection = 1.):
+def makePlots(ch, mode='broken', name = "", isNuMC = False, isNeutralHad = False, preselection = 1.):
     n = [0]*5
 
     selected_list = []
@@ -133,6 +136,8 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
     
     for i_event, event in tqdm(enumerate(ch)):
 
+        print(f'event {i_event}')
+
         if preselection < 1.:
             if random.random() > preselection:
                 continue
@@ -151,13 +156,13 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
             hcalTools.setsimulation(False, runNr)
         hcalTools.EventNumber=i_event 
 
-        data=BDT_cut(event, muFilterDet,scifiDet)
+        bdt_pred=hcalTools.BDT_cut(event, muFilterDet,scifiDet)
+        if not bdt_pred: continue
 
         weight = 1
 
         if isNeutralHad:
             weight = event.per_invfb_weight*LUMI
-
 
         elif isNuMC:
             weight = LUMI/(N_MC_FILES*100.)
@@ -171,8 +176,12 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
         passCuts = True
 
         selHits = selectHits(event, (isNuMC or isNeutralHad))
+        
+        # Temporary fix! 
+        if len(selHits)==1: continue
 
-        slopev, slopeh, reducedchi2v, reducedchi2h, reducedchi2both = getSciFiAngle(selHits)
+        if mode=='fixed':
+            slopev, slopeh, reducedchi2v, reducedchi2h, reducedchi2both = getSciFiAngle(selHits)
 
         i_flav = 0
         if isNuMC:
@@ -192,9 +201,11 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
                     i_flav = 4 #nutauCC1mu
                 else:
                     i_flav = 3 #nutauCC0mu
-                
-        h_min_chi2[i_flav].Fill(min(reducedchi2v, reducedchi2h), weight)
-        h_log_min_chi2[i_flav].Fill(ROOT.TMath.Log(min(reducedchi2v, reducedchi2h)), weight)
+
+        if mode=='fixed':        
+            h_min_chi2[i_flav].Fill(min(reducedchi2v, reducedchi2h), weight)
+            h_log_min_chi2[i_flav].Fill(ROOT.TMath.Log(min(reducedchi2v, reducedchi2h)), weight)
+
         dens_sel, dens_sel2 = getSumDensity(selHits, return_2ndhighest = True)
         h_hit_density_sel_precut[i_flav].Fill(dens_sel, weight)
         h_hit_density2_sel_precut[i_flav].Fill(dens_sel, weight)
@@ -213,13 +224,14 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
         if not (isNuMC or isNeutralHad):
             selected_list.append("SELECTED {} {} {} {}".format(i_event, event.EventHeader.GetRunId(), event.EventHeader.GetEventNumber(), dens_sel))
 
-        h_SciFiAngle[i_flav].Fill(slopev, slopeh, weight)
-        h_SciFiAngle_v_chi2[i_flav].Fill(slopev, reducedchi2v, weight)
-        h_SciFiAngle_h_chi2[i_flav].Fill(slopeh, reducedchi2h, weight)
+        if mode=='fixed':
+            h_SciFiAngle[i_flav].Fill(slopev, slopeh, weight)
+            h_SciFiAngle_v_chi2[i_flav].Fill(slopev, reducedchi2v, weight)
+            h_SciFiAngle_h_chi2[i_flav].Fill(slopeh, reducedchi2h, weight)
 
-        theta = (ROOT.TMath.ATan(slopev)**2 + ROOT.TMath.ATan(slopeh)**2)**0.5
+            theta = (ROOT.TMath.ATan(slopev)**2 + ROOT.TMath.ATan(slopeh)**2)**0.5
 
-        h_theta[i_flav].Fill(theta, weight)
+            h_theta[i_flav].Fill(theta, weight)
         
         h_n_hits_sel[i_flav].Fill(len(selHits), weight)
     
@@ -238,16 +250,20 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
 
         h_log_hit_density_sel[i_flav].Fill(ROOT.TMath.Log(dens_sel), weight)
 
-        h_theta_density[i_flav].Fill(theta, dens_sel, weight)
-
-        try:
-            tdiff_list.append(tdiff(selHits, event.Digi_MuFilterHits, (isNuMC or isNeutralHad)))
-        except ZeroDivisionError:
-            tdiff_list.append(-999)
-        max_slope_list.append(max(abs(slopev), abs(slopeh)))
         
-    for i_sel, sel in enumerate(selected_list):
-        print(sel, tdiff_list[i_sel], max_slope_list[i_sel])
+        if mode=='fixed':
+
+            h_theta_density[i_flav].Fill(theta, dens_sel, weight)
+
+            try:
+                tdiff_list.append(tdiff(selHits, event.Digi_MuFilterHits, (isNuMC or isNeutralHad)))
+            except ZeroDivisionError:
+                tdiff_list.append(-999)
+            max_slope_list.append(max(abs(slopev), abs(slopeh)))
+
+    if mode=='fixed':
+        for i_sel, sel in enumerate(selected_list):
+            print(sel, tdiff_list[i_sel], max_slope_list[i_sel])
 
     if isNeutralHad:
         for i_hist in (h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens):
@@ -256,18 +272,18 @@ def makePlots(ch, name = "", isNuMC = False, isNeutralHad = False, preselection 
         
     return (h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens)
 
-# plots_data  = makePlots(ch)
-# plots_MC = makePlots(chMC, isNuMC = True, name = "_MC")
-# plots_hadMC = makePlots(chNeutral, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
+plots_data  = makePlots(ch)
+plots_MC = makePlots(chMC, isNuMC = True, name = "_MC")
+plots_hadMC = makePlots(chNeutral, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
 
 def testing(ch, i):
     ch.GetEvent(i)
     hcalTools.EventNumber=i
     if ch.GetName()=='cbmsim':
-        hcalTools.eventHasMuon=hcalTools.OutgoingMuon(ch)
         hcalTools.setsimulation(True)
+        hcalTools.eventHasMuon=hcalTools.OutgoingMuon(ch)
     elif ch.GetName()=='rawConv':
-        runNr = event.EventHeader.GetRunId()
+        runNr = ch.EventHeader.GetRunId()
         hcalTools.setsimulation(False, runNr)
 
     data=hcalTools.BDT_cut(ch, muFilterDet, scifiDet)
@@ -308,10 +324,10 @@ def drawDataMC(data, MC):
 #
 #c.append(ROOT.TCanvas())
 #h_theta.Draw("PE")
-#if N_MC_FILES:
+# if N_MC_FILES:
 #    h_theta_MC.SetLineColor(ROOT.kRed)
 #    h_theta_MC.Draw("SAME")
-#ROOT.gPad.Update()
+# ROOT.gPad.Update()
 #
 #c.append(ROOT.TCanvas())
 #h_min_chi2.Draw("PE")
@@ -322,7 +338,7 @@ def drawDataMC(data, MC):
 #
 #for h in h_summary:
 #    h.Write()
-# out_file.Write()
-# out_file.Close()
+out_file.Write()
+out_file.Close()
 
 #input()

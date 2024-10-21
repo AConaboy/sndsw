@@ -270,18 +270,15 @@ class Analysis(object):
 		Adding some kwargs for using when the analysis instance
 		isn't connected to a FairTask
 		"""
-		if hasattr(self, "task"):
-			mufilter=self.task.MuFilter
-			hasTrack=self.task.hasTrack
-		elif not hasattr(self, "task"):
-			mufilter=kwargs.get("MuFilter")
-			if "hasTrack" in kwargs: hasTrack=kwargs.get("hasTrack")
-			else: hasTrack=False
+
+		mufilter=kwargs.get("MuFilter")
+		if "hasTrack" in kwargs: hasTrack=kwargs.get("hasTrack")
+		else: hasTrack=False
 
 		if not hasattr(self, "barlengths"): self.BuildBarLengths(mufilter)
 
-		barycentres={}
-		planewise_data = {}
+		barycentres=dict.fromkeys([i for i in range(5)], {})
+		planewise_data = dict.fromkeys([i for i in range(5)], {})
 
 		# Group hits by plane
 		for hit in hits:
@@ -321,6 +318,7 @@ class Analysis(object):
 
 		for plane in planewise_data:
 			pdata = planewise_data[plane]
+			if len(pdata)==0: continue
 
 			# Determine quantities for the bars now
 			planeQDC = sum([ pdata[detID]['bar-QDC'] for detID in pdata ])
@@ -400,7 +398,8 @@ class Analysis(object):
 		
 		if mode=='relQDC':
 			for p,pdata in barycentres.items():
-				
+				if len(pdata)==0: continue
+
 				xb_data = pdata['x-barycentres']
 				
 				xL = sum([xb_data[detID]['relQDC']*xb_data[detID]['xL'][0] for detID in xb_data.keys()])
@@ -421,7 +420,9 @@ class Analysis(object):
 		
 		elif mode=='maxQDC':
 			for p,pdata in barycentres.items():
+				if len(pdata)==0: continue
 				xb_data=pdata['x-barycentres']
+				
 				max_key = max(xb_data, key=lambda k: xb_data[k]['relQDC'])
 
 				xL=xb_data[max_key]['xL']
@@ -1250,7 +1251,7 @@ class Analysis(object):
 		print(f'Time resolution dict written to {filename}')
 
 
-	def GetPolyParams(self, runNr, fixed_ch, state='uncorrected', n=5, mode='json'):
+	def GetPolyParams(self, fixed_ch, runNr='005408', state='uncorrected', n=5, mode='json'):
 		fname=f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.{mode}'
 		if not os.path.exists(fname): 
 			return 
@@ -1808,7 +1809,7 @@ class Analysis(object):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-						tmp=self.GetPolyParams(run, fixed_ch, state='uncorrected', n=self.CorrectionType)
+						tmp=self.GetPolyParams(fixed_ch, state='uncorrected', n=self.CorrectionType)
 						if not tmp: 
 							print(f'No tw params for {fixed_ch}')
 							continue

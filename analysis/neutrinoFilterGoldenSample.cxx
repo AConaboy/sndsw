@@ -176,7 +176,6 @@ int main(int argc, char ** argv) {
     }
     cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
     cutFlow.push_back( new snd::analysis_cuts::USBarsVeto(std::vector<std::pair<int, double> >{{0, 2.}, {1, 2.}}, true, ch)); // Reject events with hits in lowest bars in first two US planes
-    cutFlow.push_back( new snd::analysis_cuts::USBarsVeto(std::vector<std::pair<int, double> >{{0, 8.}, {1, 8.}}, false, ch)); // Reject events with hits in highest bars in first two US planes
     cutFlow.push_back( new snd::analysis_cuts::vetoCut(ch)); // B. No veto hits
     cutFlow.push_back( new snd::analysis_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
     cutFlow.push_back( new snd::analysis_cuts::sciFiContinuity(ch)); // All SciFi planes downstream of first active (both views) plane must be hit (both views).

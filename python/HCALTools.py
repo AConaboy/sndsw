@@ -4,6 +4,8 @@ from datetime import datetime
 import math as m 
 import numpy as np
 from itertools import combinations
+import pandas as pd
+
 
 ROOT.gInterpreter.ProcessLine('#include "/afs/cern.ch/user/a/aconsnd/sndsw/analysis/tools/sndSciFiTools.h"')
 
@@ -38,13 +40,13 @@ class HCALTools(object):
         self.simulation=sim
 
         if sim==False:
-            if run==-1: 
+            if run==-1:
                 print(f'Have to pass a valid runNr for real data!')
                 return
             if not hasattr(self.muAna, 'twparameters'): self.muAna.MakeTWCorrectionDict()
             if not hasattr(self.muAna, 'alignmentparameters'): 
-                timealignment=muAna.GetTimeAlignmentType(runNr=str(run).zfill(6))
-                muAna.MakeAlignmentParameterDict(timealignment)
+                self.muAna.timealignment=self.muAna.GetTimeAlignmentType(runNr=str(run).zfill(6))
+                self.muAna.MakeAlignmentParameterDict()
 
     def GetDSClusterCentroids(self):
         
@@ -124,6 +126,13 @@ class HCALTools(object):
         hits = event.Digi_MuFilterHits
         scifi_hits = event.Digi_ScifiHits
 
+        # Get event t0 time if not simulation
+        if not self.simulation:
+            if self.muAna.options.referencesystem==1:
+                self.reft = self.muAna.GetScifiAverageTime(Scifi, scifi_hits)
+            elif self.muAna.options.referencesystem==3:
+                self.reft = self.muAna.GetDSHaverage(hits)
+
         # Get predicted interaction wall
         # Returns number between 0,4 or 5 for unreconstructed interaction wall
 
@@ -192,7 +201,11 @@ class HCALTools(object):
             self.lambda_y_dict = {i:np.nan for i in range(5)}
 
             for plane in self.xy_residuals:
+
                 if plane=='intWall':continue
+                if not plane in self.xbarycentres: continue
+                if not plane in self.barycentres: continue
+                
                 lambda_x = abs(self.xbarycentres[plane]['lambda_x'])
                 self.lambda_x_dict[plane] = lambda_x
                 lambda_y = self.barycentres[plane]['y-barycentre']['lambda_y']
@@ -211,10 +224,18 @@ class HCALTools(object):
             self.Get_ds()
 
             x=self.getdata(mode='get')
-            return x
-
-            # Format the data to put into the BDT model
+            xdf = pd.DataFrame([x])
+            xdf['HCAL5barcode'] = xdf['HCAL5barcode'].astype(int)
             
+            cols2drop = ['filekey', 'EventNumber']
+            if self.simulation: cols2drop.append('hasMuon')
+            xdf.drop(cols2drop, axis=1, inplace=True)
+            
+            features = self.model.feature_names_in_
+            xdf = xdf[features] # Ensure data is in the right order for BDT 
+
+            res = self.model.predict(xdf)
+            return bool(res[0])
             
         # Also must assume True here at the moment.
         # Will test extending BDT to 1 fired DS plane
@@ -361,13 +382,14 @@ class HCALTools(object):
             output_dict = dict.fromkeys(self.column_names, None)
             output_dict['filekey'] = self.filekey
             output_dict['EventNumber'] = self.EventNumber
-            output_dict['hasMuon'] = self.eventHasMuon
+            # output_dict['hasMuon'] = self.eventHasMuon
             output_dict['interactionWall'] = self.interactionWall
             output_dict['scifi_median_x'] = round(self.intWall_median_x,3)
             output_dict['scifi_median_y'] = round(self.intWall_median_y,3)
+            
             output_dict['ds_scifi'] = round(self.scifi_residual, 3)
-
-            for i,j in enumerate(['x', 'y']): output_dict[f'scifi_residual_{j}'] = scifi_residual[i]
+            output_dict['scifi_residual_x'] = round(self.xy_residuals['intWall']['x'], 3)
+            output_dict['scifi_residual_y'] = round(self.xy_residuals['intWall']['y'], 3)
 
             for i in range(5):
                 output_dict[f'dx{i}'] = dx_list[i]
@@ -391,7 +413,7 @@ class HCALTools(object):
 
     def OutgoingMuon(self, event):
         ### Return true for events with an outgoing muon
-        if not self.simulation:
+        if event.GetName()=='rawConv':
             print(f'No MCTrack branch in real data! ')
             return False
         if abs(event.MCTrack[1].GetPdgCode()) == 13: return True 

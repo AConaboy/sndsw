@@ -120,7 +120,7 @@ bool validateHit(sndScifiHit * aHit, int ref_station, bool ref_orientation){
 float snd::analysis_tools::peakScifiTiming(const TClonesArray &digiHits, int bins, float min_x, float max_x){
 
   if (digiHits.GetEntries() <= 0){
-    LOG (warning) << "digiHits has no valid SciFi Hits and as such no maximum for the timing distribution.";
+    // LOG (warning) << "digiHits has no valid SciFi Hits and as such no maximum for the timing distribution.";
     return -1.;
   }
 
@@ -277,7 +277,7 @@ std::unique_ptr<TClonesArray> snd::analysis_tools::filterScifiHits(const TClones
   int filteredHitsIndex = 0;
   int ScifiStations = 5;
   if(setup == "H8"){ScifiStations = 4;}
-  else{LOG (info) << "\"TI18\" setup will be used by default, please provide \"H8\" for the Testbeam setup.";}
+  // else{LOG (info) << "\"TI18\" setup will be used by default, please provide \"H8\" for the Testbeam setup.";}
  
   sndScifiHit * hit;
   TIter hitIterator(&supportArray);

@@ -14,6 +14,7 @@ void rs_nue_significance()
   float LUMI_SCALE = 1.;
   
   std::vector<std::string> mc_samples{"hadMC", "numuCC_MC", "nueCC_MC", "nuTauCC0mu_MC", "nuTauCC1mu_MC", "NC_MC"};
+  // std::vector<std::string> mc_samples{"numuCC_MC", "nueCC_MC", "nuTauCC0mu_MC", "nuTauCC1mu_MC", "NC_MC"};
 
   std::map<std::string, std::string> sample_colors;
   sample_colors["hadMC"] = "#EE6677";
@@ -173,7 +174,7 @@ void rs_nue_significance()
   g_SR_opt->Draw("AL");
   g_SR_opt->GetXaxis()->SetTitle("Signal region SciFi hit density lower bound");
   g_SR_opt->GetYaxis()->SetTitle("Expected observation significance / #sigma");
-  g_SR_opt->GetYaxis()->SetRangeUser(0, 6.);
+  g_SR_opt->GetYaxis()->SetRangeUser(0, 10.);
   
   g_SR_nueCC_opt->SetLineColor(kRed);
   g_SR_nueCC_opt->Draw("L");
