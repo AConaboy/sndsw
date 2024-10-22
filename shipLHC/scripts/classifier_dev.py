@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd 
-import ast, os, csv
+import ast, os, csv, shutil
 
 datapath = '/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/nue-extendedreconstruction/'
 # cols=['filekey','EventNumber','hasMuon','DSmult0x','DSmult0y','DSmult1x','DSmult1y','USmult3','USmult4','dx3','dy3','dx4','dy4','lambdax3','lambdax4','lambday3','lambday4']
@@ -64,6 +64,26 @@ def DoAll():
     SaveDf(df)
 
 def MakeFalseNegPosDirectories():
+
+    # Define the source folders
+    source_folders = ['/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalseNegatives/', '/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalsePositives/']
+    # Define the destination folder
+    destination_folder = '/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/'
+
+    # Loop through each source folder
+    for source_folder in source_folders:
+        # List all files in the current source folder
+        for filename in os.listdir(source_folder):
+            # Check if the file is a PNG file
+            if filename.endswith('.png'):
+                # Construct full file path
+                source_file = os.path.join(source_folder, filename)
+                destination_file = os.path.join(destination_folder, filename)
+                
+                # Move the file to the destination folder
+                shutil.move(source_file, destination_file)
+    print(f'Moved all FNs and FPs up 1 directory')
+
     FNs=[]
     FPs=[]
     with open('/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/nue-extendedreconstruction/extendedreconstruction_FNs.csv') as f:
@@ -79,16 +99,19 @@ def MakeFalseNegPosDirectories():
     nuefilter_events = [i for i in eventdisplays if all([i.endswith('png'), i.find('nueFilter')==0])]
 
     for ev in nuefilter_events:
+
         filekey, eventNumber = ev.removesuffix('.png').removeprefix('nueFilter_').split('_')
         for FN_key,FN_event in FNs:
-            if FN_key==filekey and FN_event==eventNumber: 
+            if FN_key==filekey and FN_event==eventNumber:
                 os.rename(f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/nueFilter_{FN_key}_{FN_event}.png', 
                         f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalseNegatives/nueFilter_{FN_key}_{FN_event}.png')
                 print(f'Moved event display file {FN_key}, event {FN_event} into FN folder')
+
         for FP_key,FP_event in FPs:
             if FP_key==filekey and FP_event==eventNumber: 
                 os.rename(f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/nueFilter_{FP_key}_{FP_event}.png', 
                         f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalsePositives/nueFilter_{FP_key}_{FP_event}.png')             
                 print(f'Moved event display file {FP_key}, event {FP_event} into FP folder')
+
 
 

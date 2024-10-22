@@ -4,6 +4,8 @@ from array import array
 import random
 from pathlib import Path
 from tqdm import tqdm
+from argparse import ArgumentParser
+
 
 
 LUMI = 68.551
@@ -32,7 +34,6 @@ Hacky way of determining BDT features until I incorportate barycentre determinat
 """
 import Monitor, TimeWalk, SndlhcTracking, joblib, json
 from args_config import add_arguments
-from argparse import ArgumentParser
 from AnalysisFunctions import Analysis
 
 parser=ArgumentParser()
@@ -44,7 +45,6 @@ options.mode='extendedreconstruction'
 options.referencesystem=1 # Use Scifi alignment
 
 muAna = Analysis(options)
-# muAna.
 
 from HCALTools import HCALTools
 hcalTools = HCALTools(muAna, muFilterDet)
@@ -75,9 +75,8 @@ for fname in allfiles:
 chNeutral = ROOT.TChain("cbmsim")
 chNeutral.Add("/afs/cern.ch/work/c/cvilela/public/SND_Nov_2023/sndsw/analysis/scripts/neutron_kaon_nue_stage1_noprescale.root")
 
-out_file = ROOT.TFile("checkDataCuts.root", "RECREATE")
-
-def makePlots(ch, mode='broken', name = "", isNuMC = False, isNeutralHad = False, preselection = 1.):
+def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False, 
+            isNeutralHad = False, preselection = 1.):
     n = [0]*5
 
     selected_list = []
@@ -146,18 +145,19 @@ def makePlots(ch, mode='broken', name = "", isNuMC = False, isNeutralHad = False
             scifiDet.InitEvent(event.EventHeader)
             muFilterDet.InitEvent(event.EventHeader)
 
-        ### Adding BDT cut
-        # Need to make sure tracking task has the event number updated! 
-        if ch.GetName()=='cbmsim':
-            hcalTools.setsimulation(True)
-            hcalTools.eventHasMuon=hcalTools.OutgoingMuon(event)
-        elif ch.GetName()=='rawConv':
-            runNr = event.EventHeader.GetRunId()
-            hcalTools.setsimulation(False, runNr)
-        hcalTools.EventNumber=i_event 
+        if BDT_cut:
+            ### Adding BDT cut
+            if ch.GetName()=='cbmsim':
+                hcalTools.setsimulation(True)
+                hcalTools.eventHasMuon=hcalTools.OutgoingMuon(event)
+            elif ch.GetName()=='rawConv':
+                runNr = event.EventHeader.GetRunId()
+                hcalTools.setsimulation(False, runNr)
+            hcalTools.EventNumber=i_event 
 
-        bdt_pred=hcalTools.BDT_cut(event, muFilterDet,scifiDet)
-        if not bdt_pred: continue
+            bdt_pred=hcalTools.BDT_cut(event, muFilterDet,scifiDet)
+            
+            if bdt_pred: continue
 
         weight = 1
 
@@ -272,9 +272,17 @@ def makePlots(ch, mode='broken', name = "", isNuMC = False, isNeutralHad = False
         
     return (h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens)
 
-plots_data  = makePlots(ch)
-plots_MC = makePlots(chMC, isNuMC = True, name = "_MC")
-plots_hadMC = makePlots(chNeutral, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
+for isBDT_cut in (True, False):
+
+    out_file = ROOT.TFile(f"checkDataCuts_BDTcut{isBDT_cut}.root", "RECREATE")
+
+    plots_data  = makePlots(ch, BDT_cut=isBDT_cut)
+    plots_MC = makePlots(chMC, BDT_cut=isBDT_cut, isNuMC = True, name = "_MC")
+    plots_hadMC = makePlots(chNeutral, BDT_cut=isBDT_cut, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
+
+    out_file.Write()
+    out_file.Close()
+    print(f'File for BDT_cut {isBDT_cut} written')
 
 def testing(ch, i):
     ch.GetEvent(i)
@@ -338,7 +346,5 @@ def drawDataMC(data, MC):
 #
 #for h in h_summary:
 #    h.Write()
-out_file.Write()
-out_file.Close()
 
 #input()

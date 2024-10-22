@@ -5,8 +5,19 @@ using namespace RooFit;
 using namespace RooStats; // the utilities are in the RooStats namespace
 using std::cout, std::endl;
  
-void rs_nue_significance()
+void rs_nue_significance(const char *filename)
 {
+  // filename must be in this vector
+  std::vector<std::string> filenames{"checkDataCuts_BDTcutFalse.root", "checkDataCuts_BDTcutTrue.root"};
+
+  if (std::find(filenames.begin(), filenames.end(), filename) != filenames.end()) {
+    // Filename is in the vector
+    std::cout << "Valid filename: " << filename << std::endl;
+  } else {
+    // Filename is not in the vector
+    std::cout << "Invalid filename: " << filename << std::endl;
+    return
+  }
 
   // WARNING WARNING WARNING SET TO 1 FOR REAL DATA ANALYSIS
   // Change only for sensitivity studies
@@ -47,7 +58,7 @@ void rs_nue_significance()
   sample_fractional_uncertainty["nuTauCC1mu_MC"] = 1.; // 100% uncertainty
   // --------------------------------------------------------------------------------
   
-  auto f_histo = new TFile("checkDataCuts.root");
+  auto f_histo = new TFile(filename);
 
   std::map<std::string, TH1D*> hists;
   for (std::string sample_name : mc_samples) hists[sample_name] = static_cast<TH1D*>(f_histo->Get(("hit_density_sel_"+sample_name).c_str()));
@@ -174,6 +185,13 @@ void rs_nue_significance()
   g_SR_opt->Draw("AL");
   g_SR_opt->GetXaxis()->SetTitle("Signal region SciFi hit density lower bound");
   g_SR_opt->GetYaxis()->SetTitle("Expected observation significance / #sigma");
+  
+  if ( strstr(filename, "True") != NULL ) {
+    g_SR_opt->SetTitle("Expected observation significance with BDT cut");
+  } else if ( strstr(filename, "False") != NULL ) {
+    g_SR_opt->SetTitle("Expected observation significance without BDT cut");
+  }
+
   g_SR_opt->GetYaxis()->SetRangeUser(0, 10.);
   
   g_SR_nueCC_opt->SetLineColor(kRed);

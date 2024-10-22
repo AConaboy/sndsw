@@ -153,12 +153,12 @@ class HCALTools(object):
 
         # Can't use BDT here, must assume True
         if len(fired_planes)==0:
-            return True   
+            return False  
 
         # Sanity check, should be none
         if len(fired_planes)==3:
             print(f'3 fired DS planes in event {self.EventNumber}')
-            return True
+            return False
 
         # Find combinations of DS cluster centroids
         self.GetCombinatorics()
@@ -194,8 +194,8 @@ class HCALTools(object):
                     self.xy_residuals[plane][proj] = best_residual[plane]
  
             # Require that the xy_residual is defined for the 4th and 5th plane
-            if list(self.xy_residuals[4].values()) == [np.nan, np.nan]: return True
-            if list(self.xy_residuals[3].values()) == [np.nan, np.nan]: return True 
+            if list(self.xy_residuals[4].values()) == [np.nan, np.nan]: return False
+            if list(self.xy_residuals[3].values()) == [np.nan, np.nan]: return False
 
             self.lambda_x_dict = {i:np.nan for i in range(5)}
             self.lambda_y_dict = {i:np.nan for i in range(5)}
@@ -225,7 +225,7 @@ class HCALTools(object):
 
             x=self.getdata(mode='get')
             xdf = pd.DataFrame([x])
-            xdf['HCAL5barcode'] = xdf['HCAL5barcode'].astype(int)
+            xdf['HCAL5barcode'] = xdf['HCAL5barcode']
             
             cols2drop = ['filekey', 'EventNumber']
             if self.simulation: cols2drop.append('hasMuon')
@@ -234,14 +234,15 @@ class HCALTools(object):
             features = self.model.feature_names_in_
             xdf = xdf[features] # Ensure data is in the right order for BDT 
 
+            # BDT returns True for predicting a muon
             res = self.model.predict(xdf)
             return bool(res[0])
             
         # Also must assume True here at the moment.
         # Will test extending BDT to 1 fired DS plane
         elif len(fired_planes)==1:
-            return True
-        else: pass        
+            return False
+        else: pass
 
     def Get_ds(self):
         self.ds = dict.fromkeys([f'ds{i}' for i in range(5)], np.nan)
