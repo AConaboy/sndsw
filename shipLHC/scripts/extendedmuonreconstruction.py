@@ -270,6 +270,7 @@ class ExtendedMuonReconstruction(object):
         histname=f'xyresidual_{self.muonhistkey}_plane{plane}'
         self.hists[histname].Fill(*self.hcalTools.xy_residuals[plane].values())                
         self.hists[f'xyresidual_allEvents_plane{plane}'].Fill(*self.hcalTools.xy_residuals[plane].values())
+<<<<<<< HEAD
 
     def lambda_hists(self, plane):
 
@@ -703,6 +704,8 @@ class QuarkVectorExtrapolation(object):
         histname=f'xyresidual_{self.muonhistkey}_plane{plane}'
         self.hists[histname].Fill(*self.xy_residuals[plane].values())                
         self.hists[f'xyresidual_allEvents_plane{plane}'].Fill(*self.xy_residuals[plane].values())
+=======
+>>>>>>> 6209bb093 (Updates to fix chi2 in data)
 
     def lambda_hists(self, plane):
 
@@ -719,13 +722,13 @@ class QuarkVectorExtrapolation(object):
                 self.hists[histname]=ROOT.TH1F(histname, title, 50, 0, 50)
 
         histname = f'lambdax_{self.muonhistkey}_plane{plane}'
-        lambda_x = self.lambda_x_dict[plane]
+        lambda_x = self.hcalTools.lambda_x_dict[plane]
         if lambda_x: 
             self.hists[histname].Fill(lambda_x)
             self.hists[f'lambdax_allEvents_plane{plane}'].Fill(lambda_x)
         
         histname = f'lambday_{self.muonhistkey}_plane{plane}'
-        lambda_y = self.lambda_y_dict[plane]
+        lambda_y = self.hcalTools.lambda_y_dict[plane]
         if lambda_y: 
             self.hists[histname].Fill(lambda_y)
             self.hists[f'lambday_allEvents_plane{plane}'].Fill(lambda_y)
@@ -749,21 +752,22 @@ class QuarkVectorExtrapolation(object):
                 title='Resultant residual between DS hits and expected position in plane '+str(plane+1)+'}{'+self.keynamedict[key]+'};ds = #sqrt{dx^{2} + dy^{2}} [cm];Counts'
                 self.hists[histname]=ROOT.TH1F(histname, title, 50, 0, 50)
         
-        if 'x' in self.xy_residuals[plane]:
+        if 'x' in self.hcalTools.xy_residuals[plane]:
             histname = f'dx_{self.muonhistkey}_plane{plane}'
-            self.hists[histname].Fill(self.xy_residuals[plane]['x'])
-            self.hists[f'dx_allEvents_plane{plane}'].Fill(self.xy_residuals[plane]['x'])
+            self.hists[histname].Fill(self.hcalTools.xy_residuals[plane]['x'])
+            self.hists[f'dx_allEvents_plane{plane}'].Fill(self.hcalTools.xy_residuals[plane]['x'])
         
-        if 'y' in self.xy_residuals[plane]:
+        if 'y' in self.hcalTools.xy_residuals[plane]:
             histname = f'dy_{self.muonhistkey}_plane{plane}'
-            self.hists[histname].Fill(self.xy_residuals[plane]['y'])
-            self.hists[f'dy_allEvents_plane{plane}'].Fill(self.xy_residuals[plane]['y'])
+            self.hists[histname].Fill(self.hcalTools.xy_residuals[plane]['y'])
+            self.hists[f'dy_allEvents_plane{plane}'].Fill(self.hcalTools.xy_residuals[plane]['y'])
         
-        if 'x' in self.xy_residuals[plane] and 'y' in self.xy_residuals[plane]:
-            dx, dy = self.xy_residuals[plane]['x'], self.xy_residuals[plane]['y']
+        if 'x' in self.hcalTools.xy_residuals[plane] and 'y' in self.hcalTools.xy_residuals[plane]:
+            dx, dy = self.hcalTools.xy_residuals[plane]['x'], self.hcalTools.xy_residuals[plane]['y']
             ds = np.sqrt(dx**2 + dy**2)
             histname = f'ds_{self.muonhistkey}_plane{plane}'
             self.hists[histname].Fill(ds)
+<<<<<<< HEAD
             self.hists[f'ds_allEvents_plane{plane}'].Fill(ds)                          
 
     def InAcceptance(self, line, proj):
@@ -895,17 +899,20 @@ class QuarkVectorExtrapolation(object):
             if not 'yB' in self.barycentres[plane]['y-barycentre']:return
             b=self.barycentres[plane]['y-barycentre']['yB']
         return b
+=======
+            self.hists[f'ds_allEvents_plane{plane}'].Fill(ds)
+>>>>>>> 6209bb093 (Updates to fix chi2 in data)
 
     def GetLambda(self, plane, proj):
         if proj=='x': 
-            if plane not in self.xbarycentres: return
-            if not 'lambda_x' in self.xbarycentres[plane]:return
-            b=self.xbarycentres[plane]['lambda_x']
+            if plane not in self.hcalTools.xbarycentres: return
+            if not 'lambda_x' in self.hcalTools.xbarycentres[plane]:return
+            b=self.hcalTools.xbarycentres[plane]['lambda_x']
         elif proj=='y': 
-            if plane not in self.barycentres: return
-            if not 'y-barycentre' in self.barycentres[plane]:return
-            if not 'lambda_y' in self.barycentres[plane]['y-barycentre']:return
-            b=self.barycentres[plane]['y-barycentre']['lambda_y']
+            if plane not in self.hcalTools.barycentres: return
+            if not 'y-barycentre' in self.hcalTools.barycentres[plane]:return
+            if not 'lambda_y' in self.hcalTools.barycentres[plane]['y-barycentre']:return
+            b=self.hcalTools.barycentres[plane]['y-barycentre']['lambda_y']
         return b        
 
     def GetMultiplicity(self, hits):
@@ -932,11 +939,14 @@ class QuarkVectorExtrapolation(object):
         if self.eventHasMuon: self.hists[f'USmultiplicity_wMuon_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
         elif not self.eventHasMuon: self.hists[f'USmultiplicity_woMuon_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
         self.hists[f'USmultiplicity_allEvents_plane{plane}'].Fill(self.multiplicity_dict[2][plane])
+<<<<<<< HEAD
         
     def RecordEventNr(self):
         fired_planes=list(self.DS_points.keys())
         event_data = [self.options.fname, self.tw.M.EventNumber, len(fired_planes)]
         self.eventswithcombinations.append(event_data)
+=======
+>>>>>>> 6209bb093 (Updates to fix chi2 in data)
 
     def WriteOutHistograms(self):
 
@@ -1007,7 +1017,7 @@ class QuarkVectorExtrapolation(object):
         outfile.Close()
         print(f'{len(self.hists)} histograms saved to {outfilename}')   
 
-        print(f'Data written to {self.datafilename}') 
+        print(f'Data written to {self.hcalTools.datafilename}') 
 
 class EMRresults(object):
     def __init__(self):

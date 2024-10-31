@@ -161,6 +161,7 @@ class TimeWalk(ROOT.FairTask):
             from extendedmuonreconstruction import QuarkVectorExtrapolation as QuarkVectorExtrapolation
             self.qve = QuarkVectorExtrapolation(options, self)
 
+
         with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
             self.histformatting=json.load(x)  
 
@@ -272,8 +273,6 @@ class TimeWalk(ROOT.FairTask):
             # self.reft = self.muAna.GetScifiAverageTime(self.Scifi, scifi_hits)
             self.sa.ReconstructMuonPosition(hits)
             return        
-
-        # Everything from here on requires a track found in the reference system (Scifi or DS)
 
         ### Slope cut
         if self.slopecut(): self.passslopecut=True 

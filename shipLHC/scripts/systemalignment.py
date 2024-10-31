@@ -129,10 +129,12 @@ class SystemAlignment(object):
                 self.hists[SiPMcut_averagebarsidetimehistname]=ROOT.TH2F(SiPMcut_averagebarsidetimehistname, title, 110, -100, 10, 2000, -5, 5)                
             if self.muAna.AllLiveSiPMs(hit):
             # if nleft>=4 and nright>=4:
-<<<<<<< HEAD
                 self.hists[SiPMcut_averagebarsidetimehistname].Fill(self.tw.Ex[p].x(), tofa_averages[side])
-=======
-                self.hists[SiPMcut_averagebarsidetimehistname].Fill(self.tw.Ex.x(), tofa_averages[side])
+
+    def ReconstructMuonPosition(self, hits):
+
+        barycentres=self.muAna.GetBarycentres(hits)
+>>>>>>> 6209bb093 (Updates to fix chi2 in data)
         x_methods_dict={mode:self.muAna.GetOverallXBarycentre(barycentres, mode=mode) for mode in ('relQDC', 'maxQDC')}
 
         for plane in barycentres:

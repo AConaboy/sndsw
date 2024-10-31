@@ -6,7 +6,6 @@ from pathlib import Path
 from tqdm import tqdm
 from argparse import ArgumentParser
 
-
 LUMI = 68.551
 
 # SCALE TOTAL HADRON CONTRIBUTION TO THIS NUMBER. THIS IS the 90% upper limit OBTAINED FROM muonDISlumiCalc.py)
@@ -193,8 +192,7 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
         # Temporary fix! 
         if len(selHits)==1: continue
 
-        if mode=='fixed':
-            slopev, slopeh, reducedchi2v, reducedchi2h, reducedchi2both = getSciFiAngle(selHits)
+        slopev, slopeh, reducedchi2v, reducedchi2h, reducedchi2both = getSciFiAngle(selHits)
 
         i_flav = 0
         if isNuMC:
@@ -236,14 +234,13 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
         if not (isNuMC or isNeutralHad):
             selected_list.append("SELECTED {} {} {} {}".format(i_event, event.EventHeader.GetRunId(), event.EventHeader.GetEventNumber(), dens_sel))
 
-        if mode=='fixed':
-            h_SciFiAngle[i_flav].Fill(slopev, slopeh, weight)
-            h_SciFiAngle_v_chi2[i_flav].Fill(slopev, reducedchi2v, weight)
-            h_SciFiAngle_h_chi2[i_flav].Fill(slopeh, reducedchi2h, weight)
+        h_SciFiAngle[i_flav].Fill(slopev, slopeh, weight)
+        h_SciFiAngle_v_chi2[i_flav].Fill(slopev, reducedchi2v, weight)
+        h_SciFiAngle_h_chi2[i_flav].Fill(slopeh, reducedchi2h, weight)
 
-            theta = (ROOT.TMath.ATan(slopev)**2 + ROOT.TMath.ATan(slopeh)**2)**0.5
+        theta = (ROOT.TMath.ATan(slopev)**2 + ROOT.TMath.ATan(slopeh)**2)**0.5
 
-            h_theta[i_flav].Fill(theta, weight)
+        h_theta[i_flav].Fill(theta, weight)
         
         h_n_hits_sel[i_flav].Fill(len(selHits), weight)
     
