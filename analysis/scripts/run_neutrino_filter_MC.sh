@@ -23,6 +23,8 @@ if [[ ! ${mode_list[@]} =~ $MODE ]]; then
     exit
 fi
 
+echo cut set $cut_set for mode $mode
+
 if [ "$mode" == "nueFilter" ]; then 
 
 	# Run first stage filter

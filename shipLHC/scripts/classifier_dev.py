@@ -5,18 +5,20 @@ import ast, os, csv, shutil
 datapath = '/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/nue-extendedreconstruction/'
 # cols=['filekey','EventNumber','hasMuon','DSmult0x','DSmult0y','DSmult1x','DSmult1y','USmult3','USmult4','dx3','dy3','dx4','dy4','lambdax3','lambdax4','lambday3','lambday4']
 column_names=['filekey', 'EventNumber','hasMuon','interactionWall',
-            'scifi_median_x','scifi_median_y','scifi_residual_x','scifi_residual_y',
-            'dx0','dx1','dx2','dx3','dx4',
-            'dy0','dy1','dy2','dy3','dy4',
-            'x0','x1','x2','x3','x4',
-            'y0','y1','y2','y3','y4',
-            'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
-            'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-            'HCAL5barcode'
-            ]
+'scifi_median_x','scifi_median_y',
+'scifi_residual_x','scifi_residual_y',
+'dx0','dx1','dx2','dx3','dx4',
+'dy0','dy1','dy2','dy3','dy4',
+'ds0','ds1','ds2','ds3','ds4', 'ds_scifi',
+'x0','x1','x2','x3','x4',
+'y0','y1','y2','y3','y4',
+'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
+'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
+'HCAL5barcode'
+]
 
 def GetFiles():
-    all_files = [i for i in os.listdir(datapath) if all([i.endswith('.csv'), i.find('total')==-1, i.find('FNs')==i.find('FPs')])]
+    all_files = [i for i in os.listdir(datapath) if all([i.endswith('.csv'), i.find('total')==-1, i.find('FNs')==i.find('FPs')==i.find('TPs')])]
     return all_files
 
 def MakeDf(all_files):
@@ -66,7 +68,7 @@ def DoAll():
 def MakeFalseNegPosDirectories():
 
     # Define the source folders
-    source_folders = ['/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalseNegatives/', '/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalsePositives/']
+    source_folders = ['/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalseNegatives/', '/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalsePositives/', '/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/TruePositives/']
     # Define the destination folder
     destination_folder = '/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/'
 
@@ -86,6 +88,7 @@ def MakeFalseNegPosDirectories():
 
     FNs=[]
     FPs=[]
+    TPs=[]
     with open('/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/nue-extendedreconstruction/extendedreconstruction_FNs.csv') as f:
         reader=csv.reader(f)
         next(reader)
@@ -94,6 +97,10 @@ def MakeFalseNegPosDirectories():
         reader=csv.reader(f)
         next(reader)
         [FPs.append(r) for r in reader]
+    with open('/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/nue-extendedreconstruction/extendedreconstruction_TPs.csv') as f:
+        reader=csv.reader(f)
+        next(reader)
+        [TPs.append(r) for r in reader]    
 
     eventdisplays = os.listdir('/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays')
     nuefilter_events = [i for i in eventdisplays if all([i.endswith('png'), i.find('nueFilter')==0])]
@@ -112,6 +119,12 @@ def MakeFalseNegPosDirectories():
                 os.rename(f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/nueFilter_{FP_key}_{FP_event}.png', 
                         f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalsePositives/nueFilter_{FP_key}_{FP_event}.png')             
                 print(f'Moved event display file {FP_key}, event {FP_event} into FP folder')
+
+        for TP_key,TP_event in TPs:
+            if TP_key==filekey and TP_event==eventNumber: 
+                os.rename(f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/nueFilter_{TP_key}_{TP_event}.png',
+                        f'/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/FalsePositives/nueFilter_{TP_key}_{TP_event}.png')             
+                print(f'Moved event display file {TP_key}, event {TP_event} into FP folder')
 
 
 

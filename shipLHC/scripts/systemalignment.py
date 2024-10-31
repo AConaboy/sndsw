@@ -53,8 +53,9 @@ class SystemAlignment(object):
 
     def FillSiPMHists(self, hit):
         detID=hit.GetDetectorID()
+        s,p,b=self.muAna.parseDetID(detID)
 
-        if not self.simulation: correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.Ex.x(), mode='aligned')
+        if not self.simulation: correctedtimes=self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=self.tw.Ex[p].x(), mode='aligned')
         else: correctedtimes=hit.GetAllTimes()
 
         for ch in correctedtimes:
@@ -82,11 +83,11 @@ class SystemAlignment(object):
         x_midpoint = 0.5 * (self.A.x() + self.B.x())        
 
         if not self.simulation:
-            correctedtimes = self.muAna.GetCorrectedTimes(hit, x=0, mode='aligned')
-            tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex.x(), mode='aligned')
+            correctedtimes = self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=0, mode='aligned')
+            tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=self.tw.Ex[p].x(), mode='aligned')
         else: 
             correctedtimes = hit.GetAllTimes()
-            tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex.x(), mode='tof')
+            tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex[p].x(), mode='tof')
 
         aligned_times={'left':{}, 'right':{}}
         tofaligned_times={'left':{}, 'right':{}}
@@ -113,7 +114,7 @@ class SystemAlignment(object):
         if not averagebartimehistname in self.hists:
             title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average of aligned times from each side as a function of x_{predicted};x_{predicted} [cm];'+'#frac{1}{2}#times(t^{DS,TW}_{left}+t^{DS,TW}_{right}) [ns];Counts'
             self.hists[averagebartimehistname]=ROOT.TH2F(averagebartimehistname, title, 110, -100, 10, 2000, -5, 5)
-        self.hists[averagebartimehistname].Fill(self.tw.Ex.x(), averagetime)
+        self.hists[averagebartimehistname].Fill(self.tw.Ex[p].x(), averagetime)
 
         for side in ('left', 'right'):
             averagebarsidetimehistname=f'sidetime_{detID}-{side}_aligned'
@@ -121,14 +122,14 @@ class SystemAlignment(object):
             if not averagebarsidetimehistname in self.hists:
                 title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average aligned + ToF corr time from '+side+' side as a function of x_{predicted};x_{predicted} [cm];'+ side+' side average of t^{DS,TW}_{'+side+'} [ns];Counts'
                 self.hists[averagebarsidetimehistname]=ROOT.TH2F(averagebarsidetimehistname, title, 110, -100, 10, 2000, -5, 5)
-            self.hists[averagebarsidetimehistname].Fill(self.tw.Ex.x(), tofa_averages[side])
+            self.hists[averagebarsidetimehistname].Fill(self.tw.Ex[p].x(), tofa_averages[side])
             
             if not SiPMcut_averagebarsidetimehistname in self.hists:
                 title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average aligned + ToF corr time from '+side+' side as a function of x_{predicted};x_{predicted} [cm];'+ side+' side average of t^{DS,TW}_{'+side+'} [ns];Counts'
                 self.hists[SiPMcut_averagebarsidetimehistname]=ROOT.TH2F(SiPMcut_averagebarsidetimehistname, title, 110, -100, 10, 2000, -5, 5)                
             if self.muAna.AllLiveSiPMs(hit):
             # if nleft>=4 and nright>=4:
-                self.hists[SiPMcut_averagebarsidetimehistname].Fill(self.tw.Ex.x(), tofa_averages[side])
+                self.hists[SiPMcut_averagebarsidetimehistname].Fill(self.tw.Ex[p].x(), tofa_averages[side])
 
     def ReconstructMuonPosition(self, hits):
 
@@ -186,7 +187,7 @@ class SystemAlignment(object):
     def ScifiCorrectedTimes(self, hit):
         detID=hit.GetDetectorID()
 
-        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.Ex.x(), mode='aligned')
+        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.Ex[p].x(), mode='aligned')
     
         for ch in correctedtimes:
             SiPM, time=ch
@@ -207,7 +208,7 @@ class SystemAlignment(object):
 
     def XTHists(self, hit):
 
-        correctedtimes, qdcs = self.muAna.GetCorrectedTimes(hit, self.tw.Ex.x(), mode='aligned'), hit.GetAllSignals()
+        correctedtimes, qdcs = self.muAna.GetCorrectedTimes(hit, self.tw.Ex[p].x(), mode='aligned'), hit.GetAllSignals()
         times={'left':{}, 'right':{}}
         detID=hit.GetDetectorID()
         s,p,b = self.muAna.parseDetID(detID)

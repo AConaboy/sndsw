@@ -37,12 +37,14 @@ class Analysis(object):
 				self.path=afswork+'-H8/'
 
 			self.referencesystem=options.referencesystem
-			self.refsysname='DS' if self.referencesystem==3 else 'SF'	
+			self.refsysname='DS' if self.referencesystem==3 else 'SF'
 			
 			if options.numuStudy: self.Get_numuevents()			
 
 		self.correctionparams=lambda ps : [y for x,y in enumerate(ps) if x%2==0]
+		
 		self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
+		
 		self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
 		self.systemAndPlanes = {1:2,2:5,3:7}
 		self.systemAndBars = {1:7,2:10,3:60}
@@ -264,21 +266,8 @@ class Analysis(object):
 		averagetime = sum(times) / len(times)
 		return averagetime
 
-	def GetBarycentres(self, hits, **kwargs):
-
-		"""
-		Adding some kwargs for using when the analysis instance
-		isn't connected to a FairTask
-		"""
-
-		mufilter=kwargs.get("MuFilter")
-		if "hasTrack" in kwargs: hasTrack=kwargs.get("hasTrack")
-		else: hasTrack=False
-
-		if not hasattr(self, "barlengths"): self.BuildBarLengths(mufilter)
-
-		barycentres=dict.fromkeys([i for i in range(5)], {})
-		planewise_data = dict.fromkeys([i for i in range(5)], {})
+	def GetPlaneData(self, hits, mufilter):
+		planewise_data = {i:{} for i in range(5)}
 
 		# Group hits by plane
 		for hit in hits:
@@ -305,16 +294,33 @@ class Analysis(object):
 			averagecscint_left, averagecscint_right = self.GetBarAveragecscint(mufilter, detID)
 			if abs(atimes_left_mean) > self.barlengths[2]/2 / averagecscint_left[0] or abs(atimes_right_mean) > self.barlengths[2]/2 / averagecscint_right[0]: continue
 
-			if not p in planewise_data: planewise_data[p]={}
 			planewise_data[p][detID] = {}
-
 			planewise_data[p][detID]['bar-QDC'] = self.GetTotalQDC(hit.GetAllSignals())
 
 			planewise_data[p][detID]['atimes-left'] = atimes_left_mean
 			planewise_data[p][detID]['atimes-right'] = atimes_right_mean
 
 			planewise_data[p][detID]['cscint-left'] = averagecscint_left
-			planewise_data[p][detID]['cscint-right'] = averagecscint_right
+			planewise_data[p][detID]['cscint-right'] = averagecscint_right	
+
+		return planewise_data	
+
+	def GetBarycentres(self, hits, **kwargs):
+
+		"""
+		Adding some kwargs for using when the analysis instance
+		isn't connected to a FairTask
+		"""
+
+		mufilter=kwargs.get("MuFilter")
+		if "hasTrack" in kwargs: hasTrack=kwargs.get("hasTrack")
+		else: hasTrack=False
+
+		if not hasattr(self, "barlengths"): self.BuildBarLengths(mufilter)
+
+		barycentres={i:{} for i in range(5)}
+
+		planewise_data = self.GetPlaneData(hits, mufilter)
 
 		for plane in planewise_data:
 			pdata = planewise_data[plane]
@@ -1250,38 +1256,18 @@ class Analysis(object):
 			json.dump(self.timeresolutiondict, json_file, indent=4)
 		print(f'Time resolution dict written to {filename}')
 
-
-	def GetPolyParams(self, fixed_ch, runNr='005408', state='uncorrected', n=5, mode='json'):
-		fname=f'{self.path}Polyparams/run{runNr}/polyparams{n}_{fixed_ch}.{mode}'
+	def GetPolyParams(self, fixed_ch, runNr='005408'):
+		fname=f'{self.path}Polyparams/run{runNr}/polyparams5_{fixed_ch}.json'
 		if not os.path.exists(fname): 
 			return 
-		
-		if mode=='csv':
-			iteration=0 if state=='uncorrected' else 1
-			with open(fname, 'r') as f:
-				reader=csv.reader(f)
-				alldata=[r for r in reader]
-				if len(alldata)==0:return
-				data=alldata[iteration]
-			
-			if n==4:		
-				params=[float(i) for i in data[1:11]]
-				limits=[float(i) for i in data[11:13]]
-				# if len(data)==15: tds0mean=[float(i) for i in data[13:]]
-			elif n==5:
-				params=[float(i) for i in data[1:13]]
-				limits=[float(i) for i in data[13:15]]
-				# tds0mean=[float(i) for i in data[15:]]
-			return params,limits
-		
-		elif mode=='json':	
-			with open(fname, 'r') as f:			
-				alldata = json.load(f)
-				data=alldata[state]
-			if n==5:
-				params=[float(i) for i in data[1:13]]
-				limits=[float(i) for i in data[13:15]]
-			return params, limits
+
+		with open(fname, 'r') as f:			
+			alldata = json.load(f)
+			data=alldata['uncorrected']
+
+		params=[float(i) for i in data[1:13]]
+		limits=[float(i) for i in data[13:15]]
+		return params, limits
 
 	def Gettds0relativetime(self, runNr, fixed_ch, mode='mean', state='uncorrected', n=5):
 		
@@ -1478,6 +1464,8 @@ class Analysis(object):
 		detID=int(fixed_ch.split('_')[0])
 		SiPM=int(fixed_ch.split('_')[-1])
 
+		# print(f'time: {clock*6.25}, x: {xEx}')
+
 		# Correct to the centre of the bar in the physics FoR
 		MuFilter.GetPosition(detID, self.A, self.B)	
 		xref = 0.5 * (self.A.x() + self.B.x())
@@ -1489,13 +1477,18 @@ class Analysis(object):
 		# fixed_subsystem, fixed_plane, fixed_bar, fixed_SiPM = fixed
 		time=clock*self.TDC2ns
 		ToFcorrection=(xEx-xref)/c_SiPM
+		# ToFcorrection=(xEx)/c_SiPM
 
 		if SiPM<8: corrected_t = time + ToFcorrection
 		else: corrected_t = time - ToFcorrection
 
 		return (SiPM, corrected_t)
 
-	def GetCorrectedTimes(self, hit, x=0, mode='unaligned'):
+	def GetCorrectedTimes(self, hit, **kwargs):
+
+		x=kwargs.get('x', 0)
+		mufilter=kwargs.get('MuFilter')
+		mode=kwargs.get('mode', 'aligned')
 
 		detID=hit.GetDetectorID()
 
@@ -1509,15 +1502,16 @@ class Analysis(object):
 			if mode == 'tof': qdc=-1
 			else: qdc=self.GetChannelVal(SiPM, qdcs)
 
-			correctedtime=self.MuFilterCorrectedTime(fixed_ch, qdc, clock, x)
-			if not correctedtime: continue
+			correctedtime=self.MuFilterCorrectedTime(mufilter, fixed_ch, qdc, clock, x)
+			if not correctedtime: continue			
 			if mode=='aligned' and not self.simulation: 
 				d = self.alignmentparameters[f'{detID}_{SiPM}']
+				# print(f'reft-twtoft: {self.task.reft-correctedtime}, d: {d[0]}')				
 				correctedtime = self.task.reft - correctedtime - d[0]
 			alignedtimes.append((SiPM, correctedtime))
 		return alignedtimes
 
-	def MuFilterCorrectedTime(self, fixed_ch, qdc, clock, x=0):
+	def MuFilterCorrectedTime(self, MuFilter, fixed_ch, qdc, clock, x=0):
 		
 		time=clock*self.TDC2ns
 		if not self.simulation:
@@ -1534,7 +1528,7 @@ class Analysis(object):
 			if x==0:
 				ToFcorrectedtime=time
 			else: 
-				ToFcorrectedtime=self.correct_ToF(fixed_ch, clock, x)[1]
+				ToFcorrectedtime=self.correct_ToF(MuFilter, fixed_ch, clock, x)[1]
 
 			# No timewalk correction if -1 passed as qdc (used for simulation data)
 			if qdc==-1:
@@ -1545,6 +1539,9 @@ class Analysis(object):
 				twcorrection=self.correctionfunction(twparams, qdc)
 				ToFTWcorrectedtime=ToFcorrectedtime+twcorrection		
 
+			# print(f'x: {x}, time: {clock*6.25}, ToF t: {ToFcorrectedtime}, tw corr: {twcorrection}')
+			# print(f'Event number: {self.task.M.EventNumber}, x: {x}, time: {clock*6.25}, ToF t: {ToFcorrectedtime}, qdc: {qdc}, tw corr: {twcorrection}')
+			# print(f'time: {clock*6.25}, qdc: {qdc}, tw corr: {twcorrection}')			
 			return ToFTWcorrectedtime
 
 		else: 
@@ -1809,7 +1806,7 @@ class Analysis(object):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-						tmp=self.GetPolyParams(fixed_ch, state='uncorrected', n=self.CorrectionType)
+						tmp=self.GetPolyParams(fixed_ch)
 						if not tmp: 
 							print(f'No tw params for {fixed_ch}')
 							continue

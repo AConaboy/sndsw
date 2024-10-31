@@ -6,8 +6,6 @@ from pathlib import Path
 from tqdm import tqdm
 from argparse import ArgumentParser
 
-
-
 LUMI = 68.551
 
 # SCALE TOTAL HADRON CONTRIBUTION TO THIS NUMBER. THIS IS the 90% upper limit OBTAINED FROM muonDISlumiCalc.py)
@@ -25,18 +23,19 @@ muFilterDet = ROOT.gROOT.GetListOfGlobals().FindObject('MuFilter')
 from sciFiTools import *
 
 """
-Hacky way of determining BDT features until I incorportate barycentre determination into the mufilter & mufilter hit code
+Hacky way of determining BDT features until barycentre determination is incorportated into the mufilter & mufilter hit code
 
 1. Make sure simulation flag changes
 2. Load in correction and alignment parameters for the data
 3. Make sure the alignment parameters change depending on the time alignment
-
 """
+
 import Monitor, TimeWalk, SndlhcTracking, joblib, json
 from args_config import add_arguments
 from AnalysisFunctions import Analysis
 
 parser=ArgumentParser()
+parser.add_argument("--BDTcut", dest="BDTcut", help="bool for applying BDT cut", action='store_true')
 add_arguments(parser)
 options = parser.parse_args()
 
@@ -47,13 +46,18 @@ options.referencesystem=1 # Use Scifi alignment
 muAna = Analysis(options)
 
 from HCALTools import HCALTools
+import xgboost as xgb
 hcalTools = HCALTools(muAna, muFilterDet)
-# Load in trained BDT
-hcalTools.model = joblib.load('/eos/home-a/aconsnd/SWAN_projects/Data analysis/bdt_model.pkl')
 hcalTools.filekey=0
-with open('/eos/home-a/aconsnd/SWAN_projects/Data analysis/best_BDTparams.json') as jf:
-    best_BDTparams = json.load(jf)
-hcalTools.BDT_features = best_BDTparams['features']
+
+# Load in trained BDT
+hcalTools.model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+hcalTools.model.load_model('/eos/home-a/aconsnd/SWAN_projects/Data analysis/bdt_model.json')
+
+# Load in the features used to train the bdt
+# with open('/eos/home-a/aconsnd/SWAN_projects/Data analysis/bdt_features.json') as jf:
+#     hcalTools.BDT_features = json.load(jf)
+
 # Tell muAna to look for reference time in hcalTools
 muAna.SetTask(hcalTools)
 
@@ -65,6 +69,7 @@ N_MC_FILES=400
 """
 For the Monte Carlo, use the MC that has been redigitised with the new timing digitisation that is compatible with data.
 """
+
 chMC = ROOT.TChain("cbmsim")
 # chMC.Add((BASE_FILTERED_DIR / "nuMC" / "filtered_stage1.root").as_posix())
 redigitisedMC_path = '/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/sndlhc_13TeV_down_volTarget_100fb-1_SNDG18_02a_01_000/nueFilter/'
@@ -75,7 +80,7 @@ for fname in allfiles:
 chNeutral = ROOT.TChain("cbmsim")
 chNeutral.Add("/afs/cern.ch/work/c/cvilela/public/SND_Nov_2023/sndsw/analysis/scripts/neutron_kaon_nue_stage1_noprescale.root")
 
-def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False, 
+def makePlots(ch, BDT_cut, name = "", isNuMC = False, 
             isNeutralHad = False, preselection = 1.):
     n = [0]*5
 
@@ -135,7 +140,7 @@ def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False,
     
     for i_event, event in tqdm(enumerate(ch)):
 
-        print(f'event {i_event}')
+        # print(f'event {i_event}')
 
         if preselection < 1.:
             if random.random() > preselection:
@@ -146,18 +151,25 @@ def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False,
             muFilterDet.InitEvent(event.EventHeader)
 
         if BDT_cut:
-            ### Adding BDT cut
+
             if ch.GetName()=='cbmsim':
-                hcalTools.setsimulation(True)
+                hcalTools.setsimulation(True) # Set simulation bool for hcalTools.muAna as well
                 hcalTools.eventHasMuon=hcalTools.OutgoingMuon(event)
             elif ch.GetName()=='rawConv':
-                runNr = event.EventHeader.GetRunId()
-                hcalTools.setsimulation(False, runNr)
+                runNr = event.EventHeader.GetRunId() 
+                hcalTools.setsimulation(False, runNr) # For real data, ensure the correct timewalk and time alignment parameters are being used
             hcalTools.EventNumber=i_event 
 
+            """
+            Determines all the features needed for the BDT (list at: hcalTools.model.feature_names_in)
+            To determine these features hcalTools is in the sndsw/python/ directory and utilises the barycentre and lambda methods in
+            sndsw/python/AnalysisFunctions.py. These should eventually be incorporated into the MuFilter class. 
+            """
             bdt_pred=hcalTools.BDT_cut(event, muFilterDet,scifiDet)
             
-            if bdt_pred: continue
+            if bdt_pred: 
+                print(f'BDT cut event {i_event}')
+                continue
 
         weight = 1
 
@@ -180,8 +192,7 @@ def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False,
         # Temporary fix! 
         if len(selHits)==1: continue
 
-        if mode=='fixed':
-            slopev, slopeh, reducedchi2v, reducedchi2h, reducedchi2both = getSciFiAngle(selHits)
+        slopev, slopeh, reducedchi2v, reducedchi2h, reducedchi2both = getSciFiAngle(selHits)
 
         i_flav = 0
         if isNuMC:
@@ -201,10 +212,9 @@ def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False,
                     i_flav = 4 #nutauCC1mu
                 else:
                     i_flav = 3 #nutauCC0mu
-
-        if mode=='fixed':        
-            h_min_chi2[i_flav].Fill(min(reducedchi2v, reducedchi2h), weight)
-            h_log_min_chi2[i_flav].Fill(ROOT.TMath.Log(min(reducedchi2v, reducedchi2h)), weight)
+  
+        h_min_chi2[i_flav].Fill(min(reducedchi2v, reducedchi2h), weight)
+        h_log_min_chi2[i_flav].Fill(ROOT.TMath.Log(min(reducedchi2v, reducedchi2h)), weight)
 
         dens_sel, dens_sel2 = getSumDensity(selHits, return_2ndhighest = True)
         h_hit_density_sel_precut[i_flav].Fill(dens_sel, weight)
@@ -224,14 +234,13 @@ def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False,
         if not (isNuMC or isNeutralHad):
             selected_list.append("SELECTED {} {} {} {}".format(i_event, event.EventHeader.GetRunId(), event.EventHeader.GetEventNumber(), dens_sel))
 
-        if mode=='fixed':
-            h_SciFiAngle[i_flav].Fill(slopev, slopeh, weight)
-            h_SciFiAngle_v_chi2[i_flav].Fill(slopev, reducedchi2v, weight)
-            h_SciFiAngle_h_chi2[i_flav].Fill(slopeh, reducedchi2h, weight)
+        h_SciFiAngle[i_flav].Fill(slopev, slopeh, weight)
+        h_SciFiAngle_v_chi2[i_flav].Fill(slopev, reducedchi2v, weight)
+        h_SciFiAngle_h_chi2[i_flav].Fill(slopeh, reducedchi2h, weight)
 
-            theta = (ROOT.TMath.ATan(slopev)**2 + ROOT.TMath.ATan(slopeh)**2)**0.5
+        theta = (ROOT.TMath.ATan(slopev)**2 + ROOT.TMath.ATan(slopeh)**2)**0.5
 
-            h_theta[i_flav].Fill(theta, weight)
+        h_theta[i_flav].Fill(theta, weight)
         
         h_n_hits_sel[i_flav].Fill(len(selHits), weight)
     
@@ -251,19 +260,16 @@ def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False,
         h_log_hit_density_sel[i_flav].Fill(ROOT.TMath.Log(dens_sel), weight)
 
         
-        if mode=='fixed':
+        h_theta_density[i_flav].Fill(theta, dens_sel, weight)
 
-            h_theta_density[i_flav].Fill(theta, dens_sel, weight)
+        try:
+            tdiff_list.append(tdiff(selHits, event.Digi_MuFilterHits, (isNuMC or isNeutralHad)))
+        except ZeroDivisionError:
+            tdiff_list.append(-999)
+        max_slope_list.append(max(abs(slopev), abs(slopeh)))
 
-            try:
-                tdiff_list.append(tdiff(selHits, event.Digi_MuFilterHits, (isNuMC or isNeutralHad)))
-            except ZeroDivisionError:
-                tdiff_list.append(-999)
-            max_slope_list.append(max(abs(slopev), abs(slopeh)))
-
-    if mode=='fixed':
-        for i_sel, sel in enumerate(selected_list):
-            print(sel, tdiff_list[i_sel], max_slope_list[i_sel])
+    for i_sel, sel in enumerate(selected_list):
+        print(sel, tdiff_list[i_sel], max_slope_list[i_sel])
 
     if isNeutralHad:
         for i_hist in (h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens):
@@ -272,17 +278,19 @@ def makePlots(ch, mode='broken', BDT_cut=True, name = "", isNuMC = False,
         
     return (h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens)
 
-for isBDT_cut in (True, False):
+out_file_name = f"checkDataCuts_BDTcut{options.BDTcut}.root"
+out_file = ROOT.TFile(out_file_name, "RECREATE")
 
-    out_file = ROOT.TFile(f"checkDataCuts_BDTcut{isBDT_cut}.root", "RECREATE")
+print(f'Making plots with data:\n')
+plots_data  = makePlots(ch, options.BDTcut)
+print(f'Making plots with neutrino MC:\n')
+plots_MC = makePlots(chMC, options.BDTcut, isNuMC = True, name = "_MC")
+print(f'Making plots with neutral hadron MC:\n')
+plots_hadMC = makePlots(chNeutral, options.BDTcut, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
 
-    plots_data  = makePlots(ch, BDT_cut=isBDT_cut)
-    plots_MC = makePlots(chMC, BDT_cut=isBDT_cut, isNuMC = True, name = "_MC")
-    plots_hadMC = makePlots(chNeutral, BDT_cut=isBDT_cut, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
-
-    out_file.Write()
-    out_file.Close()
-    print(f'File for BDT_cut {isBDT_cut} written')
+out_file.Write()
+out_file.Close()
+print(f'File for BDT_cut {options.BDTcut} written to {out_file_name}')
 
 def testing(ch, i):
     ch.GetEvent(i)

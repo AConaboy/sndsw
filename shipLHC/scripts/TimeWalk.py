@@ -66,6 +66,7 @@ class TimeWalk(ROOT.FairTask):
         else:
             self.referencesystem=options.referencesystem
             self.mode=options.mode
+        self.refsysname='DS' if self.referencesystem==3 else 'SF'   
 
         if options.path.find('commissioning/TI18')>0:
             self.outpath=options.afswork+'-commissioning/'
@@ -90,8 +91,8 @@ class TimeWalk(ROOT.FairTask):
             self.cutdists=self.muAna.GetCutDistributions("005408", ('dy'))
 
         elif not self.simulation:
-            statedict={'zeroth':'uncorrected', 'ToF':'uncorrected',
-                        'TW':'corrected', 'res':'corrected', 
+            statedict={'zeroth':'uncorrected', 'tof':'uncorrected',
+                        'tw':'corrected', 'res':'corrected', 
                         'selectioncriteria':'corrected',
                         'systemalignment':'corrected',
                         'reconstructmuonposition':'corrected',
@@ -111,9 +112,7 @@ class TimeWalk(ROOT.FairTask):
 
             self.correctionparams=lambda ps : [y for x,y in enumerate(ps) if x%2==0]
             
-            if options.CorrectionType==1: self.correctionfunction = lambda ps, qdc : 1/sum( [ ps[i]*qdc**i for i in range(len(ps)) ] ) 
-            elif options.CorrectionType==4: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) )
-            elif options.CorrectionType==5: self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
+            self.correctionfunction = lambda ps, qdc : ps[3]*(qdc-ps[0])/( ps[1] + ps[2]*(qdc-ps[0])*(qdc-ps[0]) ) + ps[4]*(qdc-ps[0])
 
             if self.path=='H8': 
 
@@ -163,12 +162,13 @@ class TimeWalk(ROOT.FairTask):
             from extendedmuonreconstruction import QuarkVectorExtrapolation as QuarkVectorExtrapolation
             self.qve = QuarkVectorExtrapolation(options, self)
 
+
         with open(f'/afs/cern.ch/user/a/aconsnd/Timing/TWhistogramformatting.json', 'r') as x:
             self.histformatting=json.load(x)  
 
         self.notInDS=0
 
-        self.trackRequired=True if self.mode in('c0', 'tof', 'tw', 'res', 'systemalignment', 'reconstructmuonposition') else False
+        self.trackRequired=True if self.mode in('zeroth', 'tof', 'tw', 'res', 'systemalignment', 'reconstructmuonposition') else False
 
     def GetEntries(self):
         return self.eventTree.GetEntries()
@@ -219,7 +219,14 @@ class TimeWalk(ROOT.FairTask):
 
             self.pos=fstate.getPos()
             self.mom=fstate.getMom()
-            self.trackchi2NDF=fitStatus.getChi2()/fitStatus.getNdf()+1E-10   
+            self.trackchi2NDF=fitStatus.getChi2()/fitStatus.getNdf()+1E-10
+            self.chi2pndf_hist()
+
+            self.Ex = {}
+            for plane in range(5):
+                zEx=self.zPos['MuFilter'][20+plane]
+                lam=(zEx-self.pos.z())/self.mom.z()
+                self.Ex[plane]=ROOT.TVector3(self.pos.x()+lam*self.mom.x(), self.pos.y()+lam*self.mom.y(), self.pos.z()+lam*self.mom.z())
 
         # Get DS event t0
         if self.referencesystem==3 and self.hasTrack and not self.simulation:
@@ -264,8 +271,6 @@ class TimeWalk(ROOT.FairTask):
             self.sa.ReconstructMuonPosition(hits)
             return
 
-        # Everything from here on requires a track found in the reference system (Scifi or DS)
-
         ### Slope cut
         if self.slopecut(): self.passslopecut=True 
         else: self.passslopecut=False
@@ -286,9 +291,10 @@ class TimeWalk(ROOT.FairTask):
             if self.yresidual3(detID): self.trackrelated = True
             else: self.trackrelated=False
 
-            zEx=self.zPos['MuFilter'][s*10+p]
-            lam=(zEx-self.pos.z())/self.mom.z()
-            self.Ex=ROOT.TVector3(self.pos.x()+lam*self.mom.x(), self.pos.y()+lam*self.mom.y(), self.pos.z()+lam*self.mom.z())
+            # zEx=self.zPos['MuFilter'][s*10+p]
+            # lam=(zEx-self.pos.z())/self.mom.z()
+            # self.Ex=ROOT.TVector3(self.pos.x()+lam*self.mom.x(), self.pos.y()+lam*self.mom.y(), self.pos.z()+lam*self.mom.z())
+            # print(f'Ex: {self.Ex.x()}')
 
             if self.options.debug: self.trackevents.append(self.M.EventNumber)
 
@@ -303,9 +309,7 @@ class TimeWalk(ROOT.FairTask):
                 continue
 
             # Only investigate track related hits
-            if not self.trackrelated:continue 
-            # Apply slope cut, res of code block is for passing muons
-            if not self.passslopecut:continue
+            if not self.trackrelated:continue             
             
             for channel in channels_t:
                 SiPM,clock=channel
@@ -313,9 +317,18 @@ class TimeWalk(ROOT.FairTask):
                 if qdc==-999.: continue
                 fixed_ch=f'{detID}_{SiPM}'
                 if self.mode=='zeroth': self.zeroth(fixed_ch, clock, qdc)
-                elif self.mode=='ToF': self.ToF(fixed_ch, clock, qdc)
-                elif self.mode=='TW': self.TW(fixed_ch, clock, qdc, meantimecorrection=False)
+                elif self.mode=='tof': self.tof(fixed_ch, clock, qdc)
+                elif self.mode=='tw': self.tw(fixed_ch, clock, qdc, meantimecorrection=False)
                 elif self.mode=='res': self.res(fixed_ch, clock, qdc)
+
+    def chi2pndf_hist(self):
+        histname = 'reducedchi2'
+        if not histname in self.hists:
+            if self.referencesystem==3: tmp='muon system'
+            else: tmp='scifi'
+            title = 'Reduced #chi^{2} for tracks in '+tmp+';#chi^{2}_{#nu} [unitless];Counts'
+            self.hists[histname] = ROOT.TH1F(histname, title, 100, 0, 50)
+        self.hists[histname].Fill(self.trackchi2NDF)
 
     def FillChannelRateHists(self):
         hits=self.M.eventTree.Digi_MuFilterHits
@@ -356,7 +369,6 @@ class TimeWalk(ROOT.FairTask):
             axestitles=coord+'_{predicted} [cm];t_{0}^{DS}-t^{uncorr}_{SiPM} [ns]'
             fulltitle=splittitle+';'+axestitles
             histformat = self.histformatting["dtvxpred"][self.state]
-            # hists[dtvpred]=ROOT.TH2F(dtvpred,fulltitle,110,-10,100, 800, -20, 20.)
             hists[dtvpred]=ROOT.TH2F(dtvpred,fulltitle,*histformat[0], *histformat[1])
 
         attlen=f'attlen_{fixed_ch}_{self.state}'
@@ -368,10 +380,10 @@ class TimeWalk(ROOT.FairTask):
             fulltitle=splittitle+';'+axestitles 
             hists[attlen]=ROOT.TH2F(attlen,fulltitle, 110, 10, -100, 200, 0., 200)
         
-        self.hists[dtvpred].Fill(self.Ex.x(),t_rel)
-        self.hists[attlen].Fill(self.Ex.x(), qdc)
+        self.hists[dtvpred].Fill(self.Ex[p].x(),t_rel)
+        self.hists[attlen].Fill(self.Ex[p].x(), qdc)
 
-    def ToF(self, fixed_ch, clock, qdc):
+    def tof(self, fixed_ch, clock, qdc):
         hists=self.hists
         ReadableFixedCh=self.muAna.MakeHumanReadableFixedCh(fixed_ch)
 
@@ -380,8 +392,10 @@ class TimeWalk(ROOT.FairTask):
         cdata=self.muAna.cscintvalues[fixed_ch]
         # cdata=self.systemobservables[fixed_ch]['cscint']['uncorrected']
     
-        s, SiPM=int(fixed_ch[0]), int(fixed_ch.split('_')[-1])
-        ToFcorrectedtime=self.muAna.correct_ToF(fixed_ch, clock, self.Ex.x())[1]
+        detID, SiPM=fixed_ch.split('_')
+        s,p,b = self.muAna.parseDetID(int(detID))
+
+        ToFcorrectedtime=self.muAna.correct_ToF(self.MuFilter, fixed_ch, clock, self.Ex[p].x())[1]
         dtvqdc=f'dtvqdc_{fixed_ch}_{self.state}'
         if not dtvqdc in hists:
             subtitle='{No time-walk correction t_{0}^{DS}-t^{uncorr}_{SiPM} v QDC_{SiPM}};QDC_{SiPM} [a.u];t_{0}^{DS}-t^{uncorr}_{SiPM} [ns]'
@@ -392,12 +406,13 @@ class TimeWalk(ROOT.FairTask):
         t_rel=self.reft-ToFcorrectedtime
         self.hists[dtvqdc].Fill(qdc,t_rel)
 
-    def TW(self, fixed_ch, clock, qdc, meantimecorrection=False):
+    def tw(self, fixed_ch, clock, qdc, meantimecorrection=False):
         hists=self.hists
         ReadableFixedCh=self.muAna.MakeHumanReadableFixedCh(fixed_ch)
         
-        s=int(fixed_ch[0])
         detID, SiPM=int(fixed_ch.split('_')[0]), int(fixed_ch.split('_')[1])
+        s,p,b = self.muAna.parseDetID(detID)
+
         time=clock*self.TDC2ns
         
         ### Check if fixed_ch has tw corr params and a cscint value
@@ -422,20 +437,22 @@ class TimeWalk(ROOT.FairTask):
             histformat = self.histformatting['dtvxpred'][self.state]        
             hists[dtvxpred]=ROOT.TH2F(dtvxpred,title,*histformat[0], *histformat[1])          
     
-        hists[dtvxpred].Fill(self.Ex.x(), TWt_rel)
+        hists[dtvxpred].Fill(self.Ex[p].x(), TWt_rel)
         
     def res(self, fixed_ch, clock, qdc):
         
         hists=self.hists
         ReadableFixedCh=self.muAna.MakeHumanReadableFixedCh(fixed_ch)
         detID, SiPM = int(fixed_ch.split('_')[0]), int(fixed_ch.split('_')[1])
+        s,p,b=self.muAna.parseDetID(detID)
+
         ### Check if fixed_ch has tw corr params and a cscint value
         if any([fixed_ch not in self.muAna.twparameters, fixed_ch not in self.muAna.cscintvalues]): return 
 
         cdata=self.muAna.cscintvalues[fixed_ch]
         twparams=self.muAna.twparameters[fixed_ch]
 
-        ToFtime=self.muAna.correct_ToF(fixed_ch, clock, self.Ex.x())[1] # method returns (SiPM, ToF corrected time)
+        ToFtime=self.muAna.correct_ToF(self.MuFilter, fixed_ch, clock, self.Ex[p].x())[1] # method returns (SiPM, ToF corrected time)
         twcorrection = self.correctionfunction(twparams, qdc)
 
         ### TW corrected time then ToF & TW corrected time
@@ -525,7 +542,7 @@ class TimeWalk(ROOT.FairTask):
 
     def WriteOutHistograms(self):
 
-        if self.mode in ('zeroth', 'ToF', 'TW', 'res'):
+        if self.mode in ('zeroth', 'tof', 'tw', 'res'):
             for h in self.hists:
                 if len(h.split('_'))==4:
                     if len(h.split('_'))==4: histkey,detID,SiPM,state=h.split('_')
@@ -542,6 +559,8 @@ class TimeWalk(ROOT.FairTask):
                         if self.referencesystem==1:name='reft-Scifi'
                         else: name='reft-DS'
                         f.WriteObject(self.hists['reft'], name, 'kOverwrite')
+                        f.WriteObject(self.hists['reducedchi2'], 'reducedchi2', 'kOverwrite')             
+                
                     f.Close()
             print(f'{len(self.M.h)} histograms saved to {self.outpath}splitfiles/run{self.runNr}/fixed_ch')
         
@@ -624,13 +643,3 @@ class TimeWalk(ROOT.FairTask):
         slopeX, slopeY = self.mom.x()/self.mom.z(), self.mom.y()/self.mom.z()
         if abs(slopeX)>slopecut or abs(slopeY)>slopecut: return 0
         else: return 1
-
-    def TDS0cut(self):
-        if self.reft==-999. or self.reft==-998. or self.reft==-6237.5: return 0
-        TDS0ns=self.reft*self.TDC2ns
-        if TDS0ns<13.75 or TDS0ns>15.45: return 0
-        return TDS0ns 
-    
-    def GetDistanceToSiPM(self):
-        # vector A contains the midpoint of the left pointing (wall-side) face of the scintillator
-        return ROOT.TMath.Sqrt((self.A.x()-self.Ex.x())**2+(self.A.y()-self.Ex.y())**2+(self.A.z()-self.Ex.z())**2)

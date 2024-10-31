@@ -14,89 +14,14 @@ def pyExit():
     os.system('kill '+str(os.getpid()))
 atexit.register(pyExit)
 
+
 from argparse import ArgumentParser
+from args_config import add_arguments
 
 parser = ArgumentParser()
-
-parser.add_argument("-A", "--auto", dest="auto", help="run in auto mode online monitoring",default=False,action='store_true')
-parser.add_argument("--Nupdate", dest="Nupdate", help="frequence of updating online plots",default=100,type=int)
-parser.add_argument("--Nlast",      dest="Nlast", help="last N events to analyze on file",default=10,type=int)
-parser.add_argument("--Cosmics",      dest="cosmics", help="use default data stream if no beam",action='store_true',default=False)
-parser.add_argument("--sudo", dest="sudo", help="update files on EOS",default=False,action='store_true')
-
-parser.add_argument("-M", "--online", dest="online", help="online mode",default=False,action='store_true')
-parser.add_argument("--batch", dest="batch", help="batch mode",default=False,action='store_true')
-parser.add_argument("--server", dest="server", help="xrootd server",default=os.environ["EOSSHIP"])
-parser.add_argument("-r", "--runNumber", dest="runNumber", help="run number", type=int,default=-1)
-parser.add_argument('-p', '--path', dest='path', help='path', type=str, default='/eos/experiment/sndlhc/convertedData/physics/2022/', required=False)
-parser.add_argument("-P", "--partition", dest="partition", help="partition of data", type=int,required=False,default=-1)
-parser.add_argument("-d", "--debug", dest="debug", help="debug", type=int, default=False)
-parser.add_argument("-cpp", "--convRawCPP", action='store_true', dest="FairTask_convRaw", help="convert raw data using ConvRawData FairTask", default=False)
-parser.add_argument( "--withCalibration", action='store_true', dest="makeCalibration", help="make QDC and TDC calibration, not taking from raw data", default=False)
-
-parser.add_argument("-f", "--inputFile", dest="fname", help="file name for MC", type=str,default=None,required=False)
-parser.add_argument("-g", "--geoFile", dest="geoFile", help="geofile", required=False,default="geofile_sndlhc_TI18_V3_08August2022.root")
-parser.add_argument("-b", "--heartBeat", dest="heartBeat", help="heart beat", default=10000,type=int)
-parser.add_argument("-c", "--command", dest="command", help="command", default="")
-parser.add_argument("-n", "--nEvents", dest="nEvents", help="number of events", default=-1,type=int)
-parser.add_argument("-s", "--nStart", dest="nStart", help="first event", default=0,type=int)
-parser.add_argument("-t", "--trackType", dest="trackType", help="DS or Scifi", default="DS")
-parser.add_argument("--CorrectionType", dest="CorrectionType", help="Type of polynomial function or log function", default=5, type=int, required=False)
-parser.add_argument("--Task", dest="Task", help="TimeWalk or SelectionCriteria", default="TimeWalk")
-parser.add_argument("--numuevents", action='store_true', default=True)
-parser.add_argument("--nStations", dest="nStations", help="How many DS planes are used in the DS track fit", type=int, default=3)
-parser.add_argument("--TWCorrectionRun", dest="TWCorrectionRun", help="Select what run to take TW correction parameters from. By default it is the same as the data", type=int)
-parser.add_argument("--AlignmentRun", dest="AlignmentRun", help="AlignmentRun", type=int)
-parser.add_argument('-D', '--datalocation', dest='datalocation', type=str, default='physics')
-parser.add_argument('--state', dest='state', type=str, default='uncorrected')
-parser.add_argument('--scifiClusters', dest='scifiClusters', action='store_true', help='Make scifi clusters without QDC weighting')
-parser.add_argument('--scifiClustersQDC', dest='scifiClustersQDC', action='store_true', help='Make scifi clusters with QDC weighting')
-
-# Cuts
-parser.add_argument('--OneHitPerSystem', dest='OneHitPerSystem', action='store_true')
-parser.add_argument('--SlopesCut', dest='SlopesCut', action='store_true')
-parser.add_argument('--nSiPMsCut', dest='nSiPMsCut', action='store_true')
-parser.add_argument('--CrossTalk', dest='CrossTalk', action='store_true')
-
-parser.add_argument('--afswork', dest='afswork', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
-parser.add_argument('--afsuser', dest='afsuser', type=str, default='/afs/cern.ch/work/a/aconsnd/Timing')
-parser.add_argument('--eosH8', dest='eosH8', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TB_H8_october/')
-parser.add_argument('--eosTI18', dest='eosTI18', type=str, default='/eos/experiment/sndlhc/convertedData/commissioning/TI18/')
-parser.add_argument('--mode', dest='mode', type=str, default='showerprofiles')
-parser.add_argument('-C', '--HTCondor', dest='HTCondor', action='store_true')
-parser.add_argument('--numusignalevents', dest='numusignalevents', action='store_true')
-parser.add_argument('--numuStudy', dest='numuStudy', action='store_true', default=True)
-# options.numuStudy=True
-
-# Investigate small SiPMs
-parser.add_argument('--SmallSiPMcheck', dest='SmallSiPMcheck', action='store_true')
-# Run showerprofiles.ShowerDirection with a cut on IsTrackRelated
-parser.add_argument('--dycut', dest='dycut', action='store_true')
-# Run showerprofiles.ShowerDirection without considering the exact bar that the DS track extrapolates to
-parser.add_argument('--notDSbar', dest='notDSbar', action='store_true')
-parser.add_argument('--SiPMmediantimeCut', dest='SiPMmediantimeCut', action='store_true')
-parser.add_argument('--SiPMtimeCut', dest='SiPMtimeCut', action='store_true')
-# Update geofile, takes longer
-parser.add_argument('--updateGeoFile', dest='updateGeoFile', action='store_true')
-
-parser.add_argument("--ScifiNbinsRes", dest="ScifiNbinsRes", default=100)
-parser.add_argument("--Scifixmin", dest="Scifixmin", default=-2000.)
-parser.add_argument("--ScifialignPar", dest="ScifialignPar", default=False)
-parser.add_argument("--ScifiResUnbiased", dest="ScifiResUnbiased", default=False)
-parser.add_argument("--Mufixmin", dest="Mufixmin", default=-10.)
-parser.add_argument("--chi2xpred_zpos", dest="chi2xpred_zpos", help="z-position for plotting DS track red-chi2 values", type=int, default=0)
-parser.add_argument("--WriteOutTrackInfo", dest="WriteOutTrackInfo", type=int, default=0)
-parser.add_argument('--numbering', dest='numbering', type=str, default='systemPCB')
-parser.add_argument('--referencesystem', dest='referencesystem', type=int, default=3)
-parser.add_argument('--simulation', dest='simulation', action='store_true')
-
-parser.add_argument("--goodEvents", dest="goodEvents", action='store_true',default=False)
-parser.add_argument("--withTrack", dest="withTrack", action='store_true',default=False)
-parser.add_argument("--nTracks", dest="nTracks",default=0,type=int)
-parser.add_argument("--save", dest="save", action='store_true',default=False)
-parser.add_argument("--interactive", dest="interactive", action='store_true',default=False)
-parser.add_argument("--postScale", dest="postScale",help="post scale events, 1..10..100", default=-1,type=int)
-parser.add_argument("--load-hists", dest="load_hists", action='store_true')
+parser.add_argument('--analysisName', dest='analysisName', type=str, default='nue')
+parser.add_argument('--load_hists', dest='load_hists', action='store_true')
+add_arguments(parser)
 
 options = parser.parse_args()
 
@@ -116,28 +41,38 @@ class Numusignaleventtiming(object):
             self.LoadSignalHists()
             self.LoadPassingMuonHists()
             self.FillLegend()
-            # self.MakeSignalComparisonCanvases()
-            # self.WriteOutSignalComparisonCanvases()
 
         else:
             self.MakeSignalPartitions()
         options.numuStudy=True
 
-    def MakeSignalPartitions(self, mode='numu'):
-        if mode=='numu': signalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
-        elif mode=='nue': signalevent_filepath = '/afs/cern.ch/work/a/aconsnd/nuesignalevents.csv'
-        self.nu_mu_events={}
-        with open(numusignalevent_filepath, 'r') as f:
-            reader=csv.reader(f)
-            for idx,x in enumerate(reader):
-                if idx==0: continue
-                self.nu_mu_events[int(x[0])] = [int(x[1]), int(x[2])] + [float(i) for i in x[3:]]        
+    def MakeSignalPartitions(self):
+        
+        self.signal_events={}
+
+        if options.analysisName=='numu': 
+            signalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
+        
+            with open(signalevent_filepath, 'r') as f:
+                reader=csv.reader(f)
+                for idx,x in enumerate(reader):
+                    if idx==0: continue
+                    self.signal_events[int(x[0])] = [int(x[1]), int(x[2])] + [float(i) for i in x[3:]]        
+
+        elif options.analysisName=='nue':
+            signalevent_filepath = '/afs/cern.ch/work/a/aconsnd/nuesignalevents.csv'
+
+            with open(signalevent_filepath, 'r') as f:
+                reader=csv.reader(f)
+                for idx,x in enumerate(reader):
+                    if idx==0: continue
+                    self.signal_events[int(x[0])] = [int(x[1])]            
 
         self.signalpartitions={}
         self.eventChain=ROOT.TChain("rawConv")
         
-        for runNr in self.nu_mu_events:
-            eventNumber=self.nu_mu_events[runNr][0]
+        for runNr in self.signal_events:
+            eventNumber=self.signal_events[runNr][0]
 
             runNumber = str(runNr).zfill(6)
             partition = int(eventNumber // 1E6)
@@ -150,7 +85,7 @@ class Numusignaleventtiming(object):
         options.customEventChain=self.eventChain
 
         # Set initial geofile to instance Monitor
-        options.runNumber = list(self.nu_mu_events.keys())[0]
+        options.runNumber = list(self.signal_events.keys())[0]
 
         FairTasks=[]
         trackTask = SndlhcTracking.Tracking()
@@ -172,7 +107,7 @@ class Numusignaleventtiming(object):
 
     def InvestigateSignalEvents(self):
 
-        runs=self.nu_mu_events.keys()
+        runs=self.signal_events.keys()
 
         for runNr in runs:
             self.InvestigateEvent(runNr)
@@ -220,13 +155,13 @@ class Numusignaleventtiming(object):
             self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
             
     def GetSignalEventNumber(self, runNr):
-        n_partition = list(self.nu_mu_events.keys()).index(runNr)
-        evt_number = int(n_partition * 1e6 + self.nu_mu_events[runNr][0] % 1e6)            
+        n_partition = list(self.signal_events.keys()).index(runNr)
+        evt_number = int(n_partition * 1e6 + self.signal_events[runNr][0] % 1e6)
         return evt_number
     
     def testing(self):
         self.fired_detIDs={}
-        for run in self.nu_mu_events:
+        for run in self.signal_events:
             signalevent = self.GetSignalEventNumber(run)
             self.M.GetEvent(signalevent)
 
@@ -493,7 +428,7 @@ class Numusignaleventtiming(object):
             extrapolations = [barycentres[i][1] for i in planes]
             xExs, yExs = zip(*extrapolations)
 
-            interactionwall = self.nu_mu_events[runNr][1]
+            interactionwall = self.signal_events[runNr][1]
 
             self.data['runNr'].append(runNr)
             self.data['planes'].append(planes)

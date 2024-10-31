@@ -6,7 +6,6 @@ import numpy as np
 from itertools import combinations
 import pandas as pd
 
-
 ROOT.gInterpreter.ProcessLine('#include "/afs/cern.ch/user/a/aconsnd/sndsw/analysis/tools/sndSciFiTools.h"')
 
 class HCALTools(object):
@@ -90,7 +89,6 @@ class HCALTools(object):
 
             For each pair of fired horizontal and vertical bars in plane i, there are N_nextplane combinations with a pair in plane i+1
             Where N_nextplane is the number of horizontal and vertical bar pairs that can be formed in the next plane
-
             """
 
             xz_proj_next, yz_proj_next = self.DS_centroids[fired_planes[1]]['x'], self.DS_centroids[fired_planes[1]]['y']
@@ -136,8 +134,7 @@ class HCALTools(object):
         # Get predicted interaction wall
         # Returns number between 0,4 or 5 for unreconstructed interaction wall
 
-        filtered_hits = ROOT.snd.analysis_tools.filterScifiHits(scifi_hits, 0, "TI18")
-        self.interactionWall = ROOT.snd.analysis_tools.showerInteractionWall(filtered_hits, 0, "TI18") + 1 
+        self.interactionWall = self.GetInteractionWall(scifi_hits)
         
         # Get the median scifi position in x and y for the interaction wall
         self.Get_interaction_median_positions(scifi_hits=scifi_hits, Scifi=Scifi)
@@ -158,7 +155,7 @@ class HCALTools(object):
         # Sanity check, should be none
         if len(fired_planes)==3:
             print(f'3 fired DS planes in event {self.EventNumber}')
-            return False
+            return True
 
         # Find combinations of DS cluster centroids
         self.GetCombinatorics()
@@ -200,16 +197,26 @@ class HCALTools(object):
             self.lambda_x_dict = {i:np.nan for i in range(5)}
             self.lambda_y_dict = {i:np.nan for i in range(5)}
 
+            self.barycentre_x_dict = {i:np.nan for i in range(5)}
+            self.barycentre_y_dict = {i:np.nan for i in range(5)}            
+
             for plane in self.xy_residuals:
 
                 if plane=='intWall':continue
-                if not plane in self.xbarycentres: continue
-                if not plane in self.barycentres: continue
-                
+                # if not plane in self.xbarycentres: continue
+                if len(self.xbarycentres[plane])==0: continue
+                # if not plane in self.barycentres: continue
+                if len(self.barycentres[plane])==0: continue
+ 
                 lambda_x = abs(self.xbarycentres[plane]['lambda_x'])
                 self.lambda_x_dict[plane] = lambda_x
                 lambda_y = self.barycentres[plane]['y-barycentre']['lambda_y']
                 self.lambda_y_dict[plane] = lambda_y
+
+                xb = abs(self.xbarycentres[plane]['dxB'])
+                self.barycentre_x_dict[plane] = xb
+                yb = self.barycentres[plane]['y-barycentre']['yB']
+                self.barycentre_y_dict[plane] = yb
 
                 # if len(self.xy_residuals[plane])==2:
 
@@ -221,11 +228,11 @@ class HCALTools(object):
                 #     self.ds_hists(plane)
 
             self.GetHCAL5barscode(hits)
+            
             self.Get_ds()
 
             x=self.getdata(mode='get')
             xdf = pd.DataFrame([x])
-            xdf['HCAL5barcode'] = xdf['HCAL5barcode']
             
             cols2drop = ['filekey', 'EventNumber']
             if self.simulation: cols2drop.append('hasMuon')
@@ -242,10 +249,10 @@ class HCALTools(object):
         # Will test extending BDT to 1 fired DS plane
         elif len(fired_planes)==1:
             return False
-        else: pass
+        else: return False
 
     def Get_ds(self):
-        self.ds = dict.fromkeys([f'ds{i}' for i in range(5)], np.nan)
+        self.ds = {f'ds{i}':np.nan for i in range(5)}
         for plane in range(5):
             self.ds[f'ds{plane}'] = np.sqrt( sum([i**2 for i in self.xy_residuals[plane].values()]) )
 
@@ -283,7 +290,7 @@ class HCALTools(object):
     
             # Get barycentre 
             b=self.GetBarycentre(plane, proj)
-            if not b:continue
+            if np.isnan(b): continue
 
             # Get z position of plane to pass into eqn of line
             MuFilter.GetPosition(20000+1000*plane, self.A, self.B)
@@ -297,7 +304,7 @@ class HCALTools(object):
         else: wall=self.interactionWall
 
         dummy_detID=int(1e6*wall + 1e5*0 + 1e4 + 1e3 + 1)
-        print(f'Getting Scifi position for detID {dummy_detID}')
+        # print(f'Getting Scifi position for detID {dummy_detID}')
         Scifi.GetPosition(dummy_detID, self.A, self.B)
         scifi_intwall_z = 0.5*(self.A.z() + self.B.z())
         
@@ -313,15 +320,16 @@ class HCALTools(object):
     def GetBarycentre(self, plane, proj):
 
         if proj=='x': 
-            if plane not in self.xbarycentres: return
-            if not 'dxB' in self.xbarycentres[plane]:return
+            if plane not in self.xbarycentres: return np.nan
+            if not 'dxB' in self.xbarycentres[plane]: return np.nan
             b=self.xbarycentres[plane]['dxB']
+
         elif proj=='y': 
-            if plane not in self.barycentres: return
-            if not 'y-barycentre' in self.barycentres[plane]:return
-            if not 'yB' in self.barycentres[plane]['y-barycentre']:return
+            if plane not in self.barycentres: return np.nan
+            if not 'y-barycentre' in self.barycentres[plane]: return np.nan
+            if not 'yB' in self.barycentres[plane]['y-barycentre']: return np.nan
             b=self.barycentres[plane]['y-barycentre']['yB']
-        return b           
+        return b
 
     def GetHCAL5barscode(self, hits):
         c=[False]*10 
@@ -342,8 +350,25 @@ class HCALTools(object):
 
     def getdata(self, mode='write'):
 
-        x_list = [round(self.xbarycentres[p]['dxB'],3) for p in range(5)]
-        y_list = [round(self.barycentres[p]['y-barycentre']['yB'],3) for p in range(5)]
+        column_names=['filekey', 'EventNumber','hasMuon','interactionWall',
+        'scifi_median_x','scifi_median_y',
+        'scifi_residual_x','scifi_residual_y',
+        'dx0','dx1','dx2','dx3','dx4',
+        'dy0','dy1','dy2','dy3','dy4',
+        'ds0','ds1','ds2','ds3','ds4', 'ds_scifi',
+        'x0','x1','x2','x3','x4',
+        'y0','y1','y2','y3','y4',
+        'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
+        'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
+        'HCAL5barcode'
+        ]        
+
+        # x_list = [round(self.xbarycentres[p]['dxB'],3) for p in range(5)]
+        # x_list = [round(self.GetBarycentre(p,'x')) for p in range(5)]
+        x_list = [round(self.GetBarycentre(p, 'x')) if not np.isnan(self.GetBarycentre(p, 'x')) else np.nan for p in range(5)]
+        # y_list = [round(self.barycentres[p]['y-barycentre']['yB'],3) for p in range(5)]
+        # y_list = [round(self.GetBarycentre(p,'y')) for p in range(5)]
+        y_list = [round(self.GetBarycentre(p, 'y')) if not np.isnan(self.GetBarycentre(p, 'y')) else np.nan for p in range(5)]        
         dx_list = [round(self.xy_residuals[p]['x'], 3) for p in range(5)]
         dy_list = [round(self.xy_residuals[p]['y'], 3) for p in range(5)]
         ds_list = [round(self.ds[f'ds{p}'], 3) for p in range(5)]
@@ -353,7 +378,7 @@ class HCALTools(object):
 
         if self.simulation:
             
-            output_dict = dict.fromkeys(self.column_names, None)
+            output_dict = {k:None for k in column_names}
             output_dict['filekey'] = self.filekey
             output_dict['EventNumber'] = self.EventNumber
             output_dict['hasMuon'] = self.eventHasMuon
@@ -375,12 +400,9 @@ class HCALTools(object):
                 output_dict[f'lambday{i}'] = round(lambda_y_list[i], 3)
 
             output_dict['HCAL5barcode'] = self.HCAL5barscode
-            
-            # output_line = self.filekey,self.tw.M.EventNumber,self.eventHasMuon,self.interactionWall,round(self.intWall_median_x,3), round(self.intWall_median_y,3),*scifi_residual,*x_residuals_list,*y_residuals_list,*xbarycentre_list,*ybarycentre_list,*[round(i,3) for i in self.lambda_x_dict.values()],*[round(i,3) for i in self.lambda_y_dict.values()],self.HCAL5barscode
 
         else:
-
-            output_dict = dict.fromkeys(self.column_names, None)
+            output_dict = {k:None for k in column_names}
             output_dict['filekey'] = self.filekey
             output_dict['EventNumber'] = self.EventNumber
             # output_dict['hasMuon'] = self.eventHasMuon
@@ -403,12 +425,13 @@ class HCALTools(object):
 
             output_dict['HCAL5barcode'] = self.HCAL5barscode
 
-            # output_line = self.filekey,self.tw.M.EventNumber,self.interactionWall,round(self.intWall_median_x,3), round(self.intWall_median_y,3),*scifi_residual,*x_residuals_list,*y_residuals_list,*xbarycentre_list,*ybarycentre_list,*[round(i,3) for i in self.lambda_x_dict.values()],*[round(i,3) for i in self.lambda_y_dict.values()],self.HCAL5barscode
-
         if mode=='write':
+            output = [output_dict[key] for key in column_names]
+            
             with open(self.datafilename, 'a', newline='') as f:
                 writer=csv.writer(f)
-                writer.writerow(output_dict.values())
+                writer.writerow(output)
+        
         elif mode=='get':
             return output_dict
 
@@ -418,15 +441,21 @@ class HCALTools(object):
             print(f'No MCTrack branch in real data! ')
             return False
         if abs(event.MCTrack[1].GetPdgCode()) == 13: return True 
-        else: return False            
+        else: return False   
+
+    def GetInteractionWall(self, scifi_hits):
+        filtered_hits = ROOT.snd.analysis_tools.filterScifiHits(scifi_hits, 0, "TI18")
+        interactionWall = ROOT.snd.analysis_tools.showerInteractionWall(filtered_hits, 0, "TI18")
+        return interactionWall+1                 
 
     def dsCluster(self, hits, mufi):
         clusters = []
         hitDict = {}
         for k in range(hits.GetEntries()):
             d = hits[k]
-            # if (d.GetDetectorID()//10000)<3 or (not d.isValid()): continue
-            if (d.GetDetectorID()//10000)<3: continue
+            if (d.GetDetectorID()//10000)<3 or (not d.isValid()): continue
+            # if (d.GetDetectorID()//10000)<3: continue
+            # if not d.isValid: continue 
             hitDict[d.GetDetectorID()] = k
         hitList = list(hitDict.keys())
         if len(hitList)>0:

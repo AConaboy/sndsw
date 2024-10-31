@@ -409,7 +409,7 @@ int snd::analysis_tools::showerInteractionWall(const TClonesArray &digiHits, con
 
   int totalScifiStations = 5;
   if(setup=="H8"){totalScifiStations = 4;}
-  else{LOG (info) << "\"TI18\" setup will be used by default, please provide \"H8\" for the Testbeam setup.";}
+  // else{LOG (info) << "\"TI18\" setup will be used by default, please provide \"H8\" for the Testbeam setup.";}
 
   //There is always 1 more Scifi Station than a target block. As such, showerStart == totalScifiStations
   //means that the shower did not start developing in the target, before the last Scifi Station

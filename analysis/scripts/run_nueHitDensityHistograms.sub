@@ -1,0 +1,17 @@
+executable = /afs/cern.ch/user/a/aconsnd/sndsw/analysis/scripts/run_nueHitDensityHistograms.sh
+arguments = $(BDT_flag)
+
+should_transfer_files = NO
+request_CPUs = 1
++AccountingGroup = "group_u_SNDLHC.users"
+
+output = /afs/cern.ch/work/a/aconsnd/HTCondor/output/nueHitDensityHistograms.BDT_flag$(BDT_flag).$(ClusterId).$(ProcId).out
+log = /afs/cern.ch/work/a/aconsnd/HTCondor/log/nueHitDensityHistograms.BDT_flag$(BDT_flag).$(ClusterId).$(ProcId).log
+error = /afs/cern.ch/work/a/aconsnd/HTCondor/error/nueHitDensityHistograms.BDT_flag$(BDT_flag).$(ClusterId).$(ProcId).err
+
+#+JobFlavour = "espresso"
+#+JobFlavour = "microcentury"
+#+JobFlavour = "longlunch"
++JobFlavour = "workday"
+
+queue BDT_flag from /afs/cern.ch/user/a/aconsnd/Timing/condor_scripts/run_nueHitDensityHistogramsList.txt
