@@ -20,6 +20,7 @@ from collections import defaultdict
 import pickle
 import argparse, os, sys
 import ROOT 
+import SndlhcGeo
 pd.options.mode.copy_on_write = True
 
 class initialise_data:
@@ -1314,9 +1315,6 @@ class muon_reconstruction:
     def reconstruct_muon(self, df):
         df_DS = df[df["StationNR"]==3]
         clusters = self.clustering(df_DS)
-#         e = df["Eventnumber"].unique()
-#         if not clusters:
-#             print("cluster is empty", e)
         coordX, coordY, coordZ = [], [], []
         muonX, muonY, muonZ = [], [], []
         polar_angle = None
@@ -1327,13 +1325,6 @@ class muon_reconstruction:
                     coordX.append(X_cluster)
                     coordY.append(Y_cluster)
                     coordZ.append(Z_cluster)
-#             if (coordX and coordY and coordZ):
-#                 coordinates = list(zip(coordX, coordY, coordZ))
-#                 coordinates.sort(key=lambda coord: coord[2])  # Sort by the Z coordinate
-#                 coordX_sorted, coordY_sorted, coordZ_sorted = zip(*coordinates)
-#                 points = Points([[x, y, z] for x, y, z in zip(coordX_sorted, coordY_sorted, coordZ_sorted)])
-#     #             points = Points([[x, y, z] for x, y, z in zip(coordX, coordY, coordZ)])
-#                 line_fit = Line.best_fit(points)
 
             if coordX and coordY and coordZ:
                 # Sort coordinates by Z to ensure correct order
@@ -1680,6 +1671,19 @@ class Tracking():
         ROOT.genfit.MaterialEffects.getInstance().init(geoMat)
         ROOT.genfit.MaterialEffects.getInstance().setNoEffects()
 
+        # if self.simulation: self.snd_geo = SndlhcGeo.GeoInterface(options.path + options.geoFile)
+        # else: 
+        #     if path.find('eos')>0: path  = options.server+options.path         
+        #     self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
+
+        filepath = "/eos/experiment/sndlhc/MonteCarlo/MuonBackground/muons_up/scoring_2.5/geofile_full.Ntuple-TGeant4.root"
+        self.snd_geo = SndlhcGeo.GeoInterface(filepath)
+        self.MuFilter = self.snd_geo.modules['MuFilter']
+
+        # self.Scifi    = self.snd_geo.modules['Scifi']
+        # self.systemAndPlanes = {1:2,2:5,3:7}
+        # self.zPos = self.getAverageZpositions()
+
     def clustering(self, data):
         data = data.reset_index(drop=True)
         clusters = []
@@ -1857,21 +1861,13 @@ class Tracking():
                 return trackCandidates
 
             #track building 
+            A, B = ROOT.TVector3(), ROOT.TVector3()
             combinations[proj] = {}  #empty dictionary for storing combinations of hits per projection
             for keyA in stations[seed]: #get average cluster position of seed plane
                 clusterA = stations[seed][keyA]
-                clusterA_hits = clusterA["hits"]
-                X, Y, Z = [], [], []
-                for hit in clusterA_hits:
-                    Xcoord, Ycoord, Zcoord = hit["coordX"], hit["coordY"], hit["coordZ"]
-                    X.append(Xcoord)
-                    Y.append(Ycoord)
-                    Z.append(Zcoord)
-                
-                # clusterA_hit = clusterA_hits[0]
-                # clusterX, clusterY, clusterZ = clusterA_hit["coordX"], clusterA_hit["coordY"], clusterA_hit["coordZ"]
-                clusterX, clusterY, clusterZ = np.mean(X), np.mean(Y), np.mean(Z)
-                posA = np.array([clusterX, clusterY, clusterZ]) #turn into vector
+                detID = clusterA["detID"]
+                self.MuFilter.GetPosition(detID, A, B)
+                posA = (A+B)/2.
                 
                 #search for clusters in other planes
                 clInPlane = {}
@@ -1894,17 +1890,10 @@ class Tracking():
                 planeB = srt[0] #plane closest to seed plane for analysis
                 for keyB in stations[planeB]:
                     clusterB = stations[planeB][keyB]
-                    clusterB_hits = clusterB["hits"]
-                    X, Y, Z = [], [], []
-                    for hit in clusterB_hits:
-                        Xcoord, Ycoord, Zcoord = hit["coordX"], hit["coordY"], hit["coordZ"]
-                        X.append(Xcoord)
-                        Y.append(Ycoord)
-                        Z.append(Zcoord)
-                    # clusterB_hit = clusterB["hits"][0]
-                    # clusterX, clusterY, clusterZ = clusterB_hit["coordX"], clusterB_hit["coordY"], clusterB_hit["coordZ"]
-                    clusterX, clusterY, clusterZ = np.mean(X), np.mean(Y), np.mean(Z)
-                    posB = np.array([clusterX, clusterY, clusterZ])
+                    detID = clusterB["detID"]
+                    self.MuFilter.GetPosition(detID, A, B)
+                    posB = (A+B)/2.
+
                     delBA = posB-posA #displacement vector from the seed cluster to the cluster in plane B
                     if proj==0: #x = slope*z+b
                         slope = delBA[1]/delBA[2] #vertical displacement/z
@@ -1922,17 +1911,10 @@ class Tracking():
                             continue
                         for keyC in stations[planeC]:
                             clusterC = stations[planeC][keyC]
-                            # clusterC_hit = clusterC["hits"][0]
-                            # clusterX, clusterY, clusterZ = clusterC_hit["coordX"], clusterC_hit["coordY"], clusterC_hit["coordZ"]
-                            clusterC_hits = clusterC["hits"]
-                            X, Y, Z = [], [], []
-                            for hit in clusterC_hits:
-                                Xcoord, Ycoord, Zcoord = hit["coordX"], hit["coordY"], hit["coordZ"]
-                                X.append(Xcoord)
-                                Y.append(Ycoord)
-                                Z.append(Zcoord)
-                            clusterX, clusterY, clusterZ = np.mean(X), np.mean(Y), np.mean(Z)
-                            posC = np.array([clusterX, clusterY, clusterZ])
+                            detID = clusterC["detID"]
+                            self.MuFilter.GetPosition(detID, A, B)
+                            posC = (A+B)/2.
+
                             eX = posC[2]*slope+b #expected position
                             if proj==0: 
                                 res = abs(eX-posC[1])
@@ -1952,17 +1934,10 @@ class Tracking():
                                         combinations[proj][res] = [[seed,keyA], [planeB,keyB], [planeC,keyC]]
                                     for keyD in stations[planeD]:
                                         clusterD = stations[planeD][keyD]
-                                        # clusterD_hit = clusterD["hits"][0]
-                                        # clusterX, clusterY, clusterZ = clusterD_hit["coordX"], clusterD_hit["coordY"], clusterD_hit["coordZ"]
-                                        clusterD_hits = clusterD["hits"]
-                                        X, Y, Z = [], [], []
-                                        for hit in clusterD_hits:
-                                            Xcoord, Ycoord, Zcoord = hit["coordX"], hit["coordY"], hit["coordZ"]
-                                            X.append(Xcoord)
-                                            Y.append(Ycoord)
-                                            Z.append(Zcoord)
-                                        clusterX, clusterY, clusterZ = np.mean(X), np.mean(Y), np.mean(Z)
-                                        posD = np.array([clusterX, clusterY, clusterZ])
+                                        detID = clusterD["detID"]
+                                        self.MuFilter.GetPosition(detID, A, B)
+                                        posD = (A+B)/2.
+
                                         eX = posD[2]*slope+b
                                         if proj==0: 
                                             res+= abs(eX-posD[1])
@@ -1972,12 +1947,9 @@ class Tracking():
 
             # find combination with smallest residual
             srt = sorted(combinations[proj])[0]
-            # print(event, combinations[proj][srt])
             for x in combinations[proj][srt]:
                 hitlist[x[1]] = stations[x[0]][x[1]]
-        # print(hitlist)
-        sorted_keys = sorted(hitlist.keys())
-        hitlist = {key: hitlist[key] for key in sorted_keys}
+
         trackCandidates.append(hitlist)
         return trackCandidates
     
@@ -2016,51 +1988,11 @@ class Tracking():
         i = 0
         for cluster in hitlist:
             # print(f"Processing cluster: {event, i}")
+            # print(cluster)
             detID = cluster["detID"]
-            detSys = 3            
-    
-            if cluster["N"] == 1:
-                continue
+            detSys = 3    
 
-            #get cluster position
-            X_left, Y_left, Z_left = None, None, None
-            X_right, Y_right, Z_right = None, None, None
-            X_top, Y_top, Z_top = None, None, None
-            X_bottom, Y_bottom, Z_bottom = None, None, None
-            firsthit = cluster["hits"][0]
-            bar = firsthit["Bar"]
-            X, Y, Z = [], [], []
-            for hit in cluster["hits"]:
-                Xcoord, Ycoord, Zcoord = hit["coordX"], hit["coordY"], hit["coordZ"]
-                X.append(Xcoord)
-                Y.append(Ycoord)
-                Z.append(Zcoord)
-
-            if bar < 60:
-                min_index, max_index = np.argmin(X), np.argmax(X)
-                X_left, Y_left, Z_left = X[min_index], Y[min_index], Z[min_index]
-                X_right, Y_right, Z_right = X[max_index], Y[max_index], Z[max_index]
-
-            elif bar >= 60:
-                min_index, max_index = np.argmin(Y), np.argmax(Y)
-                X_bottom, Y_bottom, Z_bottom = X[min_index], Y[min_index], Z[min_index]
-                X_top, Y_top, Z_top = X[max_index], Y[max_index], Z[max_index]
-
-            if all(val is not None for val in [X_left, Y_left, Z_left, X_right, Y_right, Z_right]):
-                A.SetXYZ(X_left, Y_left, Z_left) 
-                B.SetXYZ(X_right, Y_right, Z_right)
-            elif all(val is not None for val in [X_top, Y_top, Z_top, X_bottom, Y_bottom, Z_bottom]):
-                A.SetXYZ(X_top, Y_top, Z_top) 
-                B.SetXYZ(X_bottom, Y_bottom, Z_bottom)   
-            else:
-                print("cry")
-                break  
-            # A.Print()
-            # B.Print()  
-            i += 1
-            if A.X() == B.X() and A.Y() == B.Y() and A.Z() == B.Z():
-                print(f"Warning: A and B are the same point. Skipping this cluster. Event: {event}, Cluster: {i}")
-                continue  # Skip the rest of the loop
+            self.MuFilter.GetPosition(detID, A, B)
 
             distance = 0
             tmp = array('d', [A[0], A[1], A[2], B[0], B[1], B[2], distance])
@@ -2087,7 +2019,7 @@ class Tracking():
         if not theTrack.checkConsistency():
             print("track not consistent")
             theTrack.Delete()
-            return -2
+            return -1
 
         if self.Debug:
             print(f"Track initialized with {theTrack.getNumPoints()} points.")

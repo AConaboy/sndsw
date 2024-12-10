@@ -58,7 +58,7 @@ tracking = Tracking()
 tracking.Init()
 
 background = True
-amount_sel = 8
+amount_sel = 9
 #1: interaction in 5th target wall, 2: at least 2 consecutive scifi planes are hit, 3: if DS hits, then all US planes must be hit
 #4: event has one reconstructed DS track -> in MC: clustering algorithm produces clusters and fit is possible
 #5: latest DS hit time > earliest scifi hit time, 6: muon track intersects first scifi plane >5cm away from detector edge
@@ -201,17 +201,23 @@ if args.initdata:
 
 if args.track_reconstruction:
     dtype_options = {"Process": str}
-    df = pd.read_csv(f"{eospath}data_us_10_cutsapplied.csv", dtype=dtype_options).drop(columns = ["Unnamed: 0"])
-    # df = pd.read_csv(f"{eospath}data_us_10.csv", dtype=dtype_options).drop(columns = ["Unnamed: 0"])
+    df = pd.read_csv(f"{eospath}nh_fiducial.csv", dtype=dtype_options).drop(columns = ["Unnamed: 0"])
+    # df = pd.read_csv(f"{eospath}MuonDIS_fiducial.csv", dtype=dtype_options).drop(columns = ["Unnamed: 0"])
+    # df = pd.read_csv(f"{eospath}pm_fiducial.csv", dtype=dtype_options).drop(columns = ["Unnamed: 0"])
+    # df = pd.read_csv(f"{eospath}data_us_10_cutsapplied.csv", dtype=dtype_options).drop(columns = ["Unnamed: 0"])
+    # df = pd.read_csv(f"{eospath}data_us_10_fiducial.csv", dtype=dtype_options).drop(columns = ["Unnamed: 0"])
     df_DS = df[df["StationNR"]==3]
     tracking = Tracking()
     tracking.Init()
     hcal_grouped = df_DS.groupby("Eventnumber")
     a = df_DS["Eventnumber"].nunique()
     i = 0
+    reduced_chi = []
+    event_list = []
     for event, group in hcal_grouped:
         muon_points, muon_track, clusters, polar_angle = muon_recon.reconstruct_muon(group)
         trackcandidates = tracking.DStrack(event, clusters)
+        
         if len(trackcandidates) > 0:
             trackcandidate = trackcandidates[0]
         hitlist = []
@@ -225,6 +231,21 @@ if args.track_reconstruction:
             rc = tracking.fitTrack(event, hitlist)
             if rc == -1:
                 i += 1
-            # else:
-            #     print(rc)
-    # print(a, i)
+            
+            fitStatus = rc.getFitStatus()
+            # print("Chi-squared / Ndf:", fitStatus.getChi2() / (fitStatus.getNdf() + 1E-15))
+            # print("Fit Converged:", fitStatus.isFitConverged())
+            # print("Number of Degrees of Freedom:", fitStatus.getNdf())
+            reduced_chi.append(fitStatus.getChi2() / (fitStatus.getNdf() + 1E-15))
+            event_list.append(event)
+
+    print(f"Total amount of events: {a}")
+    print(f"Events with converged tracks: {a-i}")
+
+track_data = pd.DataFrame()
+track_data["Eventnumber"] = event_list
+track_data["reduced_chi"] = reduced_chi
+
+track_data.to_csv(f"{eospath}track_info_nh.csv")
+print(f'Track info csv written to: {eospath}track_info_nh.csv')
+
