@@ -28,11 +28,13 @@ class initialise_data:
         self.energy_loss_threshold = energy_loss_threshold
         self.time_cut = time_cut
         self.attenuation_length = attenuation_length
+        self.eospath = '/eos/user/t/tismith/SWAN_projects/genie_ana_output/'
 
     def init(self, df, df_scifi, fiducial_cuts, plot_fiducial, plot_time, process, veto, 
              selection_cuts, amount_selection_cuts, anti_cut, momentum_cut, slope_cut, cut_flow):
         fiducial_processor = FiducialCutProcessor(70, 105, 10, 50, 200, 1200, 300, 128*12-200, True, True)
         muon_recon = muon_reconstruction()
+        tracking = Tracking()
         
         #get detector dimensions
         hcal_xmin, hcal_xmax = df["coordX"].min(), df["coordX"].max()
@@ -119,14 +121,17 @@ class initialise_data:
                 df = df[condition]
                 cut_flow.append(("scifi plane 2 fires", df["Eventnumber"].nunique()))
 #                 cut_flow.append(("Selection cut E", df["Eventnumber"].nunique()))
+
+        # events_to_keep = df["Eventnumber"].unique()
+        # df_scifi = df_scifi[df_scifi["Eventnumber"].isin(events_to_keep)]
+        # df_scifi.to_csv(f"{self.eospath}scifi_temp_10_fiducial.csv")
+        # print(f'Numu csv written to: {self.eospath}scifi_temp_10_fiducial.csv')
+        # df.to_csv(f"{self.eospath}data_temp_10_fiducial.csv")
+        # print(f'Numu csv written to: {self.eospath}data_temp_10_fiducial.csv')
+        # cut_flow.to_csv(f"{self.eospath}cutflow_temp_10_fiducial.csv")
+        # print(f'Numu csv written to: {self.eospath}cutflow_temp_10_fiducial.csv')
         
         if selection_cuts == True:
-            if amount_selection_cuts >= 1:
-                #remove events with interaction vertex in 5th wall
-                df = df[df["wall"] != 4]
-                cut_flow.append(("interaction in 5th wall", df["Eventnumber"].nunique()))
-        #             cut_flow.append(("Selection cut F", df["Eventnumber"].nunique()))
-
             #perform selection cuts
             df, df_scifi, cut_flow = self.selection_cuts(df, df_scifi, dim_detector, cut_flow, 
                                                          process=process, amount_selection_cuts=amount_selection_cuts)
@@ -276,30 +281,24 @@ class initialise_data:
     
     def shower_wall_algo(self, df):
         k = 0.1 #parameter used as threshold
-        df["wall"] = None
+        df_grouped = df.groupby("Eventnumber")
         
-        for event in df["Eventnumber"].unique():
-            df_event = df[df["Eventnumber"]==event]
+        for event, group in df_grouped:
             i = 1
             k_temp = 0
-            energy_loss_plane = df_event.groupby("StationNR")["Energy_loss"].sum()
-#             print(event, energy_loss_plane)
+            energy_loss_plane = group.groupby("StationNR")["Energy_loss"].sum()
             while k_temp <= k and i <= 5:
                 if i not in energy_loss_plane or i + 1 not in energy_loss_plane:
-#                     if event == 2072:
-#                         print(i, "hi")
                     i += 1
-                else:
-                    E_wall = energy_loss_plane[i]
-                    E_wallnext = energy_loss_plane[i+1]
-                    k_temp = (abs(E_wall-E_wallnext))/(E_wall)
-#                     if event == 2072:
-#                         print(E_wall, E_wallnext, k_temp)
-                    if k_temp > k:
-                        df.loc[(df["Eventnumber"]==event), "wall"] = i  
-#                         if event == 2072:
-#                             print(i, "wall saved")
-                    i += 1
+                    continue
+                    
+                E_wall = energy_loss_plane[i]
+                E_wallnext = energy_loss_plane[i+1]
+                k_temp = (abs(E_wall-E_wallnext))/(E_wall)
+                if k_temp > k:
+                    df.loc[(df["Eventnumber"]==event), "wall"] = i 
+                    break
+                i += 1
         return df
     
     #cuts on muon momentum and slope
@@ -352,10 +351,245 @@ class initialise_data:
     
     #selection cuts as found in publication
     def selection_cuts(self, df, df_scifi, dim_detector, cut_flow, process, amount_selection_cuts):
+        # muon_recon = muon_reconstruction()
+        tracking = Tracking()
+        tracking.Init()
+        
+        # hcal_grouped = df.groupby("Eventnumber")
+        # scifi_grouped = df_scifi.groupby("Eventnumber")
+        df_DS = df[df["StationNR"] == 3]
+        # hcal_DS_grouped = df_DS.groupby("Eventnumber")
+        # events_to_remove = []
+        events_to_remove = set()
+
+        if amount_selection_cuts >= 1:
+            to_remove = df[df["wall"]==4]
+            events_to_remove.update(to_remove["Eventnumber"].unique())       
+            cut_flow.append(("interaction in 5th wall", df[~df["Eventnumber"].isin(events_to_remove)]["Eventnumber"].nunique()))
+        
+        if amount_selection_cuts >= 2:
+            # print("2")
+            # def planes_hit(group):
+            #     planes = group["StationNR"].nunique()
+            #     return planes >= 2
+
+            for event, group in df_scifi.groupby("Eventnumber"):
+                planes = group["StationNR"].nunique()
+                if planes < 2:
+                    events_to_remove.add(event)
+            # valid_event = df_scifi.groupby("Eventnumber").apply(planes_hit)
+            # events_to_remove.update(valid_event[~valid_event].index)
+            cut_flow.append(("2 consecutive scifi planes hit", df[~df["Eventnumber"].isin(events_to_remove)]["Eventnumber"].nunique()))
+        
+        if amount_selection_cuts >= 3:
+            # print("3")
+            grouped = df.groupby("Eventnumber")
+
+            for event, group in grouped:
+                if not group[group["StationNR"]==3].empty:
+                    if group[group["StationNR"]==2]["PlaneNR"].nunique() != 5:
+                        events_to_remove.add(event)
+
+            cut_flow.append(("if DS hit: all US planes hit", df[~df["Eventnumber"].isin(events_to_remove)]["Eventnumber"].nunique()))
+        
+        if amount_selection_cuts >= 4:
+            # print("4")
+            #event has one reconstructed DS track -> in MC: clustering algorithm produces clusters and fit is possible
+            for event, group in df_DS.groupby("Eventnumber"):
+                muon_points, muon_track, clusters, angle = tracking.reconstruct_muon(group)
+                trackcandidates = tracking.DStrack(event, clusters)
+                
+                if len(trackcandidates) > 0:
+                    trackcandidate = trackcandidates[0]
+                elif len(trackcandidates) == 0:
+                    continue
+                hitlist = []
+                for key, value in trackcandidate.items():
+                    hitlist.append(value)
+
+                if len(hitlist) == 0:
+                    continue
+                elif len(hitlist) > 0:
+                    rc = tracking.fitTrack(event, hitlist)
+                    if rc == -1:
+                        if event not in events_to_remove:
+                            events_to_remove.add(event)
+
+            # temp = df[~df["Eventnumber"].isin(events_to_remove)]   
+            cut_flow.append(("reconstructed muon track", df[~df["Eventnumber"].isin(events_to_remove)]["Eventnumber"].nunique()))
+    #             cut_flow.append(("Selection cut J", temp["Eventnumber"].nunique()))
+        
+        if amount_selection_cuts >= 5:
+            # print("5")
+            #latest DS hit time > earliest scifi hit time
+            if process != "muonDIS":
+                ds_times = df[df["StationNR"]==3].groupby("Eventnumber")["time"].max()
+                scifi_times = df_scifi.groupby("Eventnumber")["time"].min()
+                ds_times_aligned = ds_times.reindex(scifi_times.index)
+                invalid_event = ds_times_aligned <= scifi_times
+                events_to_remove.update(invalid_event[invalid_event].index)
+            cut_flow.append(("latest DS t > earliest scifi t", df[~df["Eventnumber"].isin(events_to_remove)]["Eventnumber"].nunique()))
+        
+        if amount_selection_cuts >= 6:
+            # print("6")
+            #muon track intersects first scifi plane >5cm away from detector edge
+            for event, group in df_DS.groupby("Eventnumber"):
+                muon_points, muon_track, clusters, angle = tracking.reconstruct_muon(group)
+                trackcandidates = tracking.DStrack(event, clusters)
+                
+                if len(trackcandidates) > 0:
+                    trackcandidate = trackcandidates[0]
+                elif len(trackcandidates) == 0:
+                    continue
+                hitlist = []
+                for key, value in trackcandidate.items():
+                    hitlist.append(value)
+
+                if len(hitlist) == 0:
+                    continue
+                elif len(hitlist) > 0:
+                    rc = tracking.fitTrack(event, hitlist)
+                    if rc == -1:
+                        continue
+                    else:
+                        fittedState = rc.getFittedState()
+                        state = fittedState.get6DState()
+                        x0, y0, z0 = state[0], state[1], state[2]
+                        dirx, diry, dirz = state[3], state[4], state[5] if state[5] != 0 else 1e-9
+                        slopeX = dirx/dirz
+                        slopeY = diry/dirz
+
+                        scifi_plane = zPos["Scifi"][10]
+                        x_pos = x0 + slopeX*(scifi_plane-z0)
+                        y_pos = y0 + slopeY*(scifi_plane-z0)
+
+                        x_diff, y_diff = True, True
+                        x_diff1, x_diff2 = abs(x_pos-dim_detector[4]), abs(x_pos-dim_detector[5])
+                        y_diff1, y_diff2 = abs(y_pos-dim_detector[6]), abs(y_pos-dim_detector[7])
+                        if (x_diff1 < 5 or x_diff2 < 5 or y_diff1 < 5 or y_diff2 < 5) and event not in events_to_remove:
+                            events_to_remove.add(event)
+
+            # temp = df[~df["Eventnumber"].isin(events_to_remove)]        
+            cut_flow.append(("track intersects first scifi plane \n>5cm away from detector edge", df[~df["Eventnumber"].isin(events_to_remove)]["Eventnumber"].nunique()))
+    #             cut_flow.append(("Selection cut L", temp["Eventnumber"].nunique()))
+        
+        if amount_selection_cuts >= 7:
+            # print("7")
+            #sum of min(DOCA) (=distance of closest approach) of track to scifi hits is <3cm in horizontal and vertical
+            #direction per station(plane in scifi)            
+            for event, group in df_DS.groupby("Eventnumber"):
+                muon_points, muon_track, clusters, angle = tracking.reconstruct_muon(group)
+                trackcandidates = tracking.DStrack(event, clusters)
+                
+                if len(trackcandidates) > 0:
+                    trackcandidate = trackcandidates[0]
+                elif len(trackcandidates) == 0:
+                    continue
+                hitlist = []
+                for key, value in trackcandidate.items():
+                    hitlist.append(value)
+
+                if len(hitlist) == 0:
+                    continue
+                elif len(hitlist) > 0:
+                    rc = tracking.fitTrack(event, hitlist)
+                    if rc == -1:
+                        continue
+                    else:
+                        station = 10
+                        sum_per_station = []
+                        fittedState = rc.getFittedState()
+                        state = fittedState.get6DState()
+                        x0, y0, z0 = state[0], state[1], state[2]
+                        dirx, diry, dirz = state[3], state[4], state[5] if state[5] != 0 else 1e-9
+                        slopeX = dirx/dirz
+                        slopeY = diry/dirz
+
+                        while station < 52:
+                            scifi_plane = zPos["Scifi"][station]
+                            x_pos = x0 + slopeX*(scifi_plane-z0)
+                            y_pos = y0 + slopeY*(scifi_plane-z0)
+
+                            # Filter scifi hits near the expected position (within some tolerance)
+                            tolerance = 10
+                            nearby_hits = df_scifi[
+                                (np.abs(df_scifi['coordX'] - x_pos) < tolerance) & 
+                                (np.abs(df_scifi['coordY'] - y_pos) < tolerance)
+                            ]
+
+                            if not nearby_hits.empty:
+                                # Compute DOCA (distance of closest approach) in a vectorized way
+                                distances = np.sqrt(
+                                    (nearby_hits['coordX'] - x_pos) ** 2 + 
+                                    (nearby_hits['coordY'] - y_pos) ** 2
+                                )
+                                min_distance = distances.min()
+                                sum_per_station.append(min_distance)
+
+                            station = station + 1 if station % 2 == 0 else station + 9
+
+                        any_greater_than_3 = any(dist > 3 for dist in sum_per_station)
+                        if any_greater_than_3 and event not in events_to_remove:
+                            events_to_remove.add(event)
+
+            # temp = df[~df["Eventnumber"].isin(events_to_remove)]        
+            cut_flow.append(("sum of min(DOCA) to scifi hits <3cm", df[~df["Eventnumber"].isin(events_to_remove)]["Eventnumber"].nunique()))
+    #             cut_flow.append(("Selection cut M", temp["Eventnumber"].nunique()))
+        
+        if amount_selection_cuts >= 8:
+            # print("8")
+            #more than 35 scifi hits
+            for event, group in df_scifi.groupby("Eventnumber"):
+                hits = len(group)
+                if hits <= 35 and event not in events_to_remove:
+                    events_to_remove.add(event)
+
+            temp = df[~df["Eventnumber"].isin(events_to_remove)]        
+            cut_flow.append((">35 scifi hits", temp["Eventnumber"].nunique()))
+    #             cut_flow.append(("Selection cut N", temp["Eventnumber"].nunique()))
+
+        if amount_selection_cuts >= 9:
+            # print("9")
+            #US total QDC larger than 700
+            #QDC calc: QDC calibration constant/number of SIPMs
+            #QDC calibration constant: 25000
+            for event, group in df.groupby("Eventnumber"):
+                hcal_US = group[group["StationNR"]==2]
+                hcal_US_grouped = hcal_US.groupby(["PlaneNR", "Bar"])
+                sum_QDC_hcal = 0
+                for (plane, bar), group2 in hcal_US_grouped:
+                    sum_eloss_bar = group2["Energy_loss"].sum()
+                    sum_QDC_bar = sum_eloss_bar*25*1000
+                    sum_QDC_hcal += sum_QDC_bar
+    #             print(sum_QDC_hcal)
+                if sum_QDC_hcal < 700 and event not in events_to_remove:
+                    events_to_remove.add(event)
+
+            temp = df[~df["Eventnumber"].isin(events_to_remove)]        
+            cut_flow.append(("sum US QDC >700", temp["Eventnumber"].nunique()))
+    #             cut_flow.append(("Selection cut O", temp["Eventnumber"].nunique()))
+
+        if amount_selection_cuts >= 10:
+            # print("10")
+            #number of DS hits per projection >10 (I think just means event, see selection cuts scripts from Cristovao)
+            for event, group in df_DS.groupby("Eventnumber"):
+                hcal_DS = group[group["StationNR"]==3]
+                if len(hcal_DS) > 10 and event not in events_to_remove:
+                    events_to_remove.add(event)
+
+            temp = df[~df["Eventnumber"].isin(events_to_remove)]        
+            cut_flow.append(("NR. of DS hits per event <10", temp["Eventnumber"].nunique()))
+    #             cut_flow.append(("Selection cut P", temp["Eventnumber"].nunique()))
+
+        df = df[~df["Eventnumber"].isin(events_to_remove)]
+        df_scifi = df_scifi[~df_scifi["Eventnumber"].isin(events_to_remove)]
+        
+        return df, df_scifi, cut_flow 
+
+    def selection_cuts_og(self, df, df_scifi, dim_detector, cut_flow, process, amount_selection_cuts):
         muon_recon = muon_reconstruction()
         
         hcal_grouped = df.groupby("Eventnumber")
-#         df_scifi.rename(columns={"PlaneNR": "StationNR"}, inplace=True)
         scifi_grouped = df_scifi.groupby("Eventnumber")
         events_to_remove = []
         
@@ -540,6 +774,7 @@ class initialise_data:
         df_scifi = df_scifi[~df_scifi["Eventnumber"].isin(events_to_remove)]
         
         return df, df_scifi, cut_flow            
+           
 
 #get bar positions in US
 with open(f'/eos/user/t/tismith/SWAN_projects/genie_ana_output/BarPositions.json', 'r') as jf:
@@ -1237,6 +1472,69 @@ class build_track:
                 p += 1
 
         return angle, polar_angle_muon, azimuthal_angle_muon, polar_angle_shower, azimuthal_angle_shower
+
+class lambda_likelihood_analysis:    
+    def __init__(self):
+        pass
+    
+    #get lambda x,y data for all processes
+    #if mean_per_wall: save mean lambda x,y per interaction wall    
+    def get_lambda(self, process_flags, data, mean_per_wall):
+        lambda_data = {"numu": None, "pm": None, "muonDIS": None, "nh": None}
+        bary_setup = barycenter_calc(energy_loss_threshold=0.001, QDCbar_threshold=0.002)
+
+        # Loop over each process based on the flags
+        for key, flag in process_flags.items():
+            if flag:
+                print(f"Processing {key}...")
+#                 df_temp = data[key].query("StationNR == 2 and Process != 0")
+                df_temp = data[key].query("StationNR == 2 and Process != 0").copy()
+
+                if df_temp is not None and not df_temp.empty:
+                    temp_data = {"Eventnumber": [], "PlaneNR": [], "lambdaX": [], "lambdaY": [], "wall": [], "w": []}
+                    grouped = df_temp.groupby(["Eventnumber", "PlaneNR"])
+                    
+                    for (e, p), group in grouped:
+                        result = bary_setup.barycenter(group, p, key)
+                        
+                        # Check if barycenter result is valid
+                        if all(entry is not None for entry in result) and result.lambdaX > 0:
+                            temp_data["Eventnumber"].append(e)
+                            temp_data["PlaneNR"].append(p)
+                            temp_data["lambdaX"].append(result.lambdaX)
+                            temp_data["lambdaY"].append(result.lambdaY)
+                            temp_data["wall"].append(result.interaction_wall)
+                            temp_data["w"].append(result.weight[0])
+                        
+                lambda_data[key] = pd.DataFrame(temp_data)
+        
+        # Calculate means and std deviations per wall if requested
+        if mean_per_wall:
+            for key, flag in process_flags.items():
+                if flag and lambda_data[key] is not None and not lambda_data[key].empty:
+                    print(f"Processing means for {key}...")
+                    
+                    temp_data = {"wall": [], "PlaneNR": [], "mean_lambdaX": [], "mean_lambdaY": [], "stdX": [], "stdY": [], "w": []}
+                    df_process = lambda_data[key]
+
+                    for wall in sorted(df_process["wall"].unique()):
+                        df_process_wall = df_process[df_process["wall"] == wall]
+                        
+                        for plane in sorted(df_process_wall["PlaneNR"].unique()):
+                            df_process_plane = df_process_wall[df_process_wall["PlaneNR"] == plane]
+
+                            temp_data["wall"].append(wall)
+                            temp_data["PlaneNR"].append(plane)
+                            temp_data["mean_lambdaX"].append(df_process_plane["lambdaX"].mean())
+                            temp_data["mean_lambdaY"].append(df_process_plane["lambdaY"].mean())
+                            temp_data["stdX"].append(df_process_plane["lambdaX"].std())
+                            temp_data["stdY"].append(df_process_plane["lambdaY"].std())
+                            temp_data["w"].append(df_process_plane["w"].iloc[0])
+                    
+                    # Replace the data for the current process with the summarized data
+                    lambda_data[key] = pd.DataFrame(temp_data)
+
+        return lambda_data  
     
 #muon reconstruction and cuts on muon momentum and slope
 class muon_reconstruction:
@@ -1745,6 +2043,51 @@ class Tracking():
                         clusters.append(aCluster)
                 cprev = c
         return clusters
+
+    def reconstruct_muon(self, df):
+        df_DS = df[df["StationNR"]==3]
+        clusters = self.clustering(df_DS)
+        coordX, coordY, coordZ = [], [], []
+        muonX, muonY, muonZ = [], [], []
+        polar_angle = None
+        if len(clusters) > 2:
+            for cluster in clusters:
+                for hit in cluster["hits"]:
+                    X_cluster, Y_cluster, Z_cluster = hit["coordX"], hit["coordY"], hit["coordZ"]
+                    coordX.append(X_cluster)
+                    coordY.append(Y_cluster)
+                    coordZ.append(Z_cluster)
+
+            if coordX and coordY and coordZ:
+                # Sort coordinates by Z to ensure correct order
+                coordinates = list(zip(coordX, coordY, coordZ))
+                coordinates.sort(key=lambda coord: coord[2])  # Sort by the Z coordinate
+                coordX_sorted, coordY_sorted, coordZ_sorted = zip(*coordinates)
+
+                # Perform linear fits for X and Y against Z
+                slope_x, intercept_x, _, _, _ = linregress(coordZ_sorted, coordX_sorted)
+                slope_y, intercept_y, _, _, _ = linregress(coordZ_sorted, coordY_sorted)
+
+                # Define a function for the fitted line
+                line_fit_x = lambda z: slope_x * z + intercept_x
+                line_fit_y = lambda z: slope_y * z + intercept_y
+                
+                polar_angle = math.atan(math.sqrt(slope_x**2 + slope_y**2))
+
+                # Package the fits in a dictionary for convenience
+                line_fit = {
+                    "slope_x": slope_x, "intercept_x": intercept_x,
+                    "slope_y": slope_y, "intercept_y": intercept_y,
+                    "line_fit_x": line_fit_x, "line_fit_y": line_fit_y
+                }
+
+                points = coordinates
+
+            else:
+                points, line_fit, polar_angle = None, None, None
+        else: points, line_fit, polar_angle = None, None, None
+            
+        return points, line_fit, clusters, polar_angle
         
     def ExecuteTask(self, df, nPlanes=3):
         self.trackCandidates = {}
@@ -1969,6 +2312,7 @@ class Tracking():
         # Runge-Kutta track representation(q/p, u', v', u, v). # Runge-Kutta track representation(q/p, u', v', u, v).
         # u,v: positions on a genfit.DetPlane. 13 for muon.
         rep = ROOT.genfit.RKTrackRep(13) 
+        # covM.Print()
         
         # start state
         state = ROOT.genfit.MeasuredStateOnPlane(rep)
@@ -1978,7 +2322,7 @@ class Tracking():
         seedState = ROOT.TVectorD(6)
         seedCov   = ROOT.TMatrixDSym(6)
         rep.get6DStateCov(state, seedState, seedCov)
-        # initialize a track object using a seed state (initial estimate of parameters)
+        # initialize a track object using a seed state 
         theTrack = ROOT.genfit.Track(rep, seedState, seedCov)
         
         # make measurements sorted in z
