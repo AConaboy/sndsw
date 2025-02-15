@@ -503,7 +503,7 @@ class Tracking(ROOT.FairTask):
             if detSys==1: self.scifiDet.GetSiPMPosition(detID,A,B)
         distance = 0
         tmp = array('d',[A[0],A[1],A[2],B[0],B[1],B[2],distance])
-        unSortedList[A[2]] = [ROOT.TVectorD(7,tmp),detID,k,detSys]
+        unSortedList[A[2]] = [ROOT.TVectorD(7,tmp),detID,k,detSys]  # Dictionary where key is the z position
     sorted_z=list(unSortedList.keys())
     sorted_z.sort()
     for z in sorted_z:

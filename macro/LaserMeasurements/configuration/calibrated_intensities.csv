@@ -1,4 +1,4 @@
-,Laser intensity [%],Calibrated laser intensity [%],Average adc [a.u],Average adc error [a.u],Incident photons / mm_sq
+,Laser intensity [%],Calibrated laser intensity [%],Average adc [a.u],Average adc error [a.u],Incident photons / mm^2
 0,1.0,7.5566597994424765,5.519506293804177,25.39861260823015,0.3415641754883615
 1,2.0,7.559994739738662,5.769748747737929,25.85905819086731,0.3570499549947665
 2,3.0,7.564926464744961,6.139808436397084,26.639059778475268,0.379950396757145

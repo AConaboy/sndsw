@@ -10,6 +10,7 @@ plt.rcParams['figure.titlesize'] = 18
 plt.rcParams['axes.titlesize'] = 16
 # Set the default font size for labels
 plt.rcParams['axes.labelsize'] = 16
+fontsize=16
 
 class TimeWalk(object):
 	def __init__(self, M):
@@ -136,7 +137,7 @@ class TimeWalk(object):
 					xerr=[d[0] for d in self.errors.values()], yerr=[d[1] for d in self.errors.values()], 
 					label=f'SiPM {self.M.SiPM}')				
 
-		for i in range(2): axes[i].legend()
+		for i in range(2): axes[i].legend(fontsize=fontsize)
 
 		d=f'{self.M.sndswpath}analysis-plots/timewalk/'
 		os.makedirs(d, exist_ok=True)
@@ -147,12 +148,14 @@ class TimeWalk(object):
 	
 	def CompareRunTypes(self, style='overlay'):
 		if style=='overlay':
-			fig, ax = plt.subplots()
+			fig, ax = plt.subplots(figsize=(10,6))
+			ax.tick_params(axis='both', which='major', labelsize=fontsize)
 
-			ax.set_title(f"Timestamp v QDC for SiPM {self.M.SiPM}, bar {self.M.bar}\nwith different illumination modes")
-			ax.set_ylabel('Timestamp [ns]')
-			ax.set_xlabel('QDC [a.u]')
+			ax.set_title(f"Timestamp v QDC for SiPM {self.M.SiPM}, bar {self.M.bar}\nwith different illumination modes", fontsize=fontsize)
+			ax.set_ylabel('Timestamp [ns]', fontsize=fontsize)
+			ax.set_xlabel('QDC [a.u]', fontsize=fontsize)
 			ax.grid(which='major',axis='both',linestyle='--')
+
 			for idx,runtype in enumerate(self.M.runs.keys()):
 				
     			# For SiPMs with no 3-bar illumination data:
@@ -177,7 +180,7 @@ class TimeWalk(object):
 					ax.errorbar(qdcs, timestamps, color=self.colours[idx], 
 						xerr=[d[0] for d in self.errors.values()], yerr=[d[1] for d in self.errors.values()], 
 						label=label)
-			ax.legend(loc=(0.5, 0.2))
+			ax.legend(loc=(0.5, 0.2), fontsize=fontsize)
 				
 		if style=='subplots':
 			fig, axes = plt.subplots(2,2, figsize = (12, 12))
@@ -227,12 +230,13 @@ class TimeWalk(object):
 
 		# self.twhist=twfit1Dhist
 
-		tmp = [(twfit1Dhist.GetBinCenter(i), twfit1Dhist.GetBinContent(i), twfit1Dhist.GetBinError(i)) for i in range(twfit1Dhist.GetNbinsX())]
+		# Invert trend just for better comparison with laser, done for DPG2024
+		tmp = [(twfit1Dhist.GetBinLowEdge(i), -twfit1Dhist.GetBinContent(i), twfit1Dhist.GetBinError(i)) for i in range(twfit1Dhist.GetNbinsX())] 
 		x = [i for i in tmp if i[1]!=0]
 
-		TI18_qdcs, TI18_timestamps, TI18_errors = zip(*x)
+		TI18_qdcs, TI18_times, TI18_errors = zip(*x)
 
-		return TI18_qdcs, TI18_timestamps, TI18_errors, fixed_ch
+		return TI18_qdcs, TI18_times, TI18_errors, fixed_ch
 
 	def TI18_laser_comparison(self):
 
@@ -240,29 +244,21 @@ class TimeWalk(object):
 		idx=0
 
 		if len(self.data)==0: return
-		qdcs, timestamps = zip(*self.data.values())
+		qdcs, times = zip(*self.data.values())
 
-		# Find delta t between first qdc>5 and last qdc<100
-		lasermip, laser100 = None,None
-		for i in range(len(qdcs)):
-			if qdcs[i]>=5 and lasermip==None:
-				lasermip = (qdcs[i], timestamps[i])
-			if qdcs[i]>=100:
-				laser100 = (qdcs[i-1], timestamps[i-1])
-				break 				
-		
-		TI18_qdcs, TI18_timestamps, TI18_errors, fixed_ch = self.GetTI18Timewalk()
+		lasermip_idx = next((i for i,x in enumerate(qdcs) if x >= 5), None) # pass generator object to next, return None if all < 5 which will never happen
+		lasermip = qdcs[lasermip_idx], times[lasermip_idx] 
+		laser100_idx = min(range(len(qdcs)), key=lambda i:abs(qdcs[i]-100)) # return value closest to 100
+		laser100 = qdcs[laser100_idx], times[laser100_idx]
 
-		# Find delta t between first qdc>5 and last qdc<100
-		TI18mip, TI18100 = None,None
-		for i in range(len(TI18_qdcs)):
-			if TI18_qdcs[i]>=5 and TI18mip==None:
-				TI18mip = (TI18_qdcs[i], TI18_timestamps[i])
-
-			# Get TI18 QDC closest to the laser QDC value
-			if TI18_qdcs[i]>=laser100[0]:
-				TI18100 = (TI18_qdcs[i-1], TI18_timestamps[i-1])
-				break 		
+		TI18_qdcs, TI18_times, TI18_errors, fixed_ch = self.GetTI18Timewalk(
+			plane=self.options.tw_comparison_plane,
+			side=self.options.tw_comparison_side
+			)
+		TI18mip_idx = next((i for i,x in enumerate(TI18_qdcs) if x==lasermip[0]), None)
+		TI18mip = TI18_qdcs[TI18mip_idx], TI18_times[TI18mip_idx]
+		TI18100_idx = next((i for i,x in enumerate(TI18_qdcs) if x==laser100[0]), None)
+		TI18100 = TI18_qdcs[TI18100_idx], TI18_times[TI18100_idx]	
 
 		if any([TI18100==None, TI18mip==None]): return
 		self.dts['TI18'][self.M.SiPM]=abs(TI18100[1]-TI18mip[1])
@@ -272,32 +268,50 @@ class TimeWalk(object):
 		TI18label = f't({TI18100[0]}) - t({TI18mip[0]}) = {round(TI18100[1]-TI18mip[1], 2)} ns'
 
 		# Get graph points from timewalk_{fixed_ch}.root
-		fig, axes = plt.subplots(1,2, figsize=(14,8))
+		fig, axes = plt.subplots(1,2, figsize=(14,6))
 
 		fig_title=fig.suptitle(f'Comparison of timewalk observed in TI18 with laser data SiPM {self.M.SiPM}\n{self.M.titledict[self.M.mode]} illumination')	
 		for i in range(2): 
-			axes[i].set_xlabel('QDC [a.u]', position=(1,0), horizontalalignment='right')
+			axes[i].tick_params(axis='both', which='major', labelsize=fontsize)
+			axes[i].set_xlabel('QDC [a.u]', position=(1,0), horizontalalignment='right', fontsize=fontsize)
 			axes[i].grid(which='major', axis='both', linestyle='--')
-		axes[0].set_ylabel('$t_{0}^{DS} - t_{SiPM} [ns]$', position=(0,1), horizontalalignment='right')
-		axes[0].set_title(f'TI18: {self.M.LaserAna.MakeHumanReadableFixedCh(fixed_ch)}')
-		axes[1].set_ylabel('timestamp [ns]', position=(0,1), horizontalalignment='right')
-		axes[1].set_title('Laser')
+			
+		axes[0].set_ylabel('$-(t_{0}^{DS} - t_{SiPM})$ [ns]', position=(0,1), horizontalalignment='right', fontsize=fontsize)
+		axes[0].set_title(f'TI18: {self.M.LaserAna.MakeHumanReadableFixedCh(fixed_ch)}', fontsize=fontsize)
+		axes[1].set_ylabel('time [ns]', position=(0,1), horizontalalignment='right', fontsize=fontsize)
+		axes[1].set_title('Laser', fontsize=fontsize)
 
 		# TI18 data
-		axes[0].errorbar(TI18_qdcs, [-i for i in TI18_timestamps], color="C1", 
-			yerr=TI18_errors, fmt='o', label=TI18label) # Invert trend just for better comparison with laser, done for DPG2024
-		axes[0].legend()
+		axes[0].errorbar(TI18_qdcs, [i for i in TI18_times], color="C1", 
+			yerr=TI18_errors, fmt='o', label=TI18label) 
+		axes[0].legend(fontsize=fontsize)
 
 		# Laser data
-		axes[1].errorbar(qdcs, timestamps, color=self.colours[idx], 
+		axes[1].errorbar(qdcs, times, color=self.colours[idx], 
 			xerr=[d[0] for d in self.errors.values()], yerr=[d[1] for d in self.errors.values()], 
 			label=laserlabel)
-		axes[1].legend()
+		axes[1].legend(fontsize=fontsize)
+
+		points_to_label={0:{
+							TI18mip_idx:[TI18_qdcs[TI18mip_idx], TI18_times[TI18mip_idx]],TI18100_idx:[TI18_qdcs[TI18100_idx], TI18_times[TI18100_idx]]
+						}, 
+						1:{
+							lasermip_idx:[qdcs[lasermip_idx], times[lasermip_idx]],
+							laser100_idx:[qdcs[laser100_idx], times[laser100_idx]]
+						}
+		}
+
+		for idx,ax in enumerate(axes):
+			for pt, d in points_to_label[idx].items():
+				ax.annotate(f'({round(d[0],1)}, {round(d[1],1)})', (d[0], d[1]), va='bottom', ha='left',
+				# xytext=(0.5,0.5),
+				fontsize=fontsize)
 
 		# Make directory if not already there
 		d=f'{self.M.sndswpath}analysis-plots/timewalk/TI18-comparison/'
 		os.makedirs(d, exist_ok=True)
 
+		plt.tight_layout()
 		plotlocation = d+f'SiPM_{self.M.SiPM}_{self.M.titledict[self.M.mode]}.png'
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')
@@ -311,27 +325,43 @@ class TimeWalk(object):
 
 	def PlotSystemTI18LaserDifference(self):
 
-		fig, axes = plt.subplots(2,1, figsize=(8, 12))
+		# fig, axes = plt.subplots(2,1, figsize=(8, 12))
+		fig, axes = plt.subplots(2, 1, sharex=True, figsize=(8, 8))
 		fig_title=fig.suptitle(f'Comparison of time walk between laser and TI18 for all SiPMs\n{self.M.titledict[self.M.mode]} illumination')
 
-		for i in range(2):
-			axes[i].set_xlabel('SiPM number', position=(1,0), horizontalalignment='right')
-			axes[i].grid(which='major', axis='both', linestyle='--')
-		axes[0].set_ylabel('|dt| [ns]', position=(0,1), horizontalalignment='right')
-		axes[0].set_title(f'Degree of timewalk observed over fixed QDC range')
-		axes[1].set_ylabel('Timewalk laser/TI18', position=(0,1), horizontalalignment='right')
-		axes[1].set_title('Ratio of timewalk observed between TI18 and laser')			
+		for i in axes.flatten():
+			
+			i.grid(which='both', axis='y', linestyle='--')
+			[i.axvline(g*8, linestyle='--', color='grey') for g in range(1,10)]
+			i.tick_params(axis='both', which='major', labelsize=fontsize)
+		axes[1].set_xlabel('SiPM number', position=(1,0), horizontalalignment='right', fontsize=fontsize)
+		axes[0].set_ylabel('|dt| [ns]', position=(0,1), horizontalalignment='right', fontsize=fontsize)
+		axes[0].set_title(f'Degree of timewalk observed over fixed QDC range', fontsize=fontsize)
+		axes[1].set_ylabel('Timewalk laser / TI18', position=(0,1), horizontalalignment='right', fontsize=fontsize)
+		# axes[1].set_title('Ratio of timewalk observed between TI18 and laser', fontsize=fontsize)
 
 		for i, x in enumerate((('laser', 'o'), ('TI18', 'D'))):
 			axes[0].errorbar([int(i) for i in self.dts[x[0]].keys()],self.dts[x[0]].values(), label=f'{x[0]} data', marker=x[1])
-		axes[0].legend()
+		axes[0].legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=True, fontsize=fontsize)
+
+		plane = self.options.tw_comparison_plane
+		side = self.options.tw_comparison_side
 
 		d_data = {int(SiPM):abs(self.dts['TI18'][SiPM]/self.dts['laser'][SiPM]) for SiPM in self.dts['laser'].keys()}
 		axes[1].errorbar(d_data.keys(), d_data.values())
 
+		axes[1].text(
+				0.65, 0.2, 
+				f"TI18 data from plane {plane+1}, {side} side", 
+				color='black', fontsize=fontsize, ha='left', va='center', transform=axes[1].transAxes,
+    			bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.5', alpha=0.5)
+				)
+
+
 		d = f'{self.M.sndswpath}analysis-plots/timewalk/TI18-comparison/'
 
-		plotlocation = d+f'SystemTimewalkComparison_{self.M.titledict[self.M.mode]}.png'
+		plotlocation = d+f'SystemTimewalkComparison_{self.M.titledict[self.M.mode]}-plane{plane}side{side}.png'
+		plt.tight_layout()
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Timewalk comparison plot saved to {plotlocation}')
 

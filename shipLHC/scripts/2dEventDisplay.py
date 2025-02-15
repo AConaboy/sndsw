@@ -141,7 +141,7 @@ if eventTree.GetBranch('Digi_MuFilterHit'):
   eventTree.GetEvent(0)
   eventTree.Digi_MuFilterHits = eventTree.Digi_MuFilterHit
 
-nav = ROOT.gGeoManager.GetCurrentNavigator()
+nav = ROOT.gGeoManager.GetCurrentNavigator() 
 
 # get filling scheme
 try:
@@ -195,7 +195,49 @@ def userProcessing(event,mode):
 
       DrawMuon(event)
 
+    if mode.find('muonexitpoint')>-1:
+      
+      if not abs(track.GetPdgCode())==13:
+         print(f'mctrack[1] not a muon')
+         return 
+      DrawMuonExitPoint(event)
+
     return    
+
+def DrawMuonExitPoint(event):
+   
+   acceptancelimits={'x':[-80, 5], 'y':[0, 75]}
+
+   track=event.MCTrack[1]
+   track_pz = track.GetPz() 
+
+   starts = {'x':track.GetStartX(), 'y':track.GetStartY(), 'z':track.GetStartZ()}
+
+   gradients = {'x':track.GetPx()/track_pz, 'y':track.GetPy()/track_pz}
+   intercepts = {i:starts[i]-gradients[i]*starts['z'] for i in gradients.keys()}
+
+   limits = {i:acceptancelimits[i][1] if gradients[i]>0 else acceptancelimits[i][0] for i in ['x', 'y']}
+
+   thresholds = {i:(limits[i]-intercepts[i])/gradients[i] for i in limits.keys()}
+   
+   # exitpoint = min(thresholds.values())
+
+   h['muonexitpoints'] = {
+            'X':ROOT.TMarker( thresholds['x'],limits['x'],20 ), 
+            'Y':ROOT.TMarker( thresholds['y'],limits['y'],20 )}
+
+   proj={'X':0, 'Y':1}
+   for p in proj:
+      # h['muonexitpoints'][p].SetMarkerStyle(5)
+      h['muonexitpoints'][p].SetMarkerColor(ROOT.kBlack)
+      h['muonexitpoints'][p].SetMarkerSize(2)
+
+      c=proj[p]
+      c=h['simpleDisplay'].cd(c+1)
+      h['muonexitpoints'][p].Draw('P same')
+      c.Update() 
+   h['simpleDisplay'].Update()
+
 
 def bunchXtype():
 # check for b1,b2,IP1,IP2
@@ -576,7 +618,7 @@ def loopEvents(
           if not rc: rc = twoTrackEvent(sMin=10,dClMin=7,minDistance=0.5,sepDistance=3.0)
 
     if verbose>0: dumpChannels()
-    if HCALbarycentres: userProcessing(event, 'HCALbarycentres-drawmuon')
+    if HCALbarycentres: userProcessing(event, 'HCALbarycentres-drawmuon-muonexitpoint')
 
    #  if save: h['simpleDisplay'].Print('{:0>2d}-event_{:04d}'.format(runId,N)+'.png')
     if save:
@@ -617,8 +659,10 @@ def DrawMuon(event):
 
    proj={'X':0, 'Y':1}
    for p in proj: 
+      
       c=proj[p]
       c=h['simpleDisplay'].cd(c+1)
+      h['muontrack'][p].SetLineWidth(4)
       h['muontrack'][p].Draw('P same')
       c.Update()
    h['simpleDisplay'].Update()   

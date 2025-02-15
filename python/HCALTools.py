@@ -19,18 +19,6 @@ class HCALTools(object):
         self.HCAL5z = 0.5*(self.A.z() + self.B.z())
         self.acceptancelimits={'x':[-100, 20], 'y':[-10, 100]}
 
-        self.column_names=['filekey', 'EventNumber','interactionWall',
-        'scifi_median_x','scifi_median_y',
-        'scifi_residual_x','scifi_residual_y',
-        'dx0','dx1','dx2','dx3','dx4',
-        'dy0','dy1','dy2','dy3','dy4',
-        'x0','x1','x2','x3','x4',
-        'y0','y1','y2','y3','y4',
-        'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
-        'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-        'HCAL5barcode'
-        ]
-
         self.muAna.BuildBarLengths(MuFilter)
         self.muAna.Makecscintdict('005408')
 
@@ -118,7 +106,6 @@ class HCALTools(object):
         
         self.intWall_median_x, self.intWall_median_y = np.median(positions['x']),np.median(positions['y'])  
 
-
     def BDT_cut(self, event, MuFilter, Scifi):
 
         hits = event.Digi_MuFilterHits
@@ -150,12 +137,12 @@ class HCALTools(object):
 
         # Can't use BDT here, must assume True
         if len(fired_planes)==0:
-            return False  
+            return np.array([[1,0]]) # Return 100% probability that event is signal
 
         # Sanity check, should be none
         if len(fired_planes)==3:
             print(f'3 fired DS planes in event {self.EventNumber}')
-            return True
+            return np.array([[0,1]]) # Return 100% probability that event is background
 
         # Find combinations of DS cluster centroids
         self.GetCombinatorics()
@@ -191,8 +178,8 @@ class HCALTools(object):
                     self.xy_residuals[plane][proj] = best_residual[plane]
  
             # Require that the xy_residual is defined for the 4th and 5th plane
-            if list(self.xy_residuals[4].values()) == [np.nan, np.nan]: return False
-            if list(self.xy_residuals[3].values()) == [np.nan, np.nan]: return False
+            if list(self.xy_residuals[4].values()) == [np.nan, np.nan]: return np.array([[1,0]]) # Return 100% probability that event is signal
+            if list(self.xy_residuals[3].values()) == [np.nan, np.nan]: return np.array([[1,0]]) # Return 100% probability that event is signal
 
             self.lambda_x_dict = {i:np.nan for i in range(5)}
             self.lambda_y_dict = {i:np.nan for i in range(5)}
@@ -242,17 +229,19 @@ class HCALTools(object):
             xdf = xdf[features] # Ensure data is in the right order for BDT 
 
             # BDT returns True for predicting a muon
-            res = self.model.predict(xdf)
-            return bool(res[0])
+            p_signal = self.model.predict_proba(xdf) # Probability of class 0 -> no muon / signal
+            return p_signal
             
         # Also must assume True here at the moment.
         # Will test extending BDT to 1 fired DS plane
         elif len(fired_planes)==1:
-            return False
-        else: return False
+            return np.array([[1,0]]) # Return 100% probability that event is signal
+        else: 
+            print(f'N fired planes = {len(fired_planes)}')
+            return np.array([[1,0]]) # Return 100% probability that event is signal
 
     def Get_ds(self):
-        self.ds = {f'ds{i}':np.nan for i in range(5)}
+        
         for plane in range(5):
             self.ds[f'ds{plane}'] = np.sqrt( sum([i**2 for i in self.xy_residuals[plane].values()]) )
 
@@ -315,7 +304,31 @@ class HCALTools(object):
         residual = ext-scifi_b
         res_dict['intWall']=residual
 
-        return res_dict     
+        return res_dict  
+
+    def muonexitpoint(self, event): 
+
+        # For data continuity when passing to BDT training
+        if not self.eventHasMuon:
+            self.gradients={'x':np.nan, 'y':np.nan}
+            self.intercepts={'x':np.nan, 'y':np.nan}
+
+        # This track is the most energetic final state track, which will be the lepton or neutrino
+        track = event.MCTrack[1] 
+        track_pz = track.GetPz()
+
+        starts = {'x':track.GetStartX(), 'y':track.GetStartY(), 'z':track.GetStartZ()}
+
+        self.gradients = {'x':track.GetPx()/track_pz, 'y':track.GetPy()/track_pz}
+        self.intercepts = {i:starts[i]-self.gradients[i]*starts['z'] for i in self.gradients.keys()}
+
+        limits = {i:self.acceptancelimits[i][1] if self.gradients[i]>0 else self.acceptancelimits[i][0] for i in ['x', 'y']}
+
+        thresholds = {i:(limits[i]-self.intercepts[i])/self.gradients[i] for i in limits.keys()}
+        
+        exitpoint = min(thresholds.values())
+
+        return exitpoint
 
     def GetBarycentre(self, plane, proj):
 
@@ -350,7 +363,7 @@ class HCALTools(object):
 
     def getdata(self, mode='write'):
 
-        column_names=['filekey', 'EventNumber','hasMuon','interactionWall',
+        column_names=['filekey','EventNumber','flav','hasMuon','fired_planes','interactionWall',
         'scifi_median_x','scifi_median_y',
         'scifi_residual_x','scifi_residual_y',
         'dx0','dx1','dx2','dx3','dx4',
@@ -360,14 +373,11 @@ class HCALTools(object):
         'y0','y1','y2','y3','y4',
         'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
         'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-        'HCAL5barcode'
-        ]        
+        'HCAL5barcode',
+        'm_x', 'c_x', 'm_y', 'c_y'
+        ]
 
-        # x_list = [round(self.xbarycentres[p]['dxB'],3) for p in range(5)]
-        # x_list = [round(self.GetBarycentre(p,'x')) for p in range(5)]
         x_list = [round(self.GetBarycentre(p, 'x')) if not np.isnan(self.GetBarycentre(p, 'x')) else np.nan for p in range(5)]
-        # y_list = [round(self.barycentres[p]['y-barycentre']['yB'],3) for p in range(5)]
-        # y_list = [round(self.GetBarycentre(p,'y')) for p in range(5)]
         y_list = [round(self.GetBarycentre(p, 'y')) if not np.isnan(self.GetBarycentre(p, 'y')) else np.nan for p in range(5)]        
         dx_list = [round(self.xy_residuals[p]['x'], 3) for p in range(5)]
         dy_list = [round(self.xy_residuals[p]['y'], 3) for p in range(5)]
@@ -381,7 +391,9 @@ class HCALTools(object):
             output_dict = {k:None for k in column_names}
             output_dict['filekey'] = self.filekey
             output_dict['EventNumber'] = self.EventNumber
+            output_dict['flav'] = self.NeutrinoIntType
             output_dict['hasMuon'] = self.eventHasMuon
+            output_dict['fired_planes'] = len(self.fired_planes)
             output_dict['interactionWall'] = self.interactionWall
             output_dict['scifi_median_x'] = round(self.intWall_median_x,3)
             output_dict['scifi_median_y'] = round(self.intWall_median_y,3)
@@ -389,6 +401,10 @@ class HCALTools(object):
             output_dict['ds_scifi'] = round(self.scifi_residual, 3)
             output_dict['scifi_residual_x'] = round(self.xy_residuals['intWall']['x'], 3)
             output_dict['scifi_residual_y'] = round(self.xy_residuals['intWall']['y'], 3)
+            
+            for i in ['x', 'y']: 
+                output_dict[f'm_{i}'] = self.gradients[i] 
+                output_dict[f'c_{i}'] = self.intercepts[i]
 
             for i in range(5):
                 output_dict[f'dx{i}'] = dx_list[i]
@@ -405,7 +421,7 @@ class HCALTools(object):
             output_dict = {k:None for k in column_names}
             output_dict['filekey'] = self.filekey
             output_dict['EventNumber'] = self.EventNumber
-            # output_dict['hasMuon'] = self.eventHasMuon
+            output_dict['fired planes'] = len(self.fired_planes)
             output_dict['interactionWall'] = self.interactionWall
             output_dict['scifi_median_x'] = round(self.intWall_median_x,3)
             output_dict['scifi_median_y'] = round(self.intWall_median_y,3)
@@ -433,20 +449,23 @@ class HCALTools(object):
                 writer.writerow(output)
         
         elif mode=='get':
-            return output_dict
+            return output_dict           
 
-    def OutgoingMuon(self, event):
+    def OutgoingMuon(self, event, mode):
         ### Return true for events with an outgoing muon
         if event.GetName()=='rawConv':
             print(f'No MCTrack branch in real data! ')
             return False
-        if abs(event.MCTrack[1].GetPdgCode()) == 13: return True 
+        if mode=='neutrino' and abs(event.MCTrack[1].GetPdgCode()) == 13: return True  # This is only true for numu! 
+        elif mode == 'neutralhadron': return False
+        elif mode in ['passingmuon', 'muonDIS', 'multimuon']: return True
+
         else: return False   
 
     def GetInteractionWall(self, scifi_hits):
         filtered_hits = ROOT.snd.analysis_tools.filterScifiHits(scifi_hits, 0, "TI18")
         interactionWall = ROOT.snd.analysis_tools.showerInteractionWall(filtered_hits, 0, "TI18")
-        return interactionWall+1                 
+        return interactionWall+1
 
     def dsCluster(self, hits, mufi):
         clusters = []

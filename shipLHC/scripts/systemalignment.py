@@ -14,6 +14,7 @@ class SystemAlignment(object):
         self.muAna = tw.muAna
         self.timealignment=tw.timealignment
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
+        self.muontrackIDs = [0,1]
 
         self.afswork=tw.afswork
         if not self.simulation: self.outpath=tw.outpath
@@ -27,7 +28,6 @@ class SystemAlignment(object):
         self.systemAndChannels={1:[8,0],2:[6,2],3:[1,0]}
         self.sdict={0:'Scifi',1:'Veto',2:'US',3:'DS'}
         self.zPos=tw.zPos
-        self.cutdists=self.muAna.GetCutDistributions(self.runNr, ('dy', 'timingdiscriminant'))
 
         self.freq=160.316E6
         self.TDC2ns=1E9/self.freq
@@ -42,8 +42,6 @@ class SystemAlignment(object):
             self.SiPMcombinations = {1:{'left':list(combinations(range(8), 2)), 'right':list(combinations(range(8, 16), 2))}, 
             2:{'left':list(combinations([0,1,3,4,6,7], 2)), 'right':list(combinations([8,9,11,12,14,15], 2))}
             }
-        
-        self.sigmatds0=0.263 # ns 
 
         if self.tw.mode=='reconstructmuonposition':
             from buildhistograms import MakeReconstructMuonHistograms
@@ -55,11 +53,15 @@ class SystemAlignment(object):
         detID=hit.GetDetectorID()
         s,p,b=self.muAna.parseDetID(detID)
 
-        if not self.simulation: correctedtimes=self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=self.tw.Ex[p].x(), mode='aligned')
-        else: correctedtimes=hit.GetAllTimes()
+        if not self.simulation: 
+            correctedtimes=self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=self.tw.Ex[p].x(), mode='aligned')
+        else: # simulation
+            correctedtimes=hit.GetAllTimes()
 
         for ch in correctedtimes:
-            SiPM, time=ch
+            SiPM, time = ch
+            d = self.muAna.alignmentparameters[f'{detID}_{SiPM}']
+            # print(f'{detID}_{SiPM}: time = {time}, d = {d[0]}')
             fixed_ch=f'{detID}_{SiPM}'
 
             ReadableDetID=self.muAna.MakeHumanReadableFixedCh(fixed_ch)
@@ -113,7 +115,8 @@ class SystemAlignment(object):
         averagebartimehistname=f'averagetime_{detID}_aligned'
         if not averagebartimehistname in self.hists:
             title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average of aligned times from each side as a function of x_{predicted};x_{predicted} [cm];'+'#frac{1}{2}#times(t^{DS,TW}_{left}+t^{DS,TW}_{right}) [ns];Counts'
-            self.hists[averagebartimehistname]=ROOT.TH2F(averagebartimehistname, title, 110, -100, 10, 2000, -5, 5)
+            histformat = self.tw.histformatting['averagetime']['aligned']
+            self.hists[averagebartimehistname]=ROOT.TH2F(averagebartimehistname, title, *histformat[0], *histformat[1])
         self.hists[averagebartimehistname].Fill(self.tw.Ex[p].x(), averagetime)
 
         for side in ('left', 'right'):
@@ -121,27 +124,34 @@ class SystemAlignment(object):
             SiPMcut_averagebarsidetimehistname=f'sidetime_{detID}-{side}_aligned-SiPMcut'
             if not averagebarsidetimehistname in self.hists:
                 title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average aligned + ToF corr time from '+side+' side as a function of x_{predicted};x_{predicted} [cm];'+ side+' side average of t^{DS,TW}_{'+side+'} [ns];Counts'
-                self.hists[averagebarsidetimehistname]=ROOT.TH2F(averagebarsidetimehistname, title, 110, -100, 10, 2000, -5, 5)
+                histformat=self.tw.histformatting['sidetime']['aligned']
+                self.hists[averagebarsidetimehistname]=ROOT.TH2F(averagebarsidetimehistname, title, *histformat[0], *histformat[1])
             self.hists[averagebarsidetimehistname].Fill(self.tw.Ex[p].x(), tofa_averages[side])
             
             if not SiPMcut_averagebarsidetimehistname in self.hists:
                 title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average aligned + ToF corr time from '+side+' side as a function of x_{predicted};x_{predicted} [cm];'+ side+' side average of t^{DS,TW}_{'+side+'} [ns];Counts'
-                self.hists[SiPMcut_averagebarsidetimehistname]=ROOT.TH2F(SiPMcut_averagebarsidetimehistname, title, 110, -100, 10, 2000, -5, 5)                
+                histformat = self.tw.histformatting['sidetime']['aligned']
+                self.hists[SiPMcut_averagebarsidetimehistname]=ROOT.TH2F(SiPMcut_averagebarsidetimehistname, title, *histformat[0], *histformat[1])
             if self.muAna.AllLiveSiPMs(hit):
-            # if nleft>=4 and nright>=4:
                 self.hists[SiPMcut_averagebarsidetimehistname].Fill(self.tw.Ex[p].x(), tofa_averages[side])
 
     def ReconstructMuonPosition(self, hits):
 
+<<<<<<< HEAD
         barycentres=self.muAna.GetBarycentres(hits)
 >>>>>>> 6209bb093 (Updates to fix chi2 in data)
+=======
+        barycentres=self.muAna.GetBarycentres(hits, MuFilter=self.tw.MuFilter)
+>>>>>>> 6fe2275fe (no idea what I'm doing)
         x_methods_dict={mode:self.muAna.GetOverallXBarycentre(barycentres, mode=mode) for mode in ('relQDC', 'maxQDC')}
 
         for plane in barycentres:
-
+            if len(barycentres[plane])==0: continue
             x_data, y_data = barycentres[plane].values()
 
-            if self.tw.hasTrack: xEx, yEx, zEx = self.tw.muAna.GetExtrapolatedPosition(plane)
+            if self.tw.hasTrack: 
+                
+                xEx, yEx, zEx = self.tw.muAna.GetExtrapolatedPosition(plane)
 
             # y-histograms
             self.hists[f'lambda_y-plane{plane}'].Fill(y_data['lambda_y'])
@@ -184,7 +194,6 @@ class SystemAlignment(object):
                 self.hists[f'relQDC-plane{plane}'].Fill(relQDC)
                 self.hists[f'relQDC-total'].Fill(relQDC)
 
-
     def ScifiCorrectedTimes(self, hit):
         detID=hit.GetDetectorID()
 
@@ -202,18 +211,20 @@ class SystemAlignment(object):
                 axestitles='t^{DS}_{0} - t_{SiPM '+str(SiPM)+'}^{tw corr} - d_{SiPM '+str(SiPM)+'} [ns];Counts'
                 fulltitle=splittitle+';'+axestitles
                 # if self.timealignment=='old': self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, -10, 10)
-                self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 400, -10, 10)
-                # else: self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, 2000, -5, 5)
+                histformat=self.tw.histformatting['dtvxpred']['corrected']
+                self.hists[SiPMtime]=ROOT.TH1F(SiPMtime,fulltitle, *histformat[1])
 
             self.hists[SiPMtime].Fill(time)
 
     def XTHists(self, hit):
 
-        correctedtimes, qdcs = self.muAna.GetCorrectedTimes(hit, self.tw.Ex[p].x(), mode='aligned'), hit.GetAllSignals()
-        times={'left':{}, 'right':{}}
-        detID=hit.GetDetectorID()
+        detID = hit.GetDetectorID()
         s,p,b = self.muAna.parseDetID(detID)
 
+        correctedtimes = self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=self.tw.Ex[p].x(), mode='aligned')
+        qdcs = hit.GetAllSignals()
+        times = {'left':{}, 'right':{}}
+        
         for i in correctedtimes: 
             SiPM, correctedtime = i
             fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
@@ -229,8 +240,9 @@ class SystemAlignment(object):
             title='Timing correlation between all '+self.subsystemdict[s]+' SiPMs and t_{0}^{DS}'
             axestitles='t_{0}^{DS} - t_{SiPM}^{tw corr} - d_{SiPM} [ns];t_{0}^{DS} [ns];Counts'
             fulltitle=title+';'+axestitles
-            if self.timealignment=='old': self.hists[xrefthistname]=ROOT.TH2F(xrefthistname,fulltitle, 150, -5, 20, 125, 0, 25)
-            else: self.hists[xrefthistname]=ROOT.TH2F(xrefthistname,fulltitle, 150, -5, 20, 125, 0, 25)
+            histformat=self.tw.histformatting['timingxt']['aligned']
+            if self.timealignment=='old': self.hists[xrefthistname]=ROOT.TH2F(xrefthistname,fulltitle, *histformat[0], *histformat[1])
+            else: self.hists[xrefthistname]=ROOT.TH2F(xrefthistname,fulltitle,*histformat[0], *histformat[1])
 
         for side in times:
             for combination in self.SiPMcombinations[s][side]:
@@ -245,11 +257,123 @@ class SystemAlignment(object):
                     splittitle='#splitline{'+title+'}{'+subtitle+'}'
                     axestitles='t_{0}^{DS} - t_{SiPM '+str(i)+'}^{tw corr} [ns];t_{0}^{DS} - t_{SiPM '+str(j)+'}^{tw corr} [ns];Counts'
                     fulltitle=splittitle+';'+axestitles
-                    if self.timealignment=='old': self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
-                    else: self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, 150, -5, 20, 150, -5, 20)
+                    histformat=self.tw.histformatting['timingxt']['aligned']
+                    if self.timealignment=='old': self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, *histformat[0], *histformat[1])
+                    else: self.hists[xthistname]=ROOT.TH2F(xthistname,fulltitle, *histformat[0], *histformat[1])
 
                 self.hists[xthistname].Fill(time_i, time_j)
                 self.hists[xrefthistname].Fill(time_i, self.tw.reft)
+
+    def MultiMuonReconstruction(self, hits):
+
+        samebar, leftID, rightID = self.GetMuonTracks()
+
+        if not samebar:
+            print(f'Muons not in same bar, skipping event {self.tw.M.EventNumber}')
+            return 
+
+        barycentres=self.muAna.GetBarycentres(hits, MuFilter=self.tw.MuFilter)
+        x_barycentres = self.muAna.GetOverallXBarycentre(barycentres, mode='maxQDC')
+
+        left_muon = self.tw.M.eventTree.MCTrack[leftID]
+        right_muon = self.tw.M.eventTree.MCTrack[rightID]
+
+        for plane in barycentres:
+            if len(barycentres[plane])==0: continue
+            
+            # Get detID in plane where both muons are
+            muons_detID = self.GetMultiMuonBar(plane)
+            if muons_detID== False: continue
+
+            x_data, y_data = barycentres[plane].values()
+
+            # Get the track extrapolations for the left muon and right muon
+            lefttrack_pos = self.ExtrapolateMCTrack(leftID, plane)
+            righttrack_pos = self.ExtrapolateMCTrack(rightID, plane)
+            
+            xL = x_data[muons_detID]['xL']
+            xR = x_data[muons_detID]['xR']
+            
+            # Residuals between measurements of xL/xR and the muon positions
+            dxL = lefttrack_pos[0] - xL 
+            dxR = righttrack_pos[0] - xR 
+
+            dxLvtrackx_histname = f'dxL-plane{plane}'
+            if not dxLvtrackx_histname in self.hists:
+                title = 'Residual between x_{left} and left muon track position for plane '+str(plane+1)+';#Delta(x_{left}, left muon track x) [cm];left muon track x [cm]'
+                self.hists[dxLvtrackx_histname] = ROOT.TH2F(dxLvtrackx_histname, title, 50, -25, 25, 90, -80, 10)
+            self.hists[dxLvtrackx_histname].Fill(dxL, lefttrack_pos[0])
+
+            if not dxRvtrackx_histname in self.hists:
+                title = 'Residual between x_{right} and right muon track position for plane '+str(plane+1)+';#Delta(x_{right}, right muon track x) [cm];right muon track x [cm]'
+                self.hists[dxRvtrackx_histname] = ROOT.TH2F(dxRvtrackx_histname, title, 50, -25, 25, 90, -80, 10)                
+            self.hists[dxRvtrackx_histname].Fill(dxR, righttrack_pos[0])
+
+    def ExtrapolateMCTrack(self, trackID, plane):
+        track = self.tw.M.eventTree.MCTrack[trackID]
+
+        self.tw.MuFilter.GetPosition(int(f'2{plane}000'), self.tw.A, self.tw.B)
+        planez = 0.5*(self.tw.A.z() + self.tw.B.z())
+
+        startx, starty, startz = track.GetStartX(), track.GetStartY(), track.GetStartZ()
+        px, py, pz = track.GetPx(), track.GetPy(), track.GetPz()
+
+        pos = [startx+px/pz*(planez-startz), starty+py/pz*(planez-startz), planez]
+        return pos
+
+    def GetMultiMuonBar(self, plane):
+
+        tracks = {i:self.tw.M.eventTree.MCTrack[i] for i in [0,1]}
+        
+        start_xs = {i:tracks[i].GetStartX() for i in self.muontrackIDs}
+        start_ys = {i:tracks[i].GetStartY() for i in self.muontrackIDs}
+        start_zs = {i:tracks[i].GetStartX() for i in self.muontrackIDs}
+        
+        pxs = {i:tracks[i].GetPx() for i in self.muontrackIDs}
+        pys = {i:tracks[i].GetPy() for i in self.muontrackIDs}
+        pzs = {i:tracks[i].GetPz() for i in self.muontrackIDs}
+        
+        self.tw.MuFilter.GetPosition(int(f'2{plane}000'), self.tw.A, self.tw.B)
+        plane_z = 0.5*(self.tw.A.z() + self.tw.B.z())
+
+        x_planez = {i:start_xs[i]+pxs[i]/pzs[i]*(plane_z - start_zs[i]) for i in self.muontrackIDs}
+        y_planez = {i:start_ys[i]+pys[i]/pzs[i]*(plane_z - start_zs[i]) for i in self.muontrackIDs}
+
+        detIDs = {i:self.tw.nav.FindNode(x_planez[i], x_planez[i], plane_z).GetName() for i in self.muontrackIDs}
+        if detIDs[1] != detIDs[0]: return False 
+        elif detIDs[1].find('volMuUpstreamBar'): 
+            print(f'Not in HCAL bar: {detIDs[1]}')
+            return False
+        else: 
+            print(detIDs[1])
+            return int(detIDs[1].split('_')[-1])
+
+    def GetMuonTracks(self):
+
+        tracks = {i:self.tw.M.eventTree.MCTrack[i] for i in self.muontrackIDs}
+        
+        start_xs = {i:tracks[i].GetStartX() for i in self.muontrackIDs}
+        start_ys = {i:tracks[i].GetStartY() for i in self.muontrackIDs}
+        start_zs = {i:tracks[i].GetStartX() for i in self.muontrackIDs}
+        
+        pxs = {i:tracks[i].GetPx() for i in self.muontrackIDs}
+        pys = {i:tracks[i].GetPy() for i in self.muontrackIDs}
+        pzs = {i:tracks[i].GetPz() for i in self.muontrackIDs}
+        
+        # Extrapolate tracks to HCAL plane 1
+        self.tw.MuFilter.GetPosition(20000, self.tw.A, self.tw.B)
+        HCAL1z = 0.5*(self.tw.A.z() + self.tw.B.z())
+        # Below is the x pos of each track at HCAL1-z
+        x_HCAL1z = {i:start_xs[i]+pxs[i]/pzs[i]*(HCAL1z - start_zs[i]) for i in self.muontrackIDs}
+        y_HCAL1z = {i:start_ys[i]+pys[i]/pzs[i]*(HCAL1z - start_zs[i]) for i in self.muontrackIDs}
+
+        # Check if muons in the same bar
+        if self.tw.nav.FindNode(x_HCAL1z[0], y_HCAL1z[0], HCAL1z).GetName() != self.tw.nav.FindNode(x_HCAL1z[1], y_HCAL1z[1], HCAL1z).GetName(): samebar=False 
+        else: samebar=True
+
+        rightID = min(x_HCAL1z, key=x_HCAL1z.get)
+        leftID = 1 if rightID==2 else 2
+        return samebar, leftID, rightID
 
     def WriteOutReconstructionHistograms(self):
         if not self.simulation: 
@@ -377,41 +501,3 @@ class SystemAlignment(object):
 
         outfile.Close()
         print(f'{len(self.hists)} histograms saved to {outfilename}')        
-
-    def nSiPMscut(self, hit, nLeft, nRight):
-        s,p,b=self.muAna.parseDetID(hit.GetDetectorID())
-        if s==1: 
-            if nLeft<6 or nRight<6: return False
-        elif s==2:
-            if nLeft<4 or nRight<4: return False
-        elif s==3: 
-            pass 
-        return True
-    
-    def TimingDiscriminantCut(self, td):
-        
-        if self.timealignment=='old':
-            if td<0: return False
-            else: return True
-        else: 
-            if not 'timingdiscriminant' in self.cutdists:
-                print(f'No timing discriminant histogram')
-                return 
-            hist=self.cutdists['timingdiscriminant']
-            modaltime=hist.GetBinCenter(hist.GetMaximumBin())
-            mean, stddev=hist.GetMean(), hist.GetStdDev()
-            # print(f'td: {td}, mean +/- 2*std. dev.: {mean-2*stddev}, {mean+2*stddev}')
-            if td < modaltime-2*stddev or td > modaltime+2*stddev: return False
-            else: return True
-
-    @staticmethod
-    def dycut(hist, nsig=1):    
-        dymin=hist.GetMean()-nsig*hist.GetStdDev()
-        dymax=hist.GetMean()+nsig*hist.GetStdDev()
-        return dymin, dymax
-
-    @staticmethod
-    def slopecut(mom, slopecut=0.1):
-        slopeX, slopeY=mom.x()/mom.z(), mom.y()/mom.z()
-        if abs(slopeX)>slopecut or abs(slopeY)>slopecut: return 0
-        else: return 1     

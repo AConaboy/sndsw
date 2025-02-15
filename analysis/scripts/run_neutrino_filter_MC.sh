@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # geo_file="/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V0_2022.root"
-geo_file="/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/geofile_full.PG-TGeant4-0.root"
+geo_file="/afs/cern.ch/user/a/aconsnd/geofile_full.Ntuple-TGeant4-0.root"
 
 input_file=$1
 outputfile=$2

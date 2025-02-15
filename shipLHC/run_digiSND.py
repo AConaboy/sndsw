@@ -61,7 +61,7 @@ elif options.inputFile.find('NeutralHadrons') != -1:
 		sys.exit(1)
 
 	file_number=options.inputFile.split('/')[-2]
-	output_file = options.path+'neutralhadrons/data/'+f.replace('.root', f'_{particle_type}_{Emin}_{Emax}_{file_number}.root')
+	output_file = options.path+'neutralhadron/data/'+f.replace('.root', f'_{particle_type}_{Emin}_{Emax}_{file_number}.root')
 
 elif options.inputFile.find('MuonBackground') != -1:
 
@@ -78,6 +78,13 @@ elif options.inputFile.find('/Neutrinos/Genie') != -1:
 
 	output_file = options.path+'neutrino/data/'+keys+'/'+f.replace('.root', f'_{file_number}.root')
 	
+# Working with multi muon simulation
+elif options.inputFile.find('MuMupairProduction') != -1:
+	f = options.inputFile.split('/')[-1]
+	nMuons = f.split('_')[1]
+
+	output_file = options.path+'multimuon/data/'+f.replace('_predigi.root', '.root')
+
 elif options.inputFile.find('/')==-1:
 	f = options.inputFile.split('/')[-1]
 	output_file = options.inputFile

@@ -109,6 +109,7 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
 
      // for the timing, find earliest particle and smear with time resolution
      Float_t t_Left=0, t_Right=0;
+     Float_t time;
 
      // Load bar positions
      MuFilterDet->GetPosition(fDetectorID,vLeft, vRight);
@@ -117,6 +118,7 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
      for (auto p = std::begin(V); p!= std::end(V); ++p) {
 
         signal = (*p)->GetEnergyLoss();
+        time = (*p)->GetTime();
 
         // Find distances from MCPoint centre to ends of bar 
         TVector3 impact((*p)->GetX(),(*p)->GetY() ,(*p)->GetZ() );
@@ -140,8 +142,8 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
         }
         
         // Assume earliest arriving photons set the time on each side
-        t_Left = distance_Left/signalspeed_left;
-        t_Right = distance_Right/signalspeed_right;
+        t_Left = time + distance_Left/signalspeed_left;
+        t_Right = time + distance_Right/signalspeed_right;
 
         if ( t_Left < earliestToAL){
           earliestToAL = t_Left;
@@ -178,12 +180,13 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
           signal=signalRight;
         }    
 
-        signals[j] = signal/float(nSiPMs) * SiPMcalibrationConstant;  // most simplest model, divide signal individually. Small SiPMS special
+        signals[j] = signal/float(nSiPMs) * SiPMcalibrationConstant;  // most simplest model, divide signal individually. Small SiPMs special
         times[j] = gRandom->Gaus(aligned_time, timeResol);
      }
 
-     // Hard coding 1 MeV energy cut :sweat_smiling: 
-     if (signalLeft < 0.001 or signalRight < 0.001) {flag=false;}
+     // Hard coding 0.720 MeV energy cut :sweat_smiling:
+     // Assume energy deposition MPV of 1.8 MeV is 900 keV per side, assume 80% efficiency => 720 keV
+     if (signalLeft < 720E-3 or signalRight < 720E-3) {flag=false;}
      else {flag = true;}
      
      for (Int_t i=0;i<16;i++){fMasked[i]=kFALSE;}

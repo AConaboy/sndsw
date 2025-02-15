@@ -6,17 +6,14 @@
 #include "TObject.h"
 #include "TVector3.h"
 #include <map>
-#include <variant>
 
 class MuFilterHit : public SndlhcHit {
 public:
    /** Default constructor **/
    MuFilterHit();
-   explicit MuFilterHit(Int_t detID);
+   MuFilterHit(Int_t detID);
    /** Constructor with detector id, number of SiPMs per side, number of sides **/
    MuFilterHit(Int_t detID, Int_t nP, Int_t nS);
-   MuFilterHit(const MuFilterHit &hit) = default;
-   MuFilterHit &operator=(const MuFilterHit &hit) = default;
 
    // Constructor from MuFilterPoint
    MuFilterHit(Int_t detID, std::vector<MuFilterPoint *>);

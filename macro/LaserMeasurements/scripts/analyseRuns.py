@@ -24,11 +24,14 @@ parser.add_argument('--LaserMeasurements', action='store_true', default=True)
 parser.add_argument('--laser-mode', dest='laser_mode', type=str, default='adc')
 parser.add_argument('--fitmode', dest='fitmode', type=str, default='linear')
 parser.add_argument('--eth', dest='eth', action='store_true')
+parser.add_argument('--tw-comparison-plane', dest='tw_comparison_plane', type=int, default=0)
+parser.add_argument('--tw-comparison-side', dest='tw_comparison_side', type=str, default='left')
 
 # Plot making flags
 parser.add_argument('--timewalk', action='store_true')
 parser.add_argument('--qdccalib', action='store_true')
 parser.add_argument('--all-qdccalib', action='store_true')
+parser.add_argument('--qdccalib-overlay', action='store_true')
 parser.add_argument('--offset-determination', action='store_true')
 parser.add_argument('--make-hists', action='store_true')
 parser.add_argument('--pcbdelays', action='store_true')
@@ -40,7 +43,7 @@ parser.add_argument('--TI18-timewalk-comparison-all', action='store_true')
 parser.add_argument('--qdc-compare-runtypes', action='store_true')
 parser.add_argument('--tw-compare-runtypes', action='store_true')
 parser.add_argument('--plot-smallSiPMdelays', action='store_true')
-
+parser.add_argument('--plot-all-smallSiPMdelays', action='store_true')
 parser.add_argument('--determine-offsets', action='store_true')
 
 options = parser.parse_args()
@@ -216,9 +219,9 @@ class LaserRunsData(object):
                 f.Close()
                 return            
                 
-        xproj=histogram.ProjectionX() # QDC distribution
-        modevalue = xproj.GetBinCenter(xproj.GetMaximumBin()) # Find most popular QDC value
-        stddev=xproj.GetStdDev()
+        xproj = histogram.ProjectionX() # QDC distribution
+        modevalue = xproj.GetBinLowEdge(xproj.GetMaximumBin()) # Find most popular QDC value
+        stddev = xproj.GetStdDev()
         binlow, binhigh = xproj.FindBin(modevalue-stddev), xproj.FindBin(modevalue+stddev)
         if mode=='QDC': 
             trunc_entries = sum([xproj.GetBinContent(i) for i in range(binlow, binhigh)])
@@ -248,7 +251,7 @@ class LaserRunsData(object):
     def Badrunkeywords(self):
         with open(f'{self.sndswpath}configuration/badrunkeywords.csv', 'r') as f:
             d=list(csv.reader(f))[0]
-        return d         
+        return d 
 
     def GetRunDB(self):
         configfiles=[f for f in os.listdir(f'{self.sndswpath}configuration/') if f.split('.')[-1]=='csv']
@@ -328,6 +331,9 @@ def all_qdccalib():
         qdccalib.MPVprogression()  
     qdccalib.PlotOffsets()      
 
+def qdccalib_overlay():
+    qdccalib.OverlayQDCcurves()
+
 def offset_determination():
     for SiPM in range(1,81):
         print(f"Determining QDC offset for SiPM {SiPM}")
@@ -364,6 +370,7 @@ def qdc_compare_runtypes():
             lds.SetSiPM(SiPM)
             print(f'Overlaying QDC-intensity plots for SiPM {SiPM}')
             qdccalib.CompareRunTypes()
+
 def tw_compare_runtypes():
     if options.bar==-1: bar=[2,3,4,5,6,7]
     else: bar=[options.bar]
@@ -409,11 +416,21 @@ def TI18_timewalk_comparison_all():
     tw.PlotSystemTI18LaserDifference()
         
 
-def pcbdelays():
-    delays.GetData()
-    delays.PlotDelays()  
+def pcbdelays(): 
+    delays.GetDelays()
+    delays.PlotDelays()
     
+
+def plot_all_smallSiPMdelays():
+    for mode in ['1','2']:
+        lds.mode=mode 
+        for intensity in lds.intensityprofile['US-large']: # bar runs taken at large SiPM intensity profile
+            smallSiPMdelays.intensity=intensity
+            smallSiPMdelays.GetDelays()
+            smallSiPMdelays.PlotDelays()
+
 def plot_smallSiPMdelays():
+    smallSiPMdelays.GetDelays()
     smallSiPMdelays.PlotDelays()
 
 tic=time.perf_counter()
@@ -431,6 +448,9 @@ if options.qdccalib:
 elif options.all_qdccalib:
     all_qdccalib()
 
+elif options.qdccalib_overlay:
+    qdccalib_overlay()
+
 if options.offset_determination:
     offset_determination()
 
@@ -444,18 +464,21 @@ if options.tw_compare_runtypes:
 
 if options.timewalk_overlay:
     timewalk_overlay()
+
 if options.timewalk_overlay_all:
     timewalk_overlay_all()
-        
+
 if options.TI18_timewalk_comparison:
     TI18_timewalk_comparison()
     
 if options.TI18_timewalk_comparison_all:
     TI18_timewalk_comparison_all() 
 
-
 if options.pcbdelays:
     pcbdelays()
 
 if options.plot_smallSiPMdelays:
     plot_smallSiPMdelays()
+
+if options.plot_all_smallSiPMdelays:
+    plot_all_smallSiPMdelays()

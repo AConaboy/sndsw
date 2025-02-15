@@ -347,9 +347,13 @@ with ConfigRegistry.register_config("basic") as c:
                                         exit()
                                 setattr(c.MuFilter, f"US_{param}_{k}", float(v[0])*unit)
 
-                        else: 
-                                detID, SiPMs = k.split('_')[1], k.split('_')[-1].replace('SiPMs', '').split('-')
-                                setattr(c.MuFilter, f"US_{param}_{detID}_{SiPMs[0]}_{SiPMs[1]}", float(v)*unit)        
+                        else:
+                                if k.find('timingxt_reft')==-1: # SiPM covariance 
+                                        detID, SiPMs = k.split('_')[1], k.split('_')[-1].replace('SiPMs', '').split('-')
+                                        setattr(c.MuFilter, f"US_{param}_{detID}_{SiPMs[0]}_{SiPMs[1]}", float(v)*unit)        
+                                else: # event t0, SiPM covariance 
+                                        refsys = k.split('_')[1][-2:]
+                                        setattr(c.MuFilter, f"US_{param}_SiPMs_{refsys}", float(v)*unit)
 
         c.Floor = AttrDict(z=48000.*u.cm) # to place tunnel in SND_@LHC coordinate system
         c.Floor.DX = 1.0*u.cm 

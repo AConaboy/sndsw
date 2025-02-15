@@ -71,10 +71,8 @@ class Monitoring():
       path = options.path
       self.myclient = None
 
-      if options.online:
-         pass
       # setup geometry
-      if self.simulation: self.snd_geo = SndlhcGeo.GeoInterface(options.path + options.geoFile)
+      if self.simulation: self.snd_geo = SndlhcGeo.GeoInterface(options.geoFile)
       else: 
          if path.find('eos')>0: path  = options.server+options.path         
          self.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
@@ -121,7 +119,15 @@ class Monitoring():
         self.FairTasks = {}
         for x in FairTasks:   #  keeps extended methods if from python class
                  self.FairTasks[x.GetName()] = x
+<<<<<<< HEAD
 >>>>>>> cf0e3201a (Updating files for use with simulation)
+=======
+      self.runNr   = str(options.runNumber).zfill(6)
+
+      self.FairTasks = {}
+      for x in FairTasks:   #  keeps extended methods if from python class
+         self.FairTasks[x.GetName()] = x
+>>>>>>> 6fe2275fe (no idea what I'm doing)
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -216,7 +222,10 @@ class Monitoring():
 
       elif options.customEventChain: # Code run when investigating numu candidates
          for idx, runNr in enumerate(options.signalpartitions):
-            if idx!=0: source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
+            if idx!=0: 
+               year=self.GetRunYear(runNr)
+               path=f'/eos/experiment/sndlhc/convertedData/physics/{year}/'
+               source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
 
 <<<<<<< HEAD
       else:
@@ -471,6 +480,15 @@ class Monitoring():
 =======
 >>>>>>> dfd288d1f (loads of stuff on the simulation side and adding more details to scifi event t0)
 
+   def GetRunYear(self, runNr):
+      if isinstance(runNr, str): runNr=int(runNr)
+
+      if runNr < 5485: year='2022'
+      elif 5485 <= runNr < 7656 : year='2023'
+      else: year='2024'
+
+      return year
+
    def GetEntries(self):
        if  self.options.online:
          if  self.converter.newFormat:  return self.converter.fiN.Get('data').GetEntries()
@@ -499,7 +517,10 @@ class Monitoring():
          self.Weight = self.eventTree.MCTrack[0].GetWeight()
       
       for t in self.FairTasks: 
-            if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
+            if t=='simpleTracking': 
+               # Added this in because the Scifi clusters take ages to make for neutrino sim data
+               trackingoption = 'DS' if self.options.referencesystem==3 else 'Scifi'
+               self.FairTasks[t].ExecuteTask(option=trackingoption)
             else: self.FairTasks[t].ExecuteTask()
 
 <<<<<<< HEAD

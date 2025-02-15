@@ -8,6 +8,7 @@ pd.set_option('mode.chained_assignment', None)
 import awkward as ak
 import numpy as np
 from ast import literal_eval
+from array import array
 
 path='/eos/experiment/sndlhc/raw_data/commissioning/US_tests_LabLausanne_2023/'
 afsoutpath='/afs/cern.ch/work/a/aconsnd/LaserMeasurements/plots/'
@@ -112,10 +113,8 @@ class LaserData(object):
 
         """
         Histograms to make:
-        1. qdc for all fired SiPMs
-        2. timestamps for all fired SiPMs 
-        3. 2D plot of qdc for all SiPMs
-        3. Correlation of timestamp and saturation
+        1. 2D plot of qdc for all SiPMs
+        2. Correlation of timestamp and saturation
         """    
         
         self.FillHists()
@@ -175,8 +174,20 @@ class LaserData(object):
             fractionExpSiPMs_histname=f'frac_SiPMs'
             if not fractionExpSiPMs_histname in self.h:
                 title = 'Fraction of expected SiPMs that fire;N_{fired} / N_{expected};Counts'
-                self.h[fractionExpSiPMs_histname] = ROOT.TH1F(fractionExpSiPMs_histname, title, len(self.exp_SiPMs), 0, 1)
-            
+                
+                N = len(self.exp_SiPMs)
+                bin_edges = [(i - 0.5) / N for i in range(0, N + 1)]
+                
+                # Convert bin edges to a C++ array
+                bin_edges_array = array('d', bin_edges)
+                
+                self.h[fractionExpSiPMs_histname] = ROOT.TH1F(fractionExpSiPMs_histname, title, N, bin_edges_array)
+                # Label bins by their centers for clarity
+                x_axis = self.h[fractionExpSiPMs_histname].GetXaxis()
+                for i in range(1, self.h[fractionExpSiPMs_histname].GetNbinsX() + 1):
+                    bin_center = x_axis.GetBinCenter(i)
+                    x_axis.SetBinLabel(i, f"{bin_center:.3f}")
+
             n_large, n_small = self.GetFractionExpectedSiPMs(row['SiPM number'])
             frac_n = (n_large+n_small) / len(self.exp_SiPMs)
             self.h[fractionExpSiPMs_histname].Fill(frac_n) 
@@ -199,31 +210,40 @@ class LaserData(object):
                 self.h[next_smallSiPM_vcoarse_histname] = ROOT.TH1F(next_smallSiPM_vcoarse_histname, title, 50, 0, 50) 
             
             if n_large >= 0.5*len(self.exp_SiPMs):
-                nClockCycles = self.GetNextSmallSiPMHit(row['SiPM number']) # SiPM: [nCC, QDC]
-                for i in nClockCycles.items():
-                    SiPM, data = i
+                nextSmallSiPMdata = self.GetNextSmallSiPMHit(row['SiPM number']) # SiPM: [delta_evt_timestamp, SiPMQDC, SiPMvcoarse, smallSiPMtcoarse]
+                foundsmallSiPMs=[]
+                # for i in nextSmallSiPMdata.items():
+                for SiPM in self.exp_smallSiPMs:
+
+                    next_smallSiPM_timestamp_histname=f'next_smallSiPM_timestamp_{SiPM}'
+                    if not next_smallSiPM_timestamp_histname in self.h:
+                        title = f'Clock cycles until expected small SiPM {SiPM} next fires versus QDC;Clock cycles [n];QDC [a.u];Counts'
+                        self.h[next_smallSiPM_timestamp_histname] = ROOT.TH2F(next_smallSiPM_timestamp_histname, title, 500, 0, 100, 50, -20, 30)
+
+                    if not SiPM in nextSmallSiPMdata: continue
+                    
+                    # Only take the first firing of the small SiPMs, but they won't fire
+                    # twice in 100 ccs
+                    data = nextSmallSiPMdata[SiPM]
+                    foundsmallSiPMs.append(SiPM) 
                     clockCycle, smallQDC, v_coarse, t_coarse = data 
                     self.h[next_smallSiPM_tcoarse_histname].Fill(t_coarse)
                     self.h[next_smallSiPM_vcoarse_histname].Fill(v_coarse)
-                    
-                    next_smallSiPM_timestamp_histname=f'next_smallSiPM_timestamp_{SiPM}'
-                    if not next_smallSiPM_timestamp_histname in self.h:
-                        title = f'Clock cycles until expected small SiPM {SiPM} next fires;Clock cycles [n];Counts'
-                        self.h[next_smallSiPM_timestamp_histname] = ROOT.TH1I(next_smallSiPM_timestamp_histname, title, 50, 0, 50)
-                    self.h[next_smallSiPM_timestamp_histname].Fill(clockCycle)
-
-                    # What is happening for the peak at 5 clock cycles later?
-                    if clockCycle != 0: 
-                        LateSmallSiPM_histname=f'LateSmallSiPM_{SiPM}'
-                        if not LateSmallSiPM_histname in self.h:
-                            title = 'QDC of delayed small SiPM hits;QDC [a.u];Counts'
-                            self.h[LateSmallSiPM_histname] = ROOT.TH1F(LateSmallSiPM_histname, title, 50, -20, 30)
-                        
-                        self.h[LateSmallSiPM_histname].Fill(smallQDC)
+                    self.h[next_smallSiPM_timestamp_histname].Fill(clockCycle, smallQDC)
                 
                 # Fill overflow bin for each exp. small SiPM not found in 100 events
-                if len(nClockCycles) < len(self.exp_smallSiPMs):
-                    for i in range( len(self.exp_smallSiPMs) - len(nClockCycles) ): self.h[next_smallSiPM_timestamp_histname].Fill(self.h[next_smallSiPM_timestamp_histname].GetNbinsX()+1)
+                if len(nextSmallSiPMdata) < len(self.exp_smallSiPMs):
+                    
+                    # for lostSmallSiPM in range( len(self.exp_smallSiPMs) - len(nextSmallSiPMdata) ):
+                    lostSmallSiPMs = [i for i in self.exp_smallSiPMs if i not in foundsmallSiPMs]
+                    for lostSmallSiPM in lostSmallSiPMs:
+
+                        next_smallSiPM_timestamp_histname = f'next_smallSiPM_timestamp_{lostSmallSiPM}'
+                        h=self.h[next_smallSiPM_timestamp_histname] 
+                        overflow_xbin = h.GetNbinsX() + 1
+                        overflow_ybin = h.GetNbinsY() + 1
+
+                        h.SetBinContent(overflow_xbin, overflow_ybin, h.GetBinContent(overflow_xbin, overflow_ybin)+1)
 
     def SetEventTimeStamp(self):
         self.evt_timestamp = self.timing_condition_df.iloc[self.index]['evt_timestamp']
@@ -242,28 +262,25 @@ class LaserData(object):
         """
         Steps to find the event timestamp of the next events when the expected small SiPMs fire
         1a. Check if the small SiPMs fire in the same event as when >= 0.5* exp. large SiPMs fire
-        1b. If so, fill the delta t hist with 0 for each of the small SiPM that fire in the same event
+        1b. If so, fill the delta t hist with 0 for each of the small SiPMs that fire in the same event
         1c. If all the expected small SiPMs fire in the same event, return.
         
-        2a. Loop over the subsequent events of the run (changing to next 100 events) and look for the remaining small SiPMs
-        2b. If a small SiPM is found and has not already been accounted for in the original event or a previous event, get that event timestamp
+        2a. Loop over the subsequent events of the run (next 100 events) and look for the remaining small SiPMs
+        2b. If a small SiPM is found and has not already been accounted for in the original event or a previous event, get that event timestamp and QDC
         2c. If all expected small SiPMs are accounted for, return
-        
-        3. Fill delta t histogram with the difference in event time between the large SiPM event, and the event where the expected small SiPMs fire
-        
         """
         
-        clockCycles = {} 
+        nextSmallSiPMdata = {} 
         
         # Check whether all the expected small SiPMs fire in the event: if so, return 
         for idx, SiPM in enumerate(SiPMs): 
-            if SiPM in self.exp_smallSiPMs and SiPM not in clockCycles: 
+            if SiPM in self.exp_smallSiPMs and SiPM not in nextSmallSiPMdata: 
                 smallSiPMQDC = self.timing_condition_df['value'].iloc[self.index][idx]
                 smallSiPMvcoarse = self.timing_condition_df['v_coarse'].iloc[self.index][idx]
                 smallSiPMtcoarse = self.timing_condition_df['t_coarse'].iloc[self.index][idx]
-                clockCycles[SiPM]=[0, smallSiPMQDC, smallSiPMvcoarse, smallSiPMtcoarse]
+                nextSmallSiPMdata[SiPM]=[0, smallSiPMQDC, smallSiPMvcoarse, smallSiPMtcoarse]
 
-        if len(clockCycles)==len(self.exp_smallSiPMs): return clockCycles
+        if len(nextSmallSiPMdata)==len(self.exp_smallSiPMs): return nextSmallSiPMdata
 
         else:
             index=self.index
@@ -273,18 +290,18 @@ class LaserData(object):
 
                 row = self.timing_condition_df.iloc[self.index+evt_number]
                 for idx, SiPM in enumerate(row['SiPM number']): 
-                    if SiPM in self.exp_smallSiPMs and not SiPM in clockCycles: 
+                    if SiPM in self.exp_smallSiPMs and not SiPM in nextSmallSiPMdata: 
                         
                         delta_evt_timestamp = row['evt_timestamp'] - self.evt_timestamp 
                         smallSiPMQDC = row['value'][idx]
                         smallSiPMvcoarse = row['v_coarse'][idx]
                         smallSiPMtcoarse = row['t_coarse'][idx]
                     
-                        clockCycles[SiPM] = [delta_evt_timestamp, smallSiPMQDC, smallSiPMvcoarse, smallSiPMtcoarse]
+                        nextSmallSiPMdata[SiPM] = [delta_evt_timestamp, smallSiPMQDC, smallSiPMvcoarse, smallSiPMtcoarse]
 
-                if len(clockCycles) == len(self.exp_smallSiPMs): break 
+                if len(nextSmallSiPMdata) == len(self.exp_smallSiPMs): break 
         
-        return clockCycles
+        return nextSmallSiPMdata
             
     def Find_timestamp_peak(self):
         exploded_df = self.df['timestamp'].explode()

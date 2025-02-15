@@ -75,8 +75,6 @@ M = Monitor.Monitoring(options,FairTasks)
 monitorTasks = {}
 
 if options.nEvents < 0 :   options.nEvents = M.GetEntries()
-if options.postScale==0 and options.nEvents>5E7: options.postScale = 100
-if options.postScale==0 and options.nEvents>5E6: options.postScale = 10
 
 if options.numusignalevents:
     import numusignals 

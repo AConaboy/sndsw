@@ -75,12 +75,12 @@ class ExtendedMuonReconstruction(object):
             os.makedirs(d, exist_ok=True)
 
             dirkey1, dirkey2, filename = self.options.fname.split('/')
-            key=filename.replace('.root', '').split('_')[1]
+            key = filename.replace('.root', '').split('_')[1]
 
             self.keynamedict = {'wMuon':'with muon', 'woMuon': 'w/o muon', 'allEvents':'all events'}
 
             self.hcalTools.datafilename=d+f'extendedreconstruction_{key}.csv'
-            column_names=['filekey', 'EventNumber','hasMuon','interactionWall',
+            column_names=['filekey', 'EventNumber','flav','hasMuon','fired_planes', 'interactionWall',
             'scifi_median_x','scifi_median_y',
             'scifi_residual_x','scifi_residual_y',
             'dx0','dx1','dx2','dx3','dx4',
@@ -90,8 +90,15 @@ class ExtendedMuonReconstruction(object):
             'y0','y1','y2','y3','y4',
             'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
             'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-            'HCAL5barcode'
+            'HCAL5barcode', 'm_x', 'start_x', 'm_y', 'start_y'
             ]
+
+            title = 'Final state muons exiting detector acceptance;z [cm];# muons'
+            self.hists['muon-exit-point'] = ROOT.TH1F('muon-exit-point', title, 450, 250, 600)
+            self.hists['muon-slope-x'] = ROOT.TH1F('muon-slope-x', title, 10, -1, 1)
+            self.hists['muon-slope-y'] = ROOT.TH1F('muon-slope-y', title, 10, -1, 1)
+            self.hists['muon-intercept-x'] = ROOT.TH1F('muon-intercept-x', title, 100, 0, 1000)
+            self.hists['muon-intercept-y'] = ROOT.TH1F('muon-intercept-y', title, 100, 0, 1000)
 
             with open(self.hcalTools.datafilename, 'w') as f:
                 writer=csv.writer(f)
@@ -108,7 +115,7 @@ class ExtendedMuonReconstruction(object):
             self.keynamedict = {'wMuon':'with muon', 'woMuon': 'w/o muon', 'allEvents':'all events'}
 
             # self.datafilename=d+f'extendedreconstruction_{key}.csv'
-            self.column_names=['filekey', 'EventNumber', 'hasMuon', 'interactionWall',
+            self.column_names=['filekey', 'EventNumber', 'flav', 'hasMuon', 'fired_planes', 'interactionWall',
             'scifi_median_x','scifi_median_y',
             'scifi_residual_x','scifi_residual_y',
             'dx0','dx1','dx2','dx3','dx4',
@@ -117,7 +124,7 @@ class ExtendedMuonReconstruction(object):
             'y0','y1','y2','y3','y4',
             'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
             'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-            'HCAL5bars'
+            'HCAL5barcode', 'm_x', 'start_x', 'm_y', 'start_y'
             ]
 
     def ExtendReconstruction(self, hits, scifi_hits, mode='write'):
@@ -125,27 +132,64 @@ class ExtendedMuonReconstruction(object):
         # If they do then I can plot the doca between the line formed between these DS hits and the US hit
         # if self.options.OutgoingMuon=='yes' and not eventHasMuon: return
         # elif self.options.OutgoingMuon=='no' and eventHasMuon: return
+        
         if self.simulation:
+            
             self.hcalTools.eventHasMuon=self.hcalTools.OutgoingMuon(self.tw.M.eventTree)
-            if self.hcalTools.eventHasMuon: self.muonhistkey = 'wMuon'
+
+            exitpoint = self.hcalTools.muonexitpoint(self.tw.M.eventTree)
+            self.hists['muon-exit-point'].Fill(exitpoint)
+            self.hists['muon-slope-x'].Fill(self.hcalTools.gradients['x'])
+            self.hists['muon-slope-y'].Fill(self.hcalTools.gradients['x'])
+            self.hists['muon-intercept-x'].Fill(self.hcalTools.intercepts['x'])
+            self.hists['muon-intercept-y'].Fill(self.hcalTools.intercepts['y'])
+            
+            if self.hcalTools.eventHasMuon: 
+                self.muonhistkey = 'wMuon'
+
             elif not self.hcalTools.eventHasMuon: self.muonhistkey = 'woMuon'
+            self.hcalTools.NeutrinoIntType = self.GetNeutrinoIntType(self.tw.M.eventTree)
+
         self.hcalTools.EventNumber = self.tw.M.EventNumber
 
+        # Define all necessary attributes of hcalTools
+
+        # Barycentres
         self.hcalTools.barycentres = self.muAna.GetBarycentres(hits, MuFilter=self.MuFilter)
         self.hcalTools.xbarycentres = self.muAna.GetOverallXBarycentre(self.hcalTools.barycentres, mode='maxQDC')
+        
+        # Interaction wall and interaction wall median positions
+        self.hcalTools.interactionWall = self.hcalTools.GetInteractionWall(scifi_hits)
+        self.hcalTools.Get_interaction_median_positions(scifi_hits, self.Scifi)
+
+        # Container for residuals per plane and int wall
+        self.hcalTools.xy_residuals = {plane:{'x':np.nan, 'y':np.nan} for plane in range(5)}
+        self.hcalTools.xy_residuals['intWall']={'x':np.nan, 'y':np.nan}  
+        self.hcalTools.ds = {f'ds{i}':np.nan for i in range(5)} 
+        self.hcalTools.scifi_residual = np.nan
+
+        # Container for deposition widths
+        self.hcalTools.lambda_x_dict = {i:np.nan for i in range(5)}
+        self.hcalTools.lambda_y_dict = {i:np.nan for i in range(5)}  
+
+        # HCAL 5 barcode
+        self.hcalTools.GetHCAL5barscode(hits)                   
 
         self.hcalTools.dsCluster(hits, self.MuFilter)
         if len(self.hcalTools.clusMufi)==0: 
+            self.hcalTools.fired_planes=[]
+            self.hcalTools.getdata(mode=mode)
             return
 
         self.hcalTools.GetDSClusterCentroids()
         
-        fired_planes=list(self.hcalTools.DS_centroids.keys())
-        if len(fired_planes)==3: 
-            print(f'3 fired DS planes in event {self.tw.M.EventNumber}')
-            return     
-        if len(fired_planes)==0:
-            return 
+        self.hcalTools.fired_planes=list(self.hcalTools.DS_centroids.keys())
+        # if len(fired_planes)==3: 
+        #     print(f'3 fired DS planes in event {self.tw.M.EventNumber}')
+        #     return     
+        if len(self.hcalTools.fired_planes)==0:
+            self.hcalTools.getdata(mode=mode)
+            return
 
         histname = 'n_DSclusters'
         if not histname in self.hists:
@@ -172,14 +216,9 @@ class ExtendedMuonReconstruction(object):
         # Count HCAL hits in each plane
         # if mode=='investigate': self.GetMultiplicity(hits)
 
-        self.hcalTools.interactionWall = self.hcalTools.GetInteractionWall(scifi_hits)
-        self.hcalTools.Get_interaction_median_positions(scifi_hits, self.Scifi)
-
         # If 2 fired planes in the DS, I can connect the space points in each combination together and look for a hit in the US
         
-        if len(fired_planes)==2:
-            self.hcalTools.xy_residuals = {plane:{'x':np.nan, 'y':np.nan} for plane in range(5)}
-            self.hcalTools.xy_residuals['intWall']={'x':np.nan, 'y':np.nan}
+        if len(self.hcalTools.fired_planes)==2:
 
             for idx, proj in enumerate(['x', 'y']):
                 
@@ -210,17 +249,16 @@ class ExtendedMuonReconstruction(object):
             # Require that the xy_residual is defined for the 4th and 5th plane
             if list(self.hcalTools.xy_residuals[4].values()) == [np.nan, np.nan]: 
                 print(f'Event {self.tw.M.EventNumber}, no x and y residual in plane 5')
-                return 
+                self.hcalTools.getdata(mode=mode)
+                return
             if list(self.hcalTools.xy_residuals[3].values()) == [np.nan, np.nan]: 
                 print(f'Event {self.tw.M.EventNumber}, no x and y residual in plane 4')
+                self.hcalTools.getdata(mode=mode)
                 return
-
-            self.hcalTools.lambda_x_dict = {i:np.nan for i in range(5)}
-            self.hcalTools.lambda_y_dict = {i:np.nan for i in range(5)}
 
             for plane in self.hcalTools.xy_residuals:
                 if plane=='intWall':continue
-                lambda_x = abs(self.hcalTools.xbarycentres[plane]['lambda_x'])
+                lambda_x = self.hcalTools.xbarycentres[plane]['lambda_x']
                 self.hcalTools.lambda_x_dict[plane] = lambda_x
                 lambda_y = self.hcalTools.barycentres[plane]['y-barycentre']['lambda_y']
                 self.hcalTools.lambda_y_dict[plane] = lambda_y
@@ -234,14 +272,17 @@ class ExtendedMuonReconstruction(object):
                     self.lambda_hists(plane)
                     self.ds_hists(plane)
 
-            self.hcalTools.GetHCAL5barscode(hits)
             self.hcalTools.Get_ds()
 
             self.hcalTools.getdata(mode=mode)
 
-        elif len(fired_planes)==1:
-            pass
-        else: pass
+        elif len(self.hcalTools.fired_planes)==1:
+            self.hcalTools.getdata(mode=mode)
+            return
+        else: 
+            print(f'N fired planes: {len(self.hcalTools.fired_planes)}')
+            self.hcalTools.getdata(mode=mode)
+            return
 
     def GetHCAL5barscode(self, hits):
         c=[False]*10 
@@ -251,6 +292,32 @@ class ExtendedMuonReconstruction(object):
             c[bar]=True 
         
         self.HCAL5barscode=''.join(['1' if state else '0' for state in c])
+
+    def GetNeutrinoIntType(self, event):
+
+        if not hasattr(event, "MCTrack"):
+            print(f'No MCTrack branch. Is this real data?')
+            return 
+
+        if event.MCTrack[0].GetPdgCode() == event.MCTrack[1].GetPdgCode():
+            i_flav = 0 #NC
+        elif abs(event.MCTrack[1].GetPdgCode()) == 11: # electron
+            i_flav = 1 #nueCC
+        elif abs(event.MCTrack[1].GetPdgCode()) == 13: # muon
+            i_flav = 2 #numuCC
+        elif abs(event.MCTrack[1].GetPdgCode()) == 15: # tau
+            is1Mu = False
+            for j_track in range(2, len(event.MCTrack)):
+                if event.MCTrack[j_track].GetMotherId() == 1 and abs(event.MCTrack[j_track].GetPdgCode()) == 13:
+                    is1Mu = True
+                    break
+            if is1Mu:
+                i_flav = 4 #nutauCC1mu
+            else:
+                i_flav = 3 #nutauCC0mu 
+        else: return 
+        
+        return i_flav
 
     def OutgoingMuon(self):
         ### Return true for events with an outgoing muon
@@ -425,7 +492,7 @@ class ExtendedMuonReconstruction(object):
         for hname in self.hists:
             
             hist=self.hists[hname]
-            if hname in ('yEx', 'xEx', 'reft', 'n-xz-combinations', 'n-yz-combinations', 'n_DSclusters', 'USDSmultiplicityvresresidual'):
+            if hname in ('yEx', 'xEx', 'reft', 'n-xz-combinations', 'n-yz-combinations', 'n_DSclusters', 'USDSmultiplicityvresresidual', 'muon-exit-point', 'muon-slope-x', 'muon-slope-y', 'muon-intercept-x', 'muon-intercept-y'):
                 outfile.WriteObject(hist, hname, 'kOverwrite')
                 continue
 
@@ -1128,7 +1195,7 @@ class QuarkVectorExtrapolation(object):
         self.numuStudy=True if options.numuStudy else False 
 
         # Not exact, just rough for rejecting rubbish combinations of DS clusters
-        self.acceptancelimits={'x':[-100, 20], 'y':[-10, 100]}
+        self.acceptancelimits={'x':[-80, 5], 'y':[0, 75]}
 
         self.ReadInVectors()
         if not self.quark_vectors: 

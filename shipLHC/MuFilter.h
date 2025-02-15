@@ -40,7 +40,7 @@ class MuFilter : public FairDetector
 		Float_t GetCorrectedTime(Int_t id, Int_t c, Double_t t, Double_t L=0, Float_t QDC=-1.);
 		Int_t GetnSiPMs(Int_t detID);
 		Int_t GetnSides(Int_t detID);
-		Float_t GetBarSideTimeResolution(Int_t detID, TString side);
+		Float_t GetBarSideTimeResolution(Int_t detID, TString side, TString refsys="DS");
 		Float_t GetBarSideSignalSpeed(Int_t detID, TString side);
 
         void InitEvent(SNDLHCEventHeader *e);

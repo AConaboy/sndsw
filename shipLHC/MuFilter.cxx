@@ -668,11 +668,15 @@ Float_t MuFilter::GetBarSideSignalSpeed(Int_t detID, TString side)
 	else {return 0.0;}
 }
 
-Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
+Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side, TString refsys)
 {
-	Float_t sum_sigmat_sq=0, sum_covariance=0, SiPM_resolution=0, xt=0, result=0;
+	Float_t sum_sigmat_sq=0, sum_covariance=0, SiPM_resolution=0, xt=0, result=0, xt_reft=0; // method needs to know which xt_reft to take
 	Int_t N=0;
 	TString fixed_ch;
+
+	// refsys will always be DS because it is determined by what system was used as a reference for
+	// measuring the time resolution, which is the DS for geometric acceptance reasons
+	xt_reft = conf_floats["MuFilter/US_timingxt_SiPMs_"+refsys]; 
 
 	Int_t start=0, end=0;
 	if (side=="left") {
@@ -715,7 +719,7 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 			}
 
 			xt = conf_floats["MuFilter/US_timingxt_"+to_string(detID)+"_"+to_string(i)+"_"+to_string(j)];
-			sum_covariance += 2*xt;
+			sum_covariance += xt;
 		}
 		N++;
 	}
@@ -723,7 +727,8 @@ Float_t MuFilter::GetBarSideTimeResolution(Int_t detID, TString side)
 	// Float_t result=0;
 	if (N==0) {return result;}
 	else {
-		result = 1/std::pow(N,2) * ( sum_sigmat_sq + sum_covariance );
+
+		result = 1/std::pow(N,2) * ( sum_sigmat_sq + sum_covariance ) - xt_reft;
 		return result;
 	}
 }

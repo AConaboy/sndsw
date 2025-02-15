@@ -2,6 +2,8 @@
 import ROOT, csv, os, pickle
 import numpy as np
 from pathlib import Path
+from HCALTools import HCALTools 
+ROOT.gInterpreter.ProcessLine('#include "/afs/cern.ch/user/a/aconsnd/sndsw/analysis/tools/sndSciFiTools.h"')
 
 class ShowerProfiles(object):
 
@@ -42,21 +44,53 @@ class ShowerProfiles(object):
         # self.hists=tw.hists
         # if self.tw.mode=='r':
         from buildhistograms import MakeShowerProfilesHistograms
-        self.hists = MakeShowerProfilesHistograms()        
+        self.hists = MakeShowerProfilesHistograms()
         
-        self.sigmatds0=0.263 # ns 
+        # self.sigmatds0=0.263 # ns 
         
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
         
         if options.signalpartitions: self.Loadnumuevents()
         
-        self.numuStudy=True if options.numuStudy else False 
+        self.nuStudy=True if options.numuStudy or options.nueStudy else False 
     
         self.barycentres={}
         self.clusters={}
         self.scifidata={}
         self.data={}
         
+        self.hcalTools = HCALTools(self.muAna, self.tw.MuFilter)
+        self.InstanceCuts()
+
+        if self.simulation:
+
+            self.column_names=['EventNumber', 'scaled_weight',
+            'hasMuon','interactionWall',
+            'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
+            'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
+            'relQDC0','relQDC1','relQDC2','relQDC3','relQDC4',
+            'planeQDC0','planeQDC1','planeQDC2','planeQDC3','planeQDC4',
+            'hasTrack'
+            ]
+            [self.column_names.append(i) for i in self.cuts]
+
+            # Instance list of lists to store data
+            # Estimated to be about 32 MB/500k events using float32
+            self.eventdata=[self.column_names]
+        
+    def InstanceCuts(self):
+    
+        listofcuts=['veto', 'avgSFchannel', 'avgDSchannel', 'SF1', 'SF2', '2consecSFplanes', 'allHCALplanes']
+        
+        self.cuts = {"vetoCut": ROOT.snd.analysis_cuts.vetoCut(self.tw.M.eventTree),
+            "avgSFchannel":ROOT.snd.analysis_cuts.avgSciFiFiducialCut(200, 1200, 300, 128*12-200, self.tw.M.eventTree),
+            "avgDSchannel":ROOT.snd.analysis_cuts.avgDSFiducialCut(70, 105, 10, 50, self.tw.M.eventTree),
+            "SF1":ROOT.snd.analysis_cuts.sciFiStationCut(0., ROOT.std.vector('int')([1]), self.tw.M.eventTree),
+            "SF2":ROOT.snd.analysis_cuts.sciFiStationCut(0., ROOT.std.vector('int')([2]), self.tw.M.eventTree),
+            "consec2SFplanes":ROOT.snd.analysis_cuts.minSciFiConsecutivePlanes(self.tw.M.eventTree),
+            "allHCALplanes":ROOT.snd.analysis_cuts.DSActivityCut(self.tw.M.eventTree)
+                }
+
     def Loadnumuevents(self):
         numusignalevent_filepath = '/afs/cern.ch/work/a/aconsnd/numusignalevents.csv'
         with open(numusignalevent_filepath, 'r') as f:
@@ -134,81 +168,6 @@ class ShowerProfiles(object):
                 if len(missing_small_SiPMs) != 0:
                     x=self.FindExpectedSmallSiPMs(detID, qdcs, missing_small_SiPMs)
                     if x==-999: continue # Skip event if no large SiPMs fire.
-            
-            ### Apply time-walk correction to all times in the hit.
-            correctedtimes=self.muAna.GetCorrectedTimes(hit)
-            times={'left':{}, 'right':{}}
-
-            for i in correctedtimes: 
-                SiPM, correctedtime = i
-                fixed_ch=self.muAna.MakeFixedCh((s,p,b,SiPM))
-
-                if not fixed_ch in self.muAna.alignmentparameters: continue
-                d=self.muAna.alignmentparameters[fixed_ch]
-
-                qdc=self.muAna.GetChannelVal(SiPM, qdcs)
-                side=self.muAna.GetSide(f'{detID}_{SiPM}')
-                times[side][SiPM]=self.tw.reft - correctedtime - d[0]
-                
-                QDC_histname = f'US-SiPMQDC'
-                if not QDC_histname in self.hists:
-                    title='QDC_{SiPM} for large SiPMs in #nu_{#mu} candidates hits'
-                    self.hists[QDC_histname]=ROOT.TH1F(QDC_histname,title, 110, -10, 100)
-                self.hists[QDC_histname].Fill(qdc)
-
-            if any([len(times[i])==0 for i in ('left', 'right')]): 
-                print(f'No corrected and aligned times determined for this hit')
-                continue
-                # return
-            averages={side:sum(times[side].values()) / len(times[side]) for side in times}
-            averagetime = 1/2 * sum(averages.values())
-            deltatime = averages['left'] - averages['right']
-            
-            ### Don't need to worry about nSiPMs because I have already cut on it
-            # baraveragecscint_left, baraveragecscint_right = self.muAna.GetBarAveragecscint(self.TWCorrectionRun, detID, 'corrected')
-
-            averagebartimehistname=f'averagetime_{detID}_aligned'
-            if not averagebartimehistname in self.hists:
-                title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average of aligned times;#frac{1}{2}#times(t^{tw corr}_{left}+t^{tw corr}_{right}) [ns];Counts'
-                self.hists[averagebartimehistname]=ROOT.TH1F(averagebartimehistname, title, 2000, -5, 5)
-            self.hists[averagebartimehistname].Fill(averagetime)
-            
-            deltabartimehistname=f'deltatime_{detID}_aligned'
-            if not deltabartimehistname in self.hists:
-                title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' difference of average aligned time of each side;t^{tw corr}_{left} - t^{tw corr}_{right} [ns];Counts'
-                self.hists[deltabartimehistname]=ROOT.TH1F(deltabartimehistname, title, 2000, -5, 5)
-            self.hists[deltabartimehistname].Fill(deltatime)
-
-            for side in ('left', 'right'):
-                averagebarsidetimehistname=f'sidetime_{detID}-{side}_aligned'
-                if not averagebarsidetimehistname in self.hists:
-                    title=self.subsystemdict[s]+' plane '+str(p+1)+' bar '+str(b+1)+' average aligned time from '+side+' side;'+ side+' side average of t^{tw corr}_{'+side+'} [ns];Counts'
-                    self.hists[averagebarsidetimehistname]=ROOT.TH1F(averagebarsidetimehistname, title, 2000, -5, 5)
-                self.hists[averagebarsidetimehistname].Fill(averages[side])
-
-    def nSiPMscut(self, hit, nLeft, nRight):
-        s,p,b=self.muAna.parseDetID(hit.GetDetectorID())
-        if s==1: 
-            if nLeft<6 or nRight<6: return False
-        elif s==2:
-            if nLeft<4 or nRight<4: return False
-        elif s==3: 
-            pass 
-        return True
-    
-    def TimingDiscriminantCut(self, td):
-        
-        if self.timealignment=='old':
-            if td<0: return False
-            else: return True
-        else: 
-            if not 'timingdiscriminant' in self.cutdists:
-                print(f'No timing discriminant histogram')
-                return 
-            hist=self.cutdists['timingdiscriminant']
-            mean, stddev=hist.GetMean(), hist.GetStdDev()
-            if td < mean-2*stddev or td > mean+2*stddev: return False
-            else: return True
 
     def ExtractScifiData(self, hits):
         self.runId = self.tw.M.eventTree.EventHeader.GetRunId()
@@ -237,62 +196,104 @@ class ShowerProfiles(object):
             x0,y0 = seedpos
             self.clusters[self.runId][idx]=[interactionWall,first, avg_x, avg_y, N, totalQDC, x0, y0]
 
-    def ShowerDirection(self, hits):
+    def ShowerDirection(self, hits, scifi_hits):
         
-        self.barycentres = self.muAna.GetBarycentres(hits)
-        self.x_methods_dict={mode:self.muAna.GetOverallXBarycentre(self.barycentres, mode=mode) for mode in ('relQDC', 'maxQDC')}        
+        """
+        validity of hits is ensured in muAna.GetPlaneData(hits, mufilter) ! 
+        """
+
+        self.EventNumber = self.tw.M.EventNumber
+        self.interactionWall = self.hcalTools.GetInteractionWall(scifi_hits)
+        self.barycentres = self.muAna.GetBarycentres(hits, MuFilter=self.tw.MuFilter)
+        self.x_methods_dict = {mode:self.muAna.GetOverallXBarycentre(self.barycentres, mode=mode) for mode in ('relQDC', 'maxQDC')}        
         
         # For numu study, 
-        if self.numuStudy: 
+        if self.nuStudy: 
             self.runId = self.tw.M.eventTree.EventHeader.GetRunId()
             if not int(self.runId) in self.barycentres: self.barycentres[self.runId] = {}
 
         """
         1. Plot shower barycentre in y (x) by using a QDC weighting, aligned timing
         2. First consider all hits 
-        3. For each event, plot the baricentre in x and y at each plane
+        3. For each event, plot the barycentre in x and y at each plane
         """
 
         self.FillBarycentrePlots(hits)
 
+        self.pass_cuts = {k:v.passCut() for k,v in self.cuts.items()}  # should work with sim or not
+        if self.simulation: self.StoreSimulationDetails()
+
     def FillBarycentrePlots(self, hits):
 
+        self.lambda_x_dict = {i:np.nan for i in range(5)}
+        self.lambda_y_dict = {i:np.nan for i in range(5)}
+        self.totalQDC_dict = {i:np.nan for i in range(5)}
+        self.relQDC_dict = {i:np.nan for i in range(5)}
+
         for plane in self.barycentres:
-            
-            x_data, y_data = self.barycentres[plane].values()
+            # All planes are instanced as empty dictionaries
+            # to retain the correct order for passing to the BDT
+            if len(self.barycentres[plane])==0: continue 
 
             # Write out all SiPM information when looking at the numu data
-            if self.numuStudy: self.RecordAllSiPMdata(hits, xEx, yEx)
+            if self.nuStudy: self.RecordAllSiPMdata(hits, xEx, yEx)
 
             x_data, y_data = self.barycentres[plane].values()
 
+            # Get bar max QDC and relQDC of that bar for this plane
+            maxQDC_detID = max(x_data, key=lambda detID: x_data[detID]['barQDC'])
+            maxQDC = x_data[maxQDC_detID]['barQDC']
+            totalQDC = sum(x_data[detID]['barQDC'] for detID in x_data)
+            relQDC = maxQDC / totalQDC
+
+            # print(f'relQDC:{relQDC}, totalQDC:{totalQDC}')
+
             if self.tw.hasTrack: 
                 xEx, yEx, zEx = self.tw.muAna.GetExtrapolatedPosition(plane)
-                histkey='withTrack'
-            else: histkey='noTrack'
 
             # y-histograms
-            self.hists[f'lambda_y-plane{plane}'].Fill(y_data['lambda_y'])
+            if self.simulation: 
+                self.hists[f'lambda_y-plane{plane}'].Fill(y_data['lambda_y'], self.tw.scaled_event_weight)
+            else: 
+                self.hists[f'lambda_y-plane{plane}'].Fill(y_data['lambda_y'])
+            self.lambda_y_dict[plane]=y_data['lambda_y']
 
             if self.tw.hasTrack: 
-
                 xEx, yEx, zEx = self.tw.muAna.GetExtrapolatedPosition(plane)
-
                 dy = y_data['yB'] - yEx
 
-                self.hists[f'dyB-plane{plane}'].Fill(dy)
-                self.hists[f'dyB-total'].Fill(dy)
+                if self.simulation:
+                    # Make y_b histograms
+                    self.hists[f'dyB-plane{plane}'].Fill(dy, self.tw.scaled_event_weight)
+                    self.hists[f'dyB-total'].Fill(dy, self.tw.scaled_event_weight)
 
-                self.hists[f'dyBvEy-plane{plane}'].Fill(dy, yEx)
-                self.hists[f'dyBvEy-total'].Fill(dy, yEx)
+                    self.hists[f'dyBvEy-plane{plane}'].Fill(dy, yEx, self.tw.scaled_event_weight)
+                    self.hists[f'dyBvEy-total'].Fill(dy, yEx, self.tw.scaled_event_weight)
 
-                self.hists[f'lambda_yvEy-plane{plane}'].Fill(y_data["lambda_y"], yEx)
+                    self.hists[f'lambda_yvEy-plane{plane}'].Fill(y_data["lambda_y"], yEx, self.tw.scaled_event_weight)
+                else: 
+                    # Make y_b histograms
+                    self.hists[f'dyB-plane{plane}'].Fill(dy)
+                    self.hists[f'dyB-total'].Fill(dy)
+
+                    self.hists[f'dyBvEy-plane{plane}'].Fill(dy, yEx)
+                    self.hists[f'dyBvEy-total'].Fill(dy, yEx)                    
+                    self.hists[f'lambda_yvEy-plane{plane}'].Fill(y_data["lambda_y"], yEx)
 
             for key,x_method in self.x_methods_dict.items():
                         
                 x_val=x_method[plane]['lambda_x']
                 
-                self.hists[f'lambda_x_{histkey}_{key}-plane{plane}'].Fill(x_val)
+                if self.simulation: 
+                    self.hists[f'lambda_x_{key}-plane{plane}'].Fill(x_val, self.tw.scaled_event_weight)
+                    self.hists[f'lambda_x_{key}vQDC-plane{plane}'].Fill(x_val, maxQDC, self.tw.scaled_event_weight)
+                else: 
+                    self.hists[f'lambda_x_{key}-plane{plane}'].Fill(x_val)
+                    self.hists[f'lambda_x_{key}vQDC-plane{plane}'].Fill(x_val, maxQDC)
+
+            self.lambda_x_dict[plane] = self.x_methods_dict['maxQDC'][plane]['lambda_x']
+            self.totalQDC_dict[plane] = totalQDC
+            self.relQDC_dict[plane] = relQDC 
 
             if not self.tw.hasTrack: return
 
@@ -303,18 +304,85 @@ class ShowerProfiles(object):
                     if x in ('dxL', 'dxR'): x_val = x_method[plane][x][0]-xEx
                     else: x_val = x_method[plane][x]-xEx
 
-                    self.hists[f'{x}_{histkey}_{key}-plane{plane}'].Fill(x_val)
-                    self.hists[f'{x}_{histkey}_{key}-total'].Fill(x_val)
+                    if self.simulation:
+                        self.hists[f'{x}_{key}-plane{plane}'].Fill(x_val, self.tw.scaled_event_weight)
+                        self.hists[f'{x}_{key}-total'].Fill(x_val, self.tw.scaled_event_weight)
 
-                    self.hists[f'{x}_{key}vEx-plane{plane}'].Fill(x_val, xEx)
-                    self.hists[f'{x}_{key}vEx-total'].Fill(x_val, xEx)
+                        self.hists[f'{x}_{key}vEx-plane{plane}'].Fill(x_val, xEx, self.tw.scaled_event_weight)
+                        self.hists[f'{x}_{key}vEx-total'].Fill(x_val, xEx, self.tw.scaled_event_weight)
 
-                    self.hists[f'lambda_x_{key}vEx-plane{plane}'].Fill(x_val, xEx)
+                        self.hists[f'lambda_x_{key}vEx-plane{plane}'].Fill(x_val, xEx, self.tw.scaled_event_weight)
+                    else:
+                        self.hists[f'{x}_{key}-plane{plane}'].Fill(x_val)
+                        self.hists[f'{x}_{key}-total'].Fill(x_val)
+
+                        self.hists[f'{x}_{key}vEx-plane{plane}'].Fill(x_val, xEx)
+                        self.hists[f'{x}_{key}vEx-total'].Fill(x_val, xEx)
+
+                        self.hists[f'lambda_x_{key}vEx-plane{plane}'].Fill(x_val, xEx) 
 
             for detID in x_data:
-                relQDC=x_data[detID]['relQDC']
-                self.hists[f'relQDC-plane{plane}'].Fill(relQDC)
-                self.hists[f'relQDC-total'].Fill(relQDC)            
+                # relQDC=x_data[detID]['relQDC']
+                if self.simulation:
+                    self.hists[f'relQDC-plane{plane}'].Fill(relQDC, self.tw.scaled_event_weight)
+                    self.hists[f'relQDC-total'].Fill(relQDC, self.tw.scaled_event_weight)
+                else:
+                    self.hists[f'relQDC-plane{plane}'].Fill(relQDC)
+                    self.hists[f'relQDC-total'].Fill(relQDC)
+
+    def StoreSimulationDetails(self):
+
+        output_dict = {k:None for k in self.column_names}
+
+        eventHasMuon=self.hcalTools.OutgoingMuon(self.tw.M.eventTree, self.options.simMode)
+        output_dict['EventNumber'] = self.EventNumber
+        output_dict['scaled_weight'] = self.tw.scaled_event_weight
+        output_dict['hasMuon'] = eventHasMuon # truth of whether there is a final state muon
+        output_dict['hasTrack'] = self.tw.hasTrack # is track found? 
+        output_dict['interactionWall'] = self.interactionWall
+
+        # print(self.relQDC_dict, self.totalQDC_dict)
+
+        for i in range(5):
+            output_dict[f'lambdax{i}'] = round(self.lambda_x_dict[i], 2)
+            output_dict[f'lambday{i}'] = round(self.lambda_y_dict[i], 2)
+            output_dict[f'relQDC{i}'] = round(self.relQDC_dict[i], 2)
+            output_dict[f'planeQDC{i}'] = round(self.totalQDC_dict[i], 2)
+
+        for cutname in self.pass_cuts: output_dict[cutname] = self.pass_cuts[cutname]
+
+        output = [output_dict[key] for key in self.column_names]
+        
+        # Not writing out events where all lambda values are nan
+        all_lambdaxs_nan = all([np.isnan(output_dict[f'lambdax{i}']) for i in range(5) ])
+        all_lambdays_nan = all([np.isnan(output_dict[f'lambday{i}']) for i in range(5) ])
+        if all_lambdaxs_nan and all_lambdays_nan: return
+        
+        self.eventdata.append(output)
+        
+    def WriteOutSimulationDetails(self):
+        d, outfilename_noExt = self.GetOutFileName()
+        datafilename = d+outfilename_noExt+'.csv'
+        
+        with open(datafilename, 'w', newline='') as f:
+            writer=csv.writer(f)
+            # writer.writerow(self.column_names)  # Write the header
+            writer.writerows(self.eventdata)
+        print(f'Simulation details written to {datafilename}')
+
+    def GetBarycentre(self, plane, proj):
+
+        if proj=='x': 
+            if plane not in self.xbarycentres: return np.nan
+            if not 'dxB' in self.xbarycentres[plane]: return np.nan
+            b=self.xbarycentres[plane]['dxB']
+
+        elif proj=='y': 
+            if plane not in self.barycentres: return np.nan
+            if not 'y-barycentre' in self.barycentres[plane]: return np.nan
+            if not 'yB' in self.barycentres[plane]['y-barycentre']: return np.nan
+            b=self.barycentres[plane]['y-barycentre']['yB']
+        return b
 
     def RecordAllSiPMData(self, hits, xEx, yEx):
         
@@ -365,96 +433,189 @@ class ShowerProfiles(object):
     def GetSeedPos(self, runNr):
         seedpos = self.muAna.nu_mu_events[runNr][2:4]
         return seedpos
+    def GetNeutrinoIntType(self, event):
 
-    def WriteOutRecordedTimes(self):
+        if not hasattr(event, "MCTrack"):
+            print(f'No MCTrack branch. Is this real data?')
+            return 
 
-        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits'
-
-        if self.options.notDSbar==True: filename+='-notDSbar'
-        elif self.options.dycut==True: filename+='-dycut'
-        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
-        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
-
-        with open(f'{filename}.data', 'wb') as f:
-            pickle.dump(self.data, f)
-        print(f'File saved to {filename}.data')
-
-    def SaveClusters(self):
-
-        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/clusterInfo'
-
-        if self.options.notDSbar==True: filename+='-notDSbar'
-        elif self.options.dycut==True: filename+='-dycut'
-        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
-        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
-        elif self.options.scifiClustersQDC==True: filename+='-QDCweightedClusters'
-
-        with open(f'{filename}.data', 'wb') as f:
-            pickle.dump(self.clusters, f)
-        print(f'File saved to {filename}.data')                
-
-    def SaveScifiHits(self):
-
-        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/ScifiHits'
-
-        if self.options.notDSbar==True: filename+='-notDSbar'
-        elif self.options.dycut==True: filename+='-dycut'
-        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
-        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
-
-        with open(f'{filename}.data', 'wb') as f:
-            pickle.dump(self.scifidata, f)
-        print(f'File saved to {filename}.data')                
-
-    def WriteOutHistograms(self):
-
-        if not self.simulation: 
-            d = f'{self.outpath}splitfiles/run{self.runNr}/showerprofiles/'
-            outfilename=f'showerprofiles_{self.options.nStart}.root'
-        else: d = f'{self.outpath}showerprofiles/'
+        if event.MCTrack[0].GetPdgCode() == event.MCTrack[1].GetPdgCode():
+            i_flav = 0 #NC
+        elif abs(event.MCTrack[1].GetPdgCode()) == 11: # electron
+            i_flav = 1 #nueCC
+        elif abs(event.MCTrack[1].GetPdgCode()) == 13: # muon
+            i_flav = 2 #numuCC
+        elif abs(event.MCTrack[1].GetPdgCode()) == 15: # tau
+            is1Mu = False
+            for j_track in range(2, len(event.MCTrack)):
+                if event.MCTrack[j_track].GetMotherId() == 1 and abs(event.MCTrack[j_track].GetPdgCode()) == 13:
+                    is1Mu = True
+                    break
+            if is1Mu:
+                i_flav = 4 #nutauCC1mu
+            else:
+                i_flav = 3 #nutauCC0mu 
+        else: return 
         
-        # Conditions for parsing the filenames of different simulation types
-        if self.simulation and self.options.simMode == 'muonDIS':
-            preamble, key1, key2, end = self.options.fname.split('_')
-            outfilename=f'showerprofiles_{key1}_{key2}.root'
+        return i_flav        
 
-        elif self.simulation and self.options.simMode == 'neutrino':
-            simulation_details, filename = self.options.fname.split('/')
-            key=filename.split('_')[1]
-            d+=simulation_details+'/'
-            outfilename=f'showerprofiles_{key}.root'
+    def EvaluateShowerSlopes(self):
 
-        elif self.simulation and self.options.simMode == 'neutralhadron':
-            particle_type, Emin, Emax, key = self.options.fname.split('_')[3:7]
-            # outfilename=d+f'showerprofiles_{particle_type}_{Emin}_{Emax}_{key}.root'
-            outfilename=f'showerprofiles_{particle_type}_{Emin}_{Emax}_{key}.root'
+        if self.options.simMode=='neutrino':
+            i_flav = self.GetNeutrinoIntType(self.tw.M.eventTree)
+            if i_flav==2: print(f'Event number: {self.tw.M.EventNumber}')
 
-        elif self.simulation and self.options.simMode == 'passingmuon':
-            keys=self.options.fname.split('_')[1:3]
-            outfilename=f'showerprofiles_{keys[0]}_{keys[1]}.root'
+        # Just make a single hist per proj for evaluating slopes
+        for p in ['x', 'y']:
+            name=f'{p}z-slope'
+            if name in self.hists: self.hists[name].Reset()
+            else: 
+                title = f'{p}z projection view of Scifi medians and HCAL barycentres;z [cm];{p} [cm]'
+                self.hists[name] = ROOT.TH1D(name, title, 250, 250, 500)
+
+        # Add scifi median positions to the plots
+        scifi_hitpositions = self.GetScifiMedians()
+        for station in scifi_hitpositions:
+            
+            for orientation in scifi_hitpositions[station]:
+                if orientation=='hor':vert=0 
+                else: vert=1
+                
+                zpos=self.tw.zPos['Scifi'][10*station+vert]
+                
+                data = scifi_hitpositions[station][orientation]
+                if len(data)==0: continue # suppresses output for trying to average an empty container
+
+                median = np.median(data)
+                err = median/np.sqrt(len(data))
+
+                if orientation=='hor':
+                    zbin = self.hists[f'yz-slope'].FindBin(zpos)
+                    self.hists[f'yz-slope'].SetBinContent(zbin, median)
+                    self.hists[f'yz-slope'].SetBinError(zbin, err)
+
+                elif orientation=='vert':
+                    zbin = self.hists[f'xz-slope'].FindBin(zpos)
+                    self.hists[f'xz-slope'].SetBinContent(zbin, median)
+                    self.hists[f'xz-slope'].SetBinError(zbin, err)                    
         
-        else: 
-            print('fucked it bud')
+        # Now add HCAL barycentres to the plot
+        for plane in self.barycentres:
+            if len(self.barycentres[plane])==0: continue 
+            
+            x_data, y_data = self.barycentres[plane].values() 
+
+            zPos = self.tw.zPos['MuFilter'][20+plane]
+            zbin = self.hists['yz-slope'].FindBin(zPos)
+
+            yB = y_data['yB']
+            yBerror = 3 # not sure what else to do
+
+            xB = self.x_methods_dict['maxQDC'][plane]['dxB']
+            # Calculate uncertainty
+            xLerror = self.x_methods_dict['maxQDC'][plane]['dxL'][1]
+            xRerror = self.x_methods_dict['maxQDC'][plane]['dxR'][1]
+            xBerror = np.sqrt(xLerror**2 + xRerror**2)
+
+            self.hists['yz-slope'].SetBinContent(zbin, yB)
+            self.hists['yz-slope'].SetBinError(zbin, yBerror)
+
+            self.hists['xz-slope'].SetBinContent(zbin, xB)
+            self.hists['xz-slope'].SetBinError(zbin, xBerror)
+
+        # Now all data is in the histograms I can determine the slope
+        angles={'y':np.nan, 'x':np.nan}
+
+        for p in ['x', 'y']:
+            hist = self.hists[f'{p}z-slope']
+            if hist.GetEntries()<3: continue # Can't fit data with less than 3 data points
+
+            # W: use chi-square method, Q: quiet fit, S: return resultPtr, N: don't draw or store the function
+            rc = hist.Fit('pol1', 'WQSN') 
+            res=rc.Get()
+            if not res: continue
+            
+            gradient = res.Parameter(1)
+            gradient_error = res.ParError(1) 
+            
+            angles[p] = np.degrees(np.arctan(gradient))
+
+        # Fill these angles into a plot
+        Xtheta = 'X-theta'
+        if not Xtheta in self.hists:
+            title = '#theta_{X} measured with both Scifi and HCAL;#theta_{X} [degrees];Counts'
+            self.hists[Xtheta] = ROOT.TH1D(Xtheta, title, 90, -90, 90)
+        if not np.isnan(angles['y']): self.hists[Xtheta].Fill(angles['y'])
+        
+        Xphi = 'X-phi'
+        if not Xphi in self.hists:
+            title = '#phi_{X} measured with both Scifi and HCAL;#phi_{X} [degrees];Counts'
+            self.hists[Xphi] = ROOT.TH1D(Xphi, title, 90, -90, 90)
+        if not np.isnan(angles['x']):  self.hists[Xphi].Fill(angles['x'])
+
+        thetavphi='thetavphi'
+        if not thetavphi in self.hists:
+            title = '#theta_{X} v #phi_{X} measured with both Scifi and HCAL;#phi [degrees];#theta [degrees];Counts'
+            self.hists[thetavphi] = ROOT.TH2D(thetavphi, title, 90, -90, 90, 90, -90, 90)
+        if not np.isnan(angles['x']) and not np.isnan(angles['y']):  self.hists[thetavphi].Fill(angles['x'], angles['y'])
+
+        # Make a plot of the difference between X angle and muon angle
+        # Fill these angles into a plot
+
+        if self.tw.hasTrack==False: 
+            # print(f'No fitted track in event {self.tw.M.EventNumber}\n')
             return
 
-        if os.path.exists(d+outfilename): outfile=ROOT.TFile.Open(d+outfilename, 'recreate')
-        else: 
-            path_obj=Path(d)
-            path_obj.mkdir(parents=True, exist_ok=True)
-            outfile=ROOT.TFile.Open(d+outfilename, 'create') 
+        slopeX, slopeY = self.tw.mom.x()/self.tw.mom.z(), self.tw.mom.y()/self.tw.mom.z()
+        muon_theta = np.degrees(np.arctan(slopeY))
+        muon_phi = np.degrees(np.arctan(slopeX))
 
-        for hname in self.hists:
-            key = hname.split('-')[0]
-            hist=self.hists[hname]
-
-            if not hasattr(outfile, key): folder=outfile.mkdir(key)
-            else: folder=outfile.Get(key)
+        dXmutheta = f'dXmu-theta'
+        if not dXmutheta in self.hists:
+            title = '#Delta(#theta_{X}, #theta_{#mu}) measured with both Scifi and HCAL;#Delta(#theta_{X}, #theta_{#mu}) [degrees];Counts'
+            self.hists[dXmutheta] = ROOT.TH1D(dXmutheta, title, 90, -90, 90)
+        if not np.isnan(angles['y']):  self.hists[dXmutheta].Fill(angles['y'] - muon_theta)
+       
+        dXmuphi = f'dXmu-phi'
+        if not dXmuphi in self.hists:
+            title = '#Delta(#phi_{X}, #phi_{#mu}) measured with both Scifi and HCAL;#Delta(#phi_{X}, #phi_{#mu}) [degrees];Counts'
+            self.hists[dXmuphi] = ROOT.TH1D(dXmuphi, title, 90, -90, 90)
+        if not np.isnan(angles['x']): self.hists[dXmuphi].Fill(angles['x'] - muon_phi)
             
-            folder.cd()
-            hist.Write(hname, 2) # The 2 means it will overwrite a hist of the same name  
+    def GetScifiMedians(self):
+        scifi_hits = self.tw.M.eventTree.Digi_ScifiHits
 
-        outfile.Close()
-        print(f'{len(self.hists)} histograms saved to {d+outfilename}')    
+        res={}
+        for hit in scifi_hits:
+            detID = hit.GetDetectorID()
+            station = detID//1000000
+            
+            self.tw.M.Scifi.GetSiPMPosition(detID, self.A,self.B)
+            
+            if hit.isVertical(): 
+                pos = 0.5*(self.A[0] + self.B[0])
+                orientation=1
+            else:
+                pos = 0.5*(self.A[1] + self.B[1]) 
+                orientation=0
+
+            if not station in res: res[station]={'hor':[], 'vert':[]}
+            if orientation==1: res[station]['vert'].append(pos)
+            else: res[station]['hor'].append(pos)
+        return res
+
+
+
+
+
+
+
+
+
+    ###########
+    # Method for looking for the next time an expected small SiPM fires
+    # in the numu candidate events
+    ###########
 
     def FindExpectedSmallSiPMs(self, fDetID, qdcs, smallSiPMs):
 
@@ -581,30 +742,105 @@ class ShowerProfiles(object):
         # Very important to load the signal event back!
         self.tw.M.GetEvent(signal_event)
 
-    @staticmethod
-    def dycut(hist, nsig=1):    
-        dymin=hist.GetMean()-nsig*hist.GetStdDev()
-        dymax=hist.GetMean()+nsig*hist.GetStdDev()
-        return dymin, dymax
+    def WriteOutRecordedTimes(self):
 
-    @staticmethod
-    def slopecut(mom, slopecut=0.1):
-        slopeX, slopeY=mom.x()/mom.z(), mom.y()/mom.z()
-        if abs(slopeX)>slopecut or abs(slopeY)>slopecut: return 0
-        else: return 1
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits'
 
-    def TDS0cut(self,reft):
-        if reft==-6237.5: return 0
-        reftns=reft*self.TDC2ns
-        if reftns<13.75 or reftns>15.45: return 0
-        return reftns 
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
+        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
 
-    def ParticleToFcorrection(self, start=('Scifi','10')):
-        zPos_start=self.zPos[start[0]][int(start[1])]
-        lam=(zPos_start-self.pos.z())/self.mom.z()
-        Ex_scifi=ROOT.TVector3(self.pos.x()+lam*self.mom.x(), self.pos.y()+lam*self.mom.y(), self.pos.z()+lam*self.mom.z())
-        R_sq = (self.Ex.x()-Ex_scifi.x())**2 + (self.Ex.y()-Ex_scifi.y())**2 + (self.Ex.z()-Ex_scifi.z())**2
-        R=ROOT.TMath.Sqrt(R_sq)
+        with open(f'{filename}.data', 'wb') as f:
+            pickle.dump(self.data, f)
+        print(f'File saved to {filename}.data')
 
-        tofcorrection=R/30
-        return tofcorrection 
+    def SaveClusters(self):
+
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/clusterInfo'
+
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
+        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
+        elif self.options.scifiClustersQDC==True: filename+='-QDCweightedClusters'
+
+        with open(f'{filename}.data', 'wb') as f:
+            pickle.dump(self.clusters, f)
+        print(f'File saved to {filename}.data')                
+
+    def SaveScifiHits(self):
+
+        filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/ScifiHits'
+
+        if self.options.notDSbar==True: filename+='-notDSbar'
+        elif self.options.dycut==True: filename+='-dycut'
+        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
+        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
+
+        with open(f'{filename}.data', 'wb') as f:
+            pickle.dump(self.scifidata, f)
+        print(f'File saved to {filename}.data')                
+
+    def GetOutFileName(self):
+        if not self.simulation: 
+            d = f'{self.outpath}splitfiles/run{self.runNr}/showerprofiles/'
+            outfilename_noExt=f'showerprofiles_{self.options.nStart}'
+        else: d = f'{self.outpath}showerprofiles/'
+        
+        # Conditions for parsing the filenames of different simulation types
+        if self.simulation and self.options.simMode == 'muonDIS':
+            preamble, key1, key2, end = self.options.fname.split('_')
+            outfilename_noExt=f'showerprofiles_{key1}_{key2}'
+
+        elif self.simulation and self.options.simMode == 'neutrino':
+            simulation_details, filename = self.options.fname.split('/')
+            key=filename.split('_')[1]
+            d+=simulation_details+'/'
+            outfilename_noExt=f'showerprofiles_{key}'
+
+        elif self.simulation and self.options.simMode == 'neutralhadron':
+            particle_type, Emin, Emax, key = self.options.fname.split('_')[3:7]
+            outfilename_noExt=f'showerprofiles_{particle_type}_{Emin}_{Emax}_{key}'
+
+        elif self.simulation and self.options.simMode == 'passingmuon':
+            keys=self.options.fname.split('_')[1:3]
+            outfilename_noExt=f'showerprofiles_{keys[0]}_{keys[1]}'
+        
+        else: 
+            print('fucked it bud')
+            return
+        return d, outfilename_noExt
+
+    def WriteOutHistograms(self):
+        
+        if self.simulation: 
+            self.WriteOutSimulationDetails()
+
+        d, outfilename_noExt = self.GetOutFileName()
+
+        if os.path.exists(d+outfilename_noExt+'.root'): outfile=ROOT.TFile.Open(d+outfilename_noExt, 'recreate')
+        else: 
+            path_obj=Path(d)
+            path_obj.mkdir(parents=True, exist_ok=True)
+            outfile=ROOT.TFile.Open(d+outfilename_noExt+'.root', 'create') 
+
+        for hname in self.hists:
+
+            if hname in ['X-phi', 'X-theta','thetavphi', 'dXmu-theta', 'dXmu-phi']:
+                outfile.WriteObject(self.hists[hname], hname)
+                continue
+
+            key = hname.split('-')[0]
+            # if key=='lambda_x_maxQDCvQDC': print('HELLO THERE')
+            hist=self.hists[hname]
+
+            if not hasattr(outfile, key): 
+                folder=outfile.mkdir(key)
+            else: folder=outfile.Get(key)
+            
+            folder.cd()
+            hist.Write(hname, 2) # The 2 means it will overwrite a hist of the same name  
+
+        outfile.Close()
+        print(f'{len(self.hists)} histograms saved to {d+outfilename_noExt}.root')        

@@ -81,7 +81,6 @@ if options.debug: checking4overlaps = True
 if options.pythia8:       simEngine = "Pythia8"
 if options.pg:                 simEngine = "PG"
 if options.genie:           simEngine = "Genie"
-if options.ntuple:         simEngine = "Ntuple"
 if options.muonback: simEngine = "MuonBack"
 if options.nuage:          simEngine = "Nuage"
 if options.mudis:          simEngine = "muonDIS"

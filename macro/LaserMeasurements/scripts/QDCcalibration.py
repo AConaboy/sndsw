@@ -6,7 +6,8 @@ import numpy as np
 import json
 from scipy.optimize import curve_fit
 import csv, os
-plt.rcParams['font.size'] = 16
+# plt.rcParams['font.size'] = 16
+fontsize=16
 plt.rcParams['lines.markersize'] = 8
 
 class QDCcalibration(object):
@@ -18,10 +19,13 @@ class QDCcalibration(object):
 
 		self.SiPMconfigs=self.GetSiPMconfigs()
 		if self.laser_mode.find('ngamma')==0: self.GetPhotonConversionConstants()
-		self.lasermode_displaydict = {'uncalibrated':'Uncalibrated laser intensity [%]', 'calibrated':'Calibrated laser intensity [%]', 
-            						'adc':'Average adc [a.u]', 'ngamma_incident': 'Incident photons, $n_{\gamma}$',
-									'ngamma_detected': 'Detected photons, $n_{\gamma}$', 'Npe':"N_{pe}"} 
-		self.int_title = self.lasermode_displaydict[self.laser_mode]		
+		self.lasermode_displaydict = {'uncalibrated':'Uncalibrated laser intensity [%]',
+									'calibrated':'Calibrated laser intensity [%]',
+									'adc':'Average adc [a.u]', 
+									'ngamma_incident': r'Incident photons / mm$^2$', 
+									'ngamma_detected': r'Detected photons, $n_{\gamma}$', 
+									'Npe':"N_{pe}"} 
+		self.int_title = self.lasermode_displaydict[self.laser_mode]	
 		self.colours = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'tab:orange', 'tab:purple']
 		self.calibrated_intensities=self.M.calibrated_intensities
 		self.saturation_params={}
@@ -72,13 +76,14 @@ class QDCcalibration(object):
 			if self.errors[i]<0: 
 				print(f'Run {mpv_runs[intensities[i]]} has a negative dQDC')
 
-		if self.laser_mode.find('ngamma')==-1 or self.laser_mode != 'N_pe': df_key = self.lasermode_displaydict[self.laser_mode]
-		else: df_key='Incident photons / mm_sq'
+		if self.laser_mode.find('ngamma')==-1 or self.laser_mode != 'N_pe': df_key='Incident photons / mm^2'
+		else: df_key = self.lasermode_displaydict[self.laser_mode]
 
 		self.current = self.calibrated_intensities[self.calibrated_intensities["Laser intensity [%]"].isin(intensities)][df_key]
 		if self.laser_mode.find('ngamma')!= -1: self.current = self.current*self.area
 		if self.laser_mode.find('detected')!= -1: self.current = self.current*self.PDE
 		if self.laser_mode == 'Npe': self.current = self.current*self.area*self.PDE*self.gain
+
 	def MPVprogression(self):
 
 		if len(self.current)==0:
@@ -115,8 +120,8 @@ class QDCcalibration(object):
 			if self.M.SiPMsize=='large':text_position = (500, 50)
 			else: text_position = (1000, -2.5)
 
-			if self.options.fitmode=='linear': ax.text(*text_position, f'linear offset = {round(linear_params[1], 1)} QDC', fontsize=14)
-			elif self.options.fitmode=='inv_exp': ax.text(*text_position, f'inv. exp. offset = {round(saturation_params[-1], 1)} QDC', fontsize=14)
+			if self.options.fitmode=='linear': ax.text(*text_position, f'linear offset = {round(linear_params[1], 1)} QDC', fontsize=fontsize)
+			elif self.options.fitmode=='inv_exp': ax.text(*text_position, f'inv. exp. offset = {round(saturation_params[-1], 1)} QDC', fontsize=fontsize)
 
 		elif self.laser_mode=='Npe':
 			self.DetermineQDCoffset()
@@ -132,8 +137,8 @@ class QDCcalibration(object):
 			if self.M.SiPMsize=='large':text_position = (500, 50)
 			else: text_position = (1000, -2.5)
 
-			if self.options.fitmode=='linear': ax.text(*text_position, f'linear offset = {round(linear_params[1], 1)} QDC', fontsize=14)
-			elif self.options.fitmode=='inv_exp': ax.text(*text_position, f'inv. exp. offset = {round(saturation_params[-1], 1)} QDC', fontsize=14)			
+			if self.options.fitmode=='linear': ax.text(*text_position, f'linear offset = {round(linear_params[1], 1)} QDC', fontsize=fontsize)
+			elif self.options.fitmode=='inv_exp': ax.text(*text_position, f'inv. exp. offset = {round(saturation_params[-1], 1)} QDC', fontsize=fontsize)
   
 		plt.minorticks_on()
 		plt.gca().xaxis.set_minor_locator(AutoMinorLocator(n=5))  
@@ -156,6 +161,48 @@ class QDCcalibration(object):
 		plotlocation = d+f'SiPM{self.M.SiPM}_{self.M.titledict[self.M.mode]}_{self.laser_mode}.png'
 		plt.savefig(f'{plotlocation}', bbox_inches='tight')
 		print(f'SiPM {self.M.SiPM} qdc v intensity figure saved to {plotlocation}')
+
+	def OverlayQDCcurves(self):
+
+		fig, ax = plt.subplots(figsize=(10,6))
+		ax.set_xlim(0,max(self.current))
+		
+		if self.laser_mode.find('gamma')!=-1:
+			
+			secax = ax.secondary_xaxis('top', functions=(photon_to_fraction, fraction_to_photon))
+			secax.set_ylabel(r"$n_{\gamma} / n_{\pixels}", fontsize=fontsize)
+			secax.tick_params(axis='y', which='major', labelsize=fontsize)
+
+			# Combine legend entries for both axes
+			# lines, labels = ax.get_legend_handles_labels()
+			# lines2, labels2 = secax.get_legend_handles_labels()
+
+		for SiPM in range(1,81):
+			self.M.SetSiPM(SiPM)
+			ax.errorbar(self.current.array, self.qdcs, yerr=self.errors, fmt='o', linestyle='-', markersize=8, label=f'SiPM {self.M.SiPM}')
+
+		plt.minorticks_on()
+		plt.gca().xaxis.set_minor_locator(AutoMinorLocator(n=5))  
+		plt.gca().yaxis.set_minor_locator(AutoMinorLocator(n=5))
+
+		ax.set_ylabel('QDC [a.u]')
+		
+		ax.set_xlabel(self.int_title)
+
+		# if self.laser_mode.find('gamma')!=-1: ax.legend(lines + lines2, labels + labels2, loc='lower right')
+		# else: ax.legend()
+
+		ax.grid(True, linestyle='--', alpha=0.7, color='gray')
+		ax.set_title(f'SiPMs overlay QDC measured as a function of {self.int_title.lower()}\n{self.M.titledict[self.M.mode]} illumination')
+		
+		# Create directories if not existing already
+		d=f'{self.M.sndswpath}/analysis-plots/qdc_calibration/'
+		os.makedirs(d, exist_ok=True)
+
+		plotlocation = d+f'SiPMs-overlay_{self.M.titledict[self.M.mode]}_{self.laser_mode}.png'
+		plt.savefig(f'{plotlocation}', bbox_inches='tight')
+		print(f'SiPMs overlay QDC v intensity figure saved to {plotlocation}')
+		
 
 	def DetermineQDCoffset(self):
 
@@ -217,16 +264,24 @@ class QDCcalibration(object):
 		sipmtypekey={0:'large', 1:'small'}
 		SiPMs = list(range((bar-1)*8+1, bar*8+1))
 
-		fig, axes = plt.subplots(2,1, figsize=(10,14))
-		# fig_title=fig.suptitle(f'Overlay of large and small SiPM QDC responses to laser')	
-		# fig_title.set_y(0.5)
+		fig, axes = plt.subplots(2,1, figsize=(10,16))
+		[i.tick_params(axis='both', which='major', labelsize=fontsize) for i in axes.flatten()]
 		
 		for i in range(2):
 			axes[i].set_title(f"Bar {bar}: QDC v current for {sipmtypekey[i]} SiPMs\n{self.M.titledict[self.M.mode]} illumination")
-			axes[i].set_xlabel(self.int_title)
-			axes[i].set_ylabel('QDC [a.u]')
+			axes[i].set_xlabel(self.int_title, fontsize=fontsize)
+			axes[i].set_ylabel('QDC [a.u]', fontsize=fontsize)
 			axes[i].grid(True, linestyle='--', alpha=0.7, color='gray')
 
+		if self.laser_mode.find('gamma')!=-1:
+			
+			secax_large = axes[0].secondary_xaxis('top', functions=(photon_to_fraction_largeSiPM, fraction_to_photon_largeSiPM))
+			secax_small = axes[1].secondary_xaxis('top', functions=(photon_to_fraction_smallSiPM, fraction_to_photon_smallSiPM))
+			secax_large.set_xlabel(r"$n_{\gamma} / n_{pixels}$", fontsize=fontsize)
+			secax_large.tick_params(axis='x', which='major', labelsize=fontsize)
+			secax_small.set_xlabel(r"$n_{\gamma} / n_{pixels}$", fontsize=fontsize)
+			secax_small.tick_params(axis='x', which='major', labelsize=fontsize)		
+				
 		for idx,SiPM in enumerate(SiPMs):
 			
 			x=self.SetSiPM(SiPM)
@@ -234,16 +289,17 @@ class QDCcalibration(object):
 			# current, qdcs, errors = self.GetQDCvIntensity()
 
 			# Plot the first scatter plot with error bars (blue dots)
-			if self.M.SiPMsize=='large': axes[0].errorbar(self.current, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
-			elif self.M.SiPMsize=='small': axes[1].errorbar(self.current, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
+			if self.M.SiPMsize=='large': axes[0].errorbar(self.current.array, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
+			elif self.M.SiPMsize=='small': axes[1].errorbar(self.current.array, self.qdcs, yerr=self.errors, color=self.colours[idx], label=f'SiPM {SiPM}')
 
-		for i in range(2): axes[i].legend()
+		for i in range(2): axes[i].legend(fontsize=fontsize)
 
 		# Create directories if not existing already
-		d=f'{self.M.sndswpath}/analysis-plots/qdc_calibration/'
+		d=f'{self.M.sndswpath}analysis-plots/qdc_calibration/'
 		os.makedirs(d, exist_ok=True)
 
 		plotlocation = d+f'bar{bar}_{self.M.titledict[self.M.mode]}.png'
+		plt.tight_layout()
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')
 
@@ -252,7 +308,7 @@ class QDCcalibration(object):
 		if style=='overlay':
 			fig, ax = plt.subplots(figsize=(10,6))
 
-			ax.set_title(f"QDC v {self.laser_mode} for SiPM {self.M.SiPM}, bar {self.M.bar}\nwith different illumination modes")
+			ax.set_title(f"QDC v {self.int_title} for SiPM {self.M.SiPM}, bar {self.M.bar}\nwith different illumination modes")
 			ax.set_xlabel(self.int_title)
 			ax.set_ylabel('QDC [a.u]')
 			ax.grid(which='major',axis='both',linestyle='--')
@@ -267,7 +323,7 @@ class QDCcalibration(object):
 				elif runtype==1:	label = f"1-bar illuminated"
 				else:				label = f"{runtype}-bars illuminated"
 				
-				ax.errorbar(self.current, self.qdcs, yerr=self.errors, linestyle='-', color=self.colours[idx], label=label)
+				ax.errorbar(self.current.array, self.qdcs, yerr=self.errors, linestyle='-', color=self.colours[idx], label=label)
 			ax.legend()	
 
 		if style=='subplots':
@@ -294,3 +350,13 @@ class QDCcalibration(object):
 		fig.savefig(plotlocation, bbox_inches='tight')
 		print(f'Plot saved to {plotlocation}')		
 
+# hardcoded to large SiPM atm
+def photon_to_fraction_largeSiPM(x):
+    return (x / 14331)
+def photon_to_fraction_smallSiPM(x):
+    return (x / 3531)	
+
+def fraction_to_photon_largeSiPM(x):
+    return (x * 14331)
+def fraction_to_photon_smallSiPM(x):
+    return (x * 3531)	

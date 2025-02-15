@@ -4,7 +4,7 @@ import ast, os, csv, shutil
 
 datapath = '/eos/experiment/sndlhc/users/aconsnd/simulation/neutrino/data/nue-extendedreconstruction/'
 # cols=['filekey','EventNumber','hasMuon','DSmult0x','DSmult0y','DSmult1x','DSmult1y','USmult3','USmult4','dx3','dy3','dx4','dy4','lambdax3','lambdax4','lambday3','lambday4']
-column_names=['filekey', 'EventNumber','hasMuon','interactionWall',
+column_names=['filekey', 'EventNumber', 'flav', 'hasMuon', 'fired_planes','interactionWall',
 'scifi_median_x','scifi_median_y',
 'scifi_residual_x','scifi_residual_y',
 'dx0','dx1','dx2','dx3','dx4',
@@ -14,7 +14,7 @@ column_names=['filekey', 'EventNumber','hasMuon','interactionWall',
 'y0','y1','y2','y3','y4',
 'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
 'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-'HCAL5barcode'
+'HCAL5barcode', 'm_x','c_x','m_y','c_y'
 ]
 
 def GetFiles():

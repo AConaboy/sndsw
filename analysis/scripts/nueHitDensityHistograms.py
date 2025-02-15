@@ -113,7 +113,14 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
     else:
         flav_list = [""]
 
+    if BDT_cut==True: 
+        BDT_weights = []
+
     for flav in flav_list:
+
+        # Histograms for BDT signal probabilities
+        BDT_weights.append(ROOT.TH1D("BDT_signalProb"+flav+name, "Prob event has no muon", 100, 0, 1+1/100))
+
         h_n_hits.append(ROOT.TH1D("n_hits"+flav+name, ";Number of in-time SciFi hits", 1000, 0, 5000))
         h_n_hits_sel.append(ROOT.TH1D("n_hits_sel"+flav+name, ";Number of in-time SciFi hits", 1000, 0, 5000))
         h_hit_density.append(ROOT.TH1D("hit_density"+flav+name, ";Sum of hit densities", 200, 0, 40000))
@@ -134,6 +141,8 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
             
         h_theta.append(ROOT.TH1D("theta"+flav+name, ";#theta", 100, 0, 1))
         h_theta_density.append(ROOT.TH2D("theta_density"+flav+name, ";#theta;Sum of hit densities", 100, 0, 1, 200, 0, 40000))
+    
+    BDT_weights.append(ROOT.TH1D("BDT_signalProb_all", "Prob event has no muon", 100, 0, 1))
 
     if isNeutralHad:
         totWeight = 0
@@ -150,6 +159,25 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
             scifiDet.InitEvent(event.EventHeader)
             muFilterDet.InitEvent(event.EventHeader)
 
+        i_flav = 0
+        if isNuMC:
+            if event.MCTrack[0].GetPdgCode() == event.MCTrack[1].GetPdgCode():
+                i_flav = 0 #NC
+            elif abs(event.MCTrack[1].GetPdgCode()) == 11:
+                i_flav = 1 #nueCC
+            elif abs(event.MCTrack[1].GetPdgCode()) == 13:
+                i_flav = 2 #numuCC
+            elif abs(event.MCTrack[1].GetPdgCode()) == 15:
+                is1Mu = False
+                for j_track in range(2, len(event.MCTrack)):
+                    if event.MCTrack[j_track].GetMotherId() == 1 and abs(event.MCTrack[j_track].GetPdgCode()) == 13:
+                        is1Mu = True
+                        break
+                if is1Mu:
+                    i_flav = 4 #nutauCC1mu
+                else:
+                    i_flav = 3 #nutauCC0mu            
+
         if BDT_cut:
 
             if ch.GetName()=='cbmsim':
@@ -165,9 +193,15 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
             To determine these features hcalTools is in the sndsw/python/ directory and utilises the barycentre and lambda methods in
             sndsw/python/AnalysisFunctions.py. These should eventually be incorporated into the MuFilter class. 
             """
-            bdt_pred=hcalTools.BDT_cut(event, muFilterDet,scifiDet)
+
+            bdt_probs = hcalTools.BDT_cut(event, muFilterDet,scifiDet)
+            # print(type(bdt_probs), bdt_probs)
+            prob_noMuon, prob_Muon = bdt_probs[0,0], bdt_probs[0,1]
             
-            if bdt_pred: 
+            BDT_weights[i_flav].Fill(prob_noMuon)
+            BDT_weights[-1].Fill(prob_noMuon)
+            
+            if prob_noMuon < 0.5:  # If BDT assigns less than 50% probability that event is signal (no final state muon) then ditch it
                 print(f'BDT cut event {i_event}')
                 continue
 
@@ -193,25 +227,6 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
         if len(selHits)==1: continue
 
         slopev, slopeh, reducedchi2v, reducedchi2h, reducedchi2both = getSciFiAngle(selHits)
-
-        i_flav = 0
-        if isNuMC:
-            if event.MCTrack[0].GetPdgCode() == event.MCTrack[1].GetPdgCode():
-                i_flav = 0 #NC
-            elif abs(event.MCTrack[1].GetPdgCode()) == 11:
-                i_flav = 1 #nueCC
-            elif abs(event.MCTrack[1].GetPdgCode()) == 13:
-                i_flav = 2 #numuCC
-            elif abs(event.MCTrack[1].GetPdgCode()) == 15:
-                is1Mu = False
-                for j_track in range(2, len(event.MCTrack)):
-                    if event.MCTrack[j_track].GetMotherId() == 1 and abs(event.MCTrack[j_track].GetPdgCode()) == 13:
-                        is1Mu = True
-                        break
-                if is1Mu:
-                    i_flav = 4 #nutauCC1mu
-                else:
-                    i_flav = 3 #nutauCC0mu
   
         h_min_chi2[i_flav].Fill(min(reducedchi2v, reducedchi2h), weight)
         h_log_min_chi2[i_flav].Fill(ROOT.TMath.Log(min(reducedchi2v, reducedchi2h)), weight)
@@ -276,17 +291,17 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
             for j_hist in i_hist:
                 j_hist.Scale(N_HAD/totWeight)
         
-    return (h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens)
+    return (BDT_weights, h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens)
 
 out_file_name = f"checkDataCuts_BDTcut{options.BDTcut}.root"
 out_file = ROOT.TFile(out_file_name, "RECREATE")
 
-print(f'Making plots with data:\n')
-plots_data  = makePlots(ch, options.BDTcut)
+# print(f'Making plots with data:\n')
+# plots_data  = makePlots(ch, options.BDTcut)
 print(f'Making plots with neutrino MC:\n')
 plots_MC = makePlots(chMC, options.BDTcut, isNuMC = True, name = "_MC")
-print(f'Making plots with neutral hadron MC:\n')
-plots_hadMC = makePlots(chNeutral, options.BDTcut, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
+# print(f'Making plots with neutral hadron MC:\n')
+# plots_hadMC = makePlots(chNeutral, options.BDTcut, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
 
 out_file.Write()
 out_file.Close()

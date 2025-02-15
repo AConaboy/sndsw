@@ -73,8 +73,8 @@ InitStatus DigiTaskSND::Init()
     // copy branches from input file:
     fMCTrackArray = static_cast<TClonesArray*>(ioman->GetObject("MCTrack"));
     ioman->Register("MCTrack", "ShipMCTrack", fMCTrackArray, kTRUE);
-    ioman->Register("vetoPoint", "vetoPoints", fvetoPointArray, kTRUE);
-    ioman->Register("EmulsionDetPoint", "EmulsionDetPoints", fvetoPointArray, kTRUE);
+    if (fvetoPointArray) {ioman->Register("vetoPoint", "vetoPoints", fvetoPointArray, kTRUE);}
+    ioman->Register("EmulsionDetPoint", "EmulsionDetPoints", fEmulsionPointArray, kTRUE);
     ioman->Register("ScifiPoint", "ScifiPoints", fScifiPointArray, kTRUE);
     ioman->Register("MuFilterPoint", "MuFilterPoints", fMuFilterPointArray, kTRUE);
  
@@ -103,6 +103,7 @@ InitStatus DigiTaskSND::Init()
     return kSUCCESS;
 }
 
+
 void DigiTaskSND::Exec(Option_t* /*opt*/)
 {
 
@@ -113,9 +114,14 @@ void DigiTaskSND::Exec(Option_t* /*opt*/)
     fMuFilterHit2MCPointsArray->Clear("C");
 
     // Set event header
-    fEventHeader->SetRunId(fMCEventHeader->GetRunID());
-    fEventHeader->SetEventNumber(fMCEventHeader->GetEventID());
-    fEventHeader->SetBunchType(101);
+    if (fMCEventHeader) {
+        fEventHeader->SetRunId(fMCEventHeader->GetRunID());
+        fEventHeader->SetEventNumber(fMCEventHeader->GetEventID());
+        fEventHeader->SetBunchType(101);
+    }
+    else {
+    std::cerr << "Warning: fMCEventHeader is not defined. No RunId, EventNumber, BunchType not set." << std::endl;
+    }
 
     // Digitize MC points if any
     if (fMuFilterPointArray) digitizeMuFilter();

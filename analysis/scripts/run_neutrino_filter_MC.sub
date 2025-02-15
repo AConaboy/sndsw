@@ -9,9 +9,9 @@ output = /afs/cern.ch/work/a/aconsnd/HTCondor/output/$(mode).$(ClusterId).$(Proc
 log = /afs/cern.ch/work/a/aconsnd/HTCondor/log/$(mode).$(ClusterId).$(ProcId).log
 error = /afs/cern.ch/work/a/aconsnd/HTCondor/error/$(mode).$(ClusterId).$(ProcId).err
 
-#+JobFlavour = "espresso"
-+JobFlavour = "microcentury"
++JobFlavour = "espresso"
+#+JobFlavour = "microcentury"
 #+JobFlavour = "longlunch"
 #+JobFlavour = "workday"
 
-queue input_dir, output_dir, mode, cut_set from /afs/cern.ch/user/a/aconsnd/Timing/condor_scripts/nueFilterlist.txt
+queue input_dir, output_dir, mode, cut_set from /afs/cern.ch/user/a/aconsnd/Timing/condor_scripts/nuFilterlist.txt
