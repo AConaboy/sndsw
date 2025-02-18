@@ -283,21 +283,6 @@ snd::analysis_tools::selectScifiHits(const TClonesArray &digiHits, int station, 
                           selection_parameters.at("time_lower_range"), time_upper_range, make_selection);
 }
 
-std::unique_ptr<TClonesArray>
-snd::analysis_tools::filterScifiHits(const TClonesArray &digiHits,
-                                     const std::map<std::string, float> &selection_parameters, int method,
-                                     std::string setup)
-{
-   TClonesArray supportArray("sndScifiHit", 0);
-   auto filteredHits = std::make_unique<TClonesArray>("sndScifiHit", digiHits.GetEntries());
-   int filteredHitsIndex = 0;
-   int ScifiStations = 5;
-   if (setup == "H8") {
-      ScifiStations = 4;
-   } else {
-      LOG(info) << "\"TI18\" setup will be used by default, please provide \"H8\" for the Testbeam setup.";
-   }
-
 std::unique_ptr<TClonesArray> snd::analysis_tools::filterScifiHits(const TClonesArray &digiHits, const std::map<std::string, float> &selection_parameters, int method, std::string setup){
   TClonesArray supportArray("sndScifiHit",0);
   auto filteredHits = std::make_unique<TClonesArray>("sndScifiHit",digiHits.GetEntries());

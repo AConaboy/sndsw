@@ -345,13 +345,13 @@ class HCALTools(object):
         return b
 
     def GetHCAL5barscode(self, hits):
-        c=[False]*10 
+        c={plane:[False]*10 for plane in range(5)}
         US_detID_list = [i.GetDetectorID() for i in hits if all([self.muAna.parseDetID(i.GetDetectorID())[0]==2, self.muAna.parseDetID(i.GetDetectorID())[1]==4])]
         for detID in US_detID_list:
-            bar=self.muAna.parseDetID(detID)[2]
-            c[bar]=True 
+            s,p,b=self.muAna.parseDetID(detID)
+            c[p][b]=True 
         
-        self.HCAL5barscode=''.join(['1' if state else '0' for state in c])
+        self.HCALbarscodes= {i:''.join(['1' if state else '0' for state in c] for i in range(5)}
 
     def InAcceptance(self, line, proj):
         

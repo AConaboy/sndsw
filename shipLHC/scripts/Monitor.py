@@ -85,6 +85,7 @@ class Monitoring():
       self.h = {}   # histogram storage
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       self.runNr   = str(options.runNumber).zfill(6)
       self.FairTasks = {}
       for x in FairTasks:   #  keeps extended methods if from python class
@@ -122,8 +123,9 @@ class Monitoring():
 <<<<<<< HEAD
 >>>>>>> cf0e3201a (Updating files for use with simulation)
 =======
+=======
+>>>>>>> 4ba00da25 (ehm... things)
       self.runNr   = str(options.runNumber).zfill(6)
-
       self.FairTasks = {}
       for x in FairTasks:   #  keeps extended methods if from python class
          self.FairTasks[x.GetName()] = x
@@ -222,10 +224,7 @@ class Monitoring():
 
       elif options.customEventChain: # Code run when investigating numu candidates
          for idx, runNr in enumerate(options.signalpartitions):
-            if idx!=0: 
-               year=self.GetRunYear(runNr)
-               path=f'/eos/experiment/sndlhc/convertedData/physics/{year}/'
-               source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
+            if idx!=0: source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
 
 <<<<<<< HEAD
       else:
@@ -395,6 +394,7 @@ class Monitoring():
 >>>>>>> dfd288d1f (loads of stuff on the simulation side and adding more details to scifi event t0)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       # fitted tracks
       if "simpleTracking" in self.FairTasks:
          self.trackTask = self.FairTasks["simpleTracking"]
@@ -451,6 +451,8 @@ class Monitoring():
          except:
            print('continue without knowing filling scheme',options.server+options.path)
 
+=======
+>>>>>>> 4ba00da25 (ehm... things)
          # get filling scheme, only necessary if not encoded in EventHeader, before 2022 reprocessing
          self.hasBunchInfo = False
          self.fsdict = False
@@ -479,15 +481,6 @@ class Monitoring():
 >>>>>>> cf0e3201a (Updating files for use with simulation)
 =======
 >>>>>>> dfd288d1f (loads of stuff on the simulation side and adding more details to scifi event t0)
-
-   def GetRunYear(self, runNr):
-      if isinstance(runNr, str): runNr=int(runNr)
-
-      if runNr < 5485: year='2022'
-      elif 5485 <= runNr < 7656 : year='2023'
-      else: year='2024'
-
-      return year
 
    def GetEntries(self):
        if  self.options.online:
@@ -518,9 +511,8 @@ class Monitoring():
       
       for t in self.FairTasks: 
             if t=='simpleTracking': 
-               # Added this in because the Scifi clusters take ages to make for neutrino sim data
-               trackingoption = 'DS' if self.options.referencesystem==3 else 'Scifi'
-               self.FairTasks[t].ExecuteTask(option=trackingoption)
+               trackoption='DS' if self.options.referencesystem==3 else 'Scifi'
+               self.FairTasks[t].ExecuteTask(trackoption)
             else: self.FairTasks[t].ExecuteTask()
 
 <<<<<<< HEAD

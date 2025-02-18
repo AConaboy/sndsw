@@ -102,6 +102,7 @@ class Tracking(ROOT.FairTask):
            self.scifiCluster()
            self.trackCandidates['Scifi'] = self.Scifi_track()
     i_muon = -1
+   #  print(f'{len(self.trackCandidates["DS"])} track candidates')
     for x in self.trackCandidates:
       for aTrack in self.trackCandidates[x]:
            rc = self.fitTrack(aTrack)
@@ -134,7 +135,6 @@ class Tracking(ROOT.FairTask):
                     # Store the track in sndRecoTrack format
                     self.fittedTracks[i_muon] = this_track
             
-
  def DStrack(self):
     event = self.event
     trackCandidates = []
@@ -183,10 +183,10 @@ class Tracking(ROOT.FairTask):
     for p in clusPerStation:
          if clusPerStation[p]>self.DSnHits: return trackCandidates
 
-# require one plane with 1 cluster as seed
+      # require one plane with 1 cluster as seed
 
-# proj = 0, horizontal, max 3 planes
-# proj = 1, vertex,     max 4 planes
+      # proj = 0, horizontal, max 3 planes
+      # proj = 1, vertex,     max 4 planes
     seed = -1
     combinations = {}
     hitlist = {}
@@ -382,9 +382,14 @@ class Tracking(ROOT.FairTask):
  def dsCluster(self):
        clusters = []
        hitDict = {}
+       invalid=0
        for k in range(self.event.Digi_MuFilterHits.GetEntries()):
             d = self.event.Digi_MuFilterHits[k]
-            if (d.GetDetectorID()//10000)<3 or (not d.isValid()): continue
+            if not d.isValid(): invalid+=1
+
+            # if (d.GetDetectorID()//10000)<3 or (not d.isValid()): 
+            if (d.GetDetectorID()//10000)<3: continue 
+            # print(d.GetEnergy())
             hitDict[d.GetDetectorID()] = k
        hitList = list(hitDict.keys())
        if len(hitList)>0:
@@ -419,6 +424,7 @@ class Tracking(ROOT.FairTask):
                    cprev = c
        self.clusMufi.Delete()
        for c in clusters:  self.clusMufi.Add(c)
+      #  if len(self.event.Digi_MuFilterHits)>0: print(f'{invalid}/{len(self.event.Digi_MuFilterHits)} invalid')
 
  def patternReco(self):
 # very simple for the moment, take all scifi clusters

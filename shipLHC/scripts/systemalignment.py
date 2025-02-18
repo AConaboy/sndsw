@@ -61,7 +61,6 @@ class SystemAlignment(object):
         for ch in correctedtimes:
             SiPM, time = ch
             d = self.muAna.alignmentparameters[f'{detID}_{SiPM}']
-            # print(f'{detID}_{SiPM}: time = {time}, d = {d[0]}')
             fixed_ch=f'{detID}_{SiPM}'
 
             ReadableDetID=self.muAna.MakeHumanReadableFixedCh(fixed_ch)
@@ -149,23 +148,8 @@ class SystemAlignment(object):
             if len(barycentres[plane])==0: continue
             x_data, y_data = barycentres[plane].values()
 
-            if self.tw.hasTrack: 
-                
-                xEx, yEx, zEx = self.tw.muAna.GetExtrapolatedPosition(plane)
-
             # y-histograms
             self.hists[f'lambda_y-plane{plane}'].Fill(y_data['lambda_y'])
-
-            if self.tw.hasTrack: 
-                dy = y_data['yB'] - yEx
-
-                self.hists[f'dyB-plane{plane}'].Fill(dy)
-                self.hists[f'dyB-total'].Fill(dy)
-
-                self.hists[f'dyBvEy-plane{plane}'].Fill(dy, yEx)
-                self.hists[f'dyBvEy-total'].Fill(dy, yEx)
-
-                self.hists[f'lambda_yvEy-plane{plane}'].Fill(y_data["lambda_y"], yEx)
 
             for key,x_method in x_methods_dict.items():
                         
@@ -173,6 +157,18 @@ class SystemAlignment(object):
                 self.hists[f'lambda_x_{key}-plane{plane}'].Fill(x_val)
 
             if not self.tw.hasTrack: return
+
+            xEx, yEx, zEx = self.tw.muAna.GetExtrapolatedPosition(plane)
+
+            dy = y_data['yB'] - yEx
+
+            self.hists[f'dyB-plane{plane}'].Fill(dy)
+            self.hists[f'dyB-total'].Fill(dy)
+
+            self.hists[f'dyBvEy-plane{plane}'].Fill(dy, yEx)
+            self.hists[f'dyBvEy-total'].Fill(dy, yEx)
+
+            self.hists[f'lambda_yvEy-plane{plane}'].Fill(y_data["lambda_y"], yEx)
 
             for key,x_method in x_methods_dict.items():                
                 
@@ -189,10 +185,17 @@ class SystemAlignment(object):
 
                     self.hists[f'lambda_x_{key}vEx-plane{plane}'].Fill(x_val, xEx)
 
-            for detID in x_data:
-                relQDC=x_data[detID]['relQDC']
-                self.hists[f'relQDC-plane{plane}'].Fill(relQDC)
-                self.hists[f'relQDC-total'].Fill(relQDC)
+            # for detID in x_data:
+            #     # relQDC=x_data[detID]['relQDC']
+
+            #     # Get bar max QDC and relQDC of that bar for this plane
+            #     maxQDC_detID = max(x_data, key=lambda detID: x_data[detID]['barQDC'])
+            #     maxQDC = x_data[maxQDC_detID]['barQDC']
+            #     totalQDC = sum(x_data[detID]['barQDC'] for detID in x_data)
+            #     relQDC = maxQDC / totalQDC
+
+            #     self.hists[f'relQDC-plane{plane}'].Fill(relQDC)
+            #     self.hists[f'relQDC-total'].Fill(relQDC)
 
     def ScifiCorrectedTimes(self, hit):
         detID=hit.GetDetectorID()

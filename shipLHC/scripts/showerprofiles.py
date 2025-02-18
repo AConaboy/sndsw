@@ -344,10 +344,10 @@ class ShowerProfiles(object):
         # print(self.relQDC_dict, self.totalQDC_dict)
 
         for i in range(5):
-            output_dict[f'lambdax{i}'] = round(self.lambda_x_dict[i], 2)
-            output_dict[f'lambday{i}'] = round(self.lambda_y_dict[i], 2)
-            output_dict[f'relQDC{i}'] = round(self.relQDC_dict[i], 2)
-            output_dict[f'planeQDC{i}'] = round(self.totalQDC_dict[i], 2)
+            output_dict[f'lambdax{i}'] = np.float32(self.lambda_x_dict[i])
+            output_dict[f'lambday{i}'] = np.float32(self.lambda_y_dict[i])
+            output_dict[f'relQDC{i}'] = np.float32(self.relQDC_dict[i])
+            output_dict[f'planeQDC{i}'] = np.float32(self.totalQDC_dict[i])
 
         for cutname in self.pass_cuts: output_dict[cutname] = self.pass_cuts[cutname]
 
@@ -463,7 +463,6 @@ class ShowerProfiles(object):
 
         if self.options.simMode=='neutrino':
             i_flav = self.GetNeutrinoIntType(self.tw.M.eventTree)
-            if i_flav==2: print(f'Event number: {self.tw.M.EventNumber}')
 
         # Just make a single hist per proj for evaluating slopes
         for p in ['x', 'y']:

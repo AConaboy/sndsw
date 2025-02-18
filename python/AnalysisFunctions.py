@@ -275,7 +275,9 @@ class Analysis(object):
 			detID = hit.GetDetectorID()
 			s,p,b = self.parseDetID(detID)
 			if not s==2: continue
-			if not hit.isValid(): continue
+			
+			# commenting this out because the thresholds are fucked
+			if not hit.isValid(): continue 
 
 			# muAna knows the reference time needed to apply for !simulation
 			if not self.simulation: alignedtimes=self.GetCorrectedTimes(hit, mode='aligned')

@@ -90,7 +90,8 @@ class ExtendedMuonReconstruction(object):
             'y0','y1','y2','y3','y4',
             'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
             'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-            'HCAL5barcode', 'm_x', 'start_x', 'm_y', 'start_y'
+            'HCAL5barcode0', 'HCAL5barcode1','HCAL5barcode2','HCAL5barcode3','HCAL5barcode4',
+            'm_x', 'start_x', 'm_y', 'start_y'
             ]
 
             title = 'Final state muons exiting detector acceptance;z [cm];# muons'
@@ -124,7 +125,8 @@ class ExtendedMuonReconstruction(object):
             'y0','y1','y2','y3','y4',
             'lambdax0','lambdax1', 'lambdax2','lambdax3', 'lambdax4', 
             'lambday0','lambday1', 'lambday2','lambday3', 'lambday4',
-            'HCAL5barcode', 'm_x', 'start_x', 'm_y', 'start_y'
+            'HCAL5barcode0','HCAL5barcode1','HCAL5barcode2','HCAL5barcode3','HCAL5barcode4',
+            'm_x', 'start_x', 'm_y', 'start_y'
             ]
 
     def ExtendReconstruction(self, hits, scifi_hits, mode='write'):
@@ -173,9 +175,10 @@ class ExtendedMuonReconstruction(object):
         self.hcalTools.lambda_y_dict = {i:np.nan for i in range(5)}  
 
         # HCAL 5 barcode
-        self.hcalTools.GetHCAL5barscode(hits)                   
+        self.hcalTools.GetHCALbarscodes(hits)
 
         self.hcalTools.dsCluster(hits, self.MuFilter)
+        # if there are no clusters in the muon system we're kinda screwed
         if len(self.hcalTools.clusMufi)==0: 
             self.hcalTools.fired_planes=[]
             self.hcalTools.getdata(mode=mode)
@@ -187,6 +190,7 @@ class ExtendedMuonReconstruction(object):
         # if len(fired_planes)==3: 
         #     print(f'3 fired DS planes in event {self.tw.M.EventNumber}')
         #     return     
+        # This is superfluous, if there are not muon system planes that fire it should be the same as there being no clusters
         if len(self.hcalTools.fired_planes)==0:
             self.hcalTools.getdata(mode=mode)
             return
@@ -243,7 +247,7 @@ class ExtendedMuonReconstruction(object):
 
                 for plane in best_residual:
                     # if plane=='intWall':continue
-                    # Update value for each projection if there are suitable combinations
+                    # The best combination of DS clusters in each projection, is the one whose line has the smallest residual to the Scifi median
                     self.hcalTools.xy_residuals[plane][proj] = best_residual[plane]
  
             # Require that the xy_residual is defined for the 4th and 5th plane
