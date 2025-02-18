@@ -136,12 +136,7 @@ class SystemAlignment(object):
 
     def ReconstructMuonPosition(self, hits):
 
-<<<<<<< HEAD
-        barycentres=self.muAna.GetBarycentres(hits)
->>>>>>> 6209bb093 (Updates to fix chi2 in data)
-=======
         barycentres=self.muAna.GetBarycentres(hits, MuFilter=self.tw.MuFilter)
->>>>>>> 6fe2275fe (no idea what I'm doing)
         x_methods_dict={mode:self.muAna.GetOverallXBarycentre(barycentres, mode=mode) for mode in ('relQDC', 'maxQDC')}
 
         for plane in barycentres:
