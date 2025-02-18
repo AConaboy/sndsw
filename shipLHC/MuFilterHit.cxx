@@ -72,7 +72,7 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
               attLength = MuFilterDet->GetConfParF("MuFilter/VandUpAttenuationLength");
               SiPMcalibration = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibration");
               SiPMcalibrationS = MuFilterDet->GetConfParF("MuFilter/VandUpSiPMcalibrationS");
-              
+
               timeresol_left = MuFilterDet->GetBarSideTimeResolution(detID, "left");
               timeresol_right = MuFilterDet->GetBarSideTimeResolution(detID, "right");
 
@@ -167,14 +167,12 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
         if ( (subsystem==2) and (j%8==2 or j%8==5) ) { SiPMcalibrationConstant = SiPMcalibrationS;}
         else { SiPMcalibrationConstant = SiPMcalibration; }
 
-        if ( (subsystem!=3 and j<8) || (subsystem==3 and j==0) ) { // If left-side channel
-          side="left";
+        if ( (subsystem!=3 and j<8) || (subsystem==3 and j==0) ) { // If left-side or top channel
           timeResol=timeresol_left;
           aligned_time = dxL/signalspeed_left;
           signal=signalLeft;
         }
-        else {
-          side="right";
+        else { // If right-side channel {
           timeResol=timeresol_right;
           aligned_time = dxR/signalspeed_right;          
           signal=signalRight;
@@ -186,7 +184,7 @@ MuFilterHit::MuFilterHit(Int_t detID, std::vector<MuFilterPoint*> V)
 
      // Hard coding 0.720 MeV energy cut :sweat_smiling:
      // Assume energy deposition MPV of 1.8 MeV is 900 keV per side, assume 80% efficiency => 720 keV
-     if (signalLeft < 720E-3 or signalRight < 720E-3) {flag=false;}
+     if (signalLeft < 0.4E-3 or signalRight < 0.4E-3) {flag=false;}
      else {flag = true;}
      
      for (Int_t i=0;i<16;i++){fMasked[i]=kFALSE;}
