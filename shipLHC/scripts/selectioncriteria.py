@@ -162,11 +162,11 @@ class MuonSelectionCriteria(object):
             if plane in (0,2,4): pull, coord, station='Vertical', 'y', int(plane/2)
             elif plane in (1,3,5): pull, coord, station='Horizontal', 'x', int((plane-1)/2)
             else: pull, coord, station='Horizontal', 'x', 3
-            title=f'{pull} pull for DS plane {station};Bar position - expected position in {coord} [cm];Counts'
+            title=f'{pull} pull for DS plane {station};Bar position - expected position in {coord} [cm];Number of fired bars in muon system cluster'
             # if coord=='y': bins=(80, 0, 80, 80, 0, 80)
             # else: bins=(70, -60, 10, 70, -60, 10)
-            bins=(30, -15, 15)
-            self.hists[f'pull_{3*10+plane}']=ROOT.TH1F(f'pull_{plane}', title, *bins)
+            bins=(30, -15, 15), (6,0,6)
+            self.hists[f'pull_{3*10+plane}']=ROOT.TH2F(f'pullvclustermultiplicity_{plane}', title, *bins)
 
         for plane in range(self.systemAndPlanes[2]):
             for bar in range(self.systemAndBars[2]):
@@ -300,13 +300,20 @@ class MuonSelectionCriteria(object):
 
         if not all([self.tw.passslopecut, self.tw.passredchi2cut]): return 
 
-        for hit in hits:
-            vertical=False
+        # for hit in hits:
+        track = self.tw.M.Reco_MuonTracks[0]
+        nM = track.getNumPointsWithMeasurement()
+        for n in range(nM):
+            M=track.getPointsWithMeasurement(n)
+            W=M.getRawMeasurement()
+            nbars = int(W.getRawHitCoords()[6])
             detID=hit.GetDetectorID()
             s,p,b=self.muAna.parseDetID(detID)
             if s!=3: continue
+
             # parseDetID returns station number, zPos distinguishes between the planes in DS stations. 
             # Analysis.GetDSPlaneNumber(detID) returns the plane number to use in the zPos dictionary
+
             plane=self.muAna.GetDSPlaneNumber(detID)
             key=10*s+plane
             z=self.zPos['MuFilter'][key]

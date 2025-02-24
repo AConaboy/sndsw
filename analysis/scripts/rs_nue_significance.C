@@ -341,12 +341,12 @@ void rs_nue_significance(const char *filename)
    }
 
    std::string boolcut = BDT_cut ? "True" : "False"; // Convert bool to string
-   std::string c_opt_savename = "c_opt-BDTcut" + boolcut + ".png";
+   std::string c_opt_savename = "c_opt-BDTcut" + boolcut + ".pdf";
    c_opt->SaveAs(c_opt_savename.c_str());
 
-   std::string c_rates_0mu_savename = "c_rates_0mu-BDTcut" + boolcut + ".png";
+   std::string c_rates_0mu_savename = "c_rates_0mu-BDTcut" + boolcut + ".pdf";
    c_rates_0mu->SaveAs(c_rates_0mu_savename.c_str());
 
-   std::string c_rates_nueCC_savename = "c_rates_nueCC-BDTcut" + boolcut + ".png";
+   std::string c_rates_nueCC_savename = "c_rates_nueCC-BDTcut" + boolcut + ".pdf";
    c_rates_nueCC->SaveAs(c_rates_nueCC_savename.c_str());
 }

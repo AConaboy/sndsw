@@ -351,7 +351,7 @@ class HCALTools(object):
             s,p,b=self.muAna.parseDetID(detID)
             c[p][b]=True 
         
-        self.HCALbarscodes= {i:''.join(['1' if state else '0' for state in c] for i in range(5)}
+        self.HCALbarscodes= {i:''.join(['1' if state else '0' for state in c]) for i in range(5)}
 
     def InAcceptance(self, line, proj):
         

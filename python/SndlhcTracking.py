@@ -498,6 +498,7 @@ class Tracking(ROOT.FairTask):
         aCl = hitlist[k]
         if hasattr(aCl,"GetFirst"):
             detID = aCl.GetFirst()
+            N = aCl.GetN()
             aCl.GetPosition(A,B)
             detSys  = 1
             if detID<40000: detSys=3
@@ -508,7 +509,7 @@ class Tracking(ROOT.FairTask):
             if detSys==3: self.mufiDet.GetPosition(detID,A,B)
             if detSys==1: self.scifiDet.GetSiPMPosition(detID,A,B)
         distance = 0
-        tmp = array('d',[A[0],A[1],A[2],B[0],B[1],B[2],distance])
+        tmp = array('d',[A[0],A[1],A[2],B[0],B[1],B[2],N])
         unSortedList[A[2]] = [ROOT.TVectorD(7,tmp),detID,k,detSys]  # Dictionary where key is the z position
     sorted_z=list(unSortedList.keys())
     sorted_z.sort()
@@ -516,8 +517,9 @@ class Tracking(ROOT.FairTask):
         tp = ROOT.genfit.TrackPoint() # note how the point is told which track it belongs to
         hitCov = ROOT.TMatrixDSym(7)
         detSys = unSortedList[z][3]
+        N_bars = unSortedList[z][0][6]
         if detSys==3:      
-              res = self.sigmaMufiDS_spatial
+              res = N_bars*self.sigmaMufiDS_spatial # if multiple bars fire in the cluster, the resolution must be worse
               maxDis = 1.0
         elif detSys==2:  
               res = self.sigmaMufiUS_spatial

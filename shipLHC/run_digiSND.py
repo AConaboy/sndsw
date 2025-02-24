@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 firstEvent = 0
 
-def pyExit():
-       "unfortunately need as bypassing an issue related to use xrootd"
-       os.system('kill '+str(os.getpid()))
-atexit.register(pyExit)
-
 import resource
 def mem_monitor():
  # Getting virtual memory size 
@@ -83,13 +78,6 @@ elif options.inputFile.find('/Neutrinos/Genie') != -1:
 
 	output_file = options.path+'neutrino/data/'+keys+'/'+f.replace('.root', f'_{file_number}.root')
 	
-# Working with multi muon simulation
-elif options.inputFile.find('MuMupairProduction') != -1:
-	f = options.inputFile.split('/')[-1]
-	nMuons = f.split('_')[1]
-
-	output_file = options.path+'multimuon/data/'+f.replace('_predigi.root', '.root')
-
 elif options.inputFile.find('/')==-1:
 	f = options.inputFile.split('/')[-1]
 	output_file = options.inputFile

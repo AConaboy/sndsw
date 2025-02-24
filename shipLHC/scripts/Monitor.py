@@ -252,7 +252,9 @@ class Monitoring():
          self.Weight = self.eventTree.MCTrack[0].GetWeight()
       
       for t in self.FairTasks: 
-            if t=='simpleTracking': self.FairTasks[t].ExecuteTask(nPlanes=3)
+            if t=='simpleTracking': 
+               refsysname='DS' if self.options.referencesystem==3 else 'Scifi'
+               self.FairTasks[t].ExecuteTask(option=refsysname)
             else: self.FairTasks[t].ExecuteTask()
 
       self.EventNumber = n
