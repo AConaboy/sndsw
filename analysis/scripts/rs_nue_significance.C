@@ -32,7 +32,6 @@ void rs_nue_significance(const char *filename)
    float LUMI_SCALE = 1.;
 
    std::vector<std::string> mc_samples{"hadMC", "numuCC_MC", "nueCC_MC", "nuTauCC0mu_MC", "nuTauCC1mu_MC", "NC_MC"};
-   // std::vector<std::string> mc_samples{"numuCC_MC", "nueCC_MC", "nuTauCC0mu_MC", "nuTauCC1mu_MC", "NC_MC"};
 
    std::map<std::string, std::string> sample_colors;
    sample_colors["hadMC"] = "#EE6677";
@@ -83,7 +82,7 @@ void rs_nue_significance(const char *filename)
    // static_cast<TH1D*>(f_histo->Get(("hit_density_sel_"+sample_name).c_str())); for (std::string sample_name :
    // mc_samples) hists[sample_name]->Scale(LUMI_SCALE);
 
-   // Fill the map with histograms
+   // Fill the map with histograms for all mc samples
    for (std::string sample_name : mc_samples) {
       hists[sample_name] = static_cast<TH1D *>(f_histo->Get(("hit_density_sel_" + sample_name).c_str()));
    }
@@ -141,12 +140,15 @@ void rs_nue_significance(const char *filename)
    // Now, find optimal region to exclude no-shower hypothesis using the MC expectation for the signal and the scaled
    // background.
    auto g_SR_opt = new TGraph();
+   g_SR_opt->SetName("0mu_SR_opt");
    auto g_SR_nueCC_opt = new TGraph();
+   g_SR_nueCC_opt->SetName("nueCC_SR_opt");
 
    std::map<std::string, TGraphErrors *> g_SR_rates;
 
    for (std::string sample_name : mc_samples) {
       g_SR_rates[sample_name] = new TGraphErrors();
+      g_SR_rates[sample_name]->SetName(sample_name.c_str());
    }
 
    for (double test_SR = 5000; test_SR <= 20000; test_SR += 500) {
@@ -172,6 +174,7 @@ void rs_nue_significance(const char *filename)
    }
 
    g_SR_rates["0mu"] = new TGraphErrors();
+   g_SR_rates["0mu"]->SetName("0mu");
 
    for (int i_point = 0; i_point < g_SR_rates["NC_MC"]->GetN(); i_point++) {
 
@@ -196,14 +199,16 @@ void rs_nue_significance(const char *filename)
          if (sample_name.compare("nueCC_MC") == 0) { // Signal in both cases
             n_sig_nueCC += rate * sample_scale[sample_name];
             n_sig += rate * sample_scale[sample_name];
-         } else if ((sample_name.compare("NC_MC") == 0) or
+         } 
+         else if ((sample_name.compare("NC_MC") == 0) or
                     (sample_name.compare("nuTauCC0mu_MC") == 0)) { // Signal for 0mu, else background
             n_sig += rate * sample_scale[sample_name];
 
             n_background_nueCC += rate * sample_scale[sample_name];
             uncert_background_nueCC =
                sqrt(pow(uncert_background_nueCC, 2) + pow(error * sample_scale[sample_name] * rate, 2));
-         } else { // Background in all cases
+         } 
+         else { // Background in all cases
 
             n_background += rate * sample_scale[sample_name];
             uncert_background = sqrt(pow(uncert_background, 2) + pow(error * sample_scale[sample_name] * rate, 2));
@@ -349,4 +354,13 @@ void rs_nue_significance(const char *filename)
 
    std::string c_rates_nueCC_savename = "c_rates_nueCC-BDTcut" + boolcut + ".pdf";
    c_rates_nueCC->SaveAs(c_rates_nueCC_savename.c_str());
+
+   std::string outfilename = "c_" + boolcut + ".root";
+
+   TFile *outfile = new TFile(outfilename.c_str(), "RECREATE");
+   c_opt->Write();  
+   c_rates_0mu->Write();  
+   c_rates_nueCC->Write();  
+   outfile->Close(); // Close the file to save the contents
+
 }

@@ -274,27 +274,41 @@ class Analysis(object):
 
 			detID = hit.GetDetectorID()
 			s,p,b = self.parseDetID(detID)
-			if not s==2: continue
+			if not s==2: 
+				continue
 			
 			# commenting this out because the thresholds are fucked
-			if not hit.isValid(): continue 
+			if not hit.isValid():
+				print(f'Hit not valid')
+				continue 
 
 			# muAna knows the reference time needed to apply for !simulation
-			if not self.simulation: alignedtimes=self.GetCorrectedTimes(hit, mode='aligned')
+			if not self.simulation: alignedtimes=self.GetCorrectedTimes(hit, mode='aligned', MuFilter=mufilter)
 			else: alignedtimes=hit.GetAllTimes()
 
 			atimes_left = [i[1] for i in alignedtimes if i[0]<8]
 			atimes_right = [i[1] for i in alignedtimes if i[0]>=8] 
 
+			if (len(atimes_left)==0 or len(atimes_right)==0): 
+				print(f'skipping event for nSiPMs=0 on left or right criteria')
+				print(f'{len(atimes_left)}, {len(atimes_right)}')
+				continue
+
 			# Check nSiPMs left and right. Skip hit if less than 4 SiPMs on either left or right fire
-			if len(atimes_left)<4 or len(atimes_right)<4:continue
+			if (len(atimes_left)<4 or len(atimes_right)<4) and not self.nuStudy:
+				print(f'skipping event for nSiPMs criteria')
+				continue
 
 			atimes_left_mean = sum(atimes_left)/len(atimes_left)
 			atimes_right_mean = sum(atimes_right)/len(atimes_right)
 
 			# Skip hit if abs( atimes_left(right) ) > L/2 / cscint_L(R)
 			averagecscint_left, averagecscint_right = self.GetBarAveragecscint(mufilter, detID)
-			if abs(atimes_left_mean) > self.barlengths[2]/2 / averagecscint_left[0] or abs(atimes_right_mean) > self.barlengths[2]/2 / averagecscint_right[0]: continue
+			# if not self.
+
+			if (abs(atimes_left_mean) > self.barlengths[2]/2 / averagecscint_left[0] or abs(atimes_right_mean) > self.barlengths[2]/2 / averagecscint_right[0]) and not self.nuStudy: 
+				print(f'skipping event for times criteria')
+				continue
 
 			planewise_data[p][detID] = {}
 			planewise_data[p][detID]['bar-QDC'] = self.GetTotalQDC(hit.GetAllSignals())
@@ -305,6 +319,8 @@ class Analysis(object):
 			planewise_data[p][detID]['cscint-left'] = averagecscint_left
 			planewise_data[p][detID]['cscint-right'] = averagecscint_right	
 
+		if all([len(planewise_data[p])==0 for p in range(5)]):
+			print(f'All planes have no data')
 		return planewise_data	
 
 	def GetBarycentres(self, hits, **kwargs):
@@ -493,7 +509,7 @@ class Analysis(object):
 					total[p]+=dscorrectedtime
 					counter[p]+=1
 
-			# Only using DS3 and DS2
+			# Only using DS3 (p=2) and DS2 (p=1)
 			sum_total, counter_total = total[2] + total[1], counter[2] + counter[1]
 			# print(f'total, counter: {sum_total}, {counter_total}')
 			if counter_total==0: return -999
@@ -548,8 +564,6 @@ class Analysis(object):
 				tdcs = trackHit.GetAllTimes()
 				# print(f'DetID: {detID}, len(tdcs)={len(tdcs)}')
 				if not all ( [p in (0,1,2), b<60, len(tdcs)==2] ): continue
-
-				if len(tdcs) != 2: continue # pass
 
 				for item in tdcs: 
 					SiPM, clock = item
@@ -721,11 +735,11 @@ class Analysis(object):
 
 		return vals
 
-	def GetAverageTime(self, mufiHit, side='both', correctTW=True):
+	def GetAverageTime(self, mufiHit, mufilter, side='both', correctTW=True):
 		value=[0, 0]
 		count=[0, 0]
 		nSiPMs=mufiHit.GetnSiPMs()
-		if correctTW: times = self.GetCorrectedTimes(mufiHit) # in nanoseconds
+		if correctTW: times = self.GetCorrectedTimes(mufiHit, mode='aligned', MuFilter=mufilter) # in nanoseconds
 		else: times = mufiHit.GetAllTimes() # in clockcycles
 		
 		detID=mufiHit.GetDetectorID()
@@ -1175,6 +1189,9 @@ class Analysis(object):
 		else: return int(detIDEx.split('_')[1])
 
 	def GetExtrapolatedPosition(self, plane):
+		if not self.task.hasTrack:
+			print(f'No track to evaluate expected position!')
+			return 
 		zEx = self.zPos['MuFilter'][20+plane]
 		lam = (zEx-self.task.pos.z())/self.task.mom.z()
 		yEx = self.task.pos.y() + lam*self.task.mom.y()
@@ -1279,6 +1296,11 @@ class Analysis(object):
 		return float(data[-2])/int(data[-1])
 
 	def Makecscintdict(self, runNr, state='corrected'):
+		
+		if self.timealignment=='old': run=str(5097).zfill(6)
+		elif self.timealignment=='new': run=str(5408).zfill(6)
+		elif self.timealignment=='new+LHCsynch': run=str(5999).zfill(6)		
+		
 		d={}
 		s=2
 		for p in range(self.systemAndPlanes[s]):
@@ -1440,7 +1462,7 @@ class Analysis(object):
 	def GetCovariances(self, detID, side):
 
 		if not hasattr(self, "timingcovariance"): 
-			self.MakeTimingCovarianceDict(self.runNr)
+			self.MakeTimingCovarianceDict()
 
 		if side=='left':SiPMs = [0,1,3,4,6,7]
 		else: SiPMs = [8,9,11,12,14,15]
@@ -1635,8 +1657,12 @@ class Analysis(object):
 	def GetCorrectedTimes(self, hit, **kwargs):
 
 		x=kwargs.get('x', 0)
-		mufilter=kwargs.get('MuFilter')
+		mufilter=kwargs.get('MuFilter', None)
 		mode=kwargs.get('mode', 'aligned')
+
+		if mufilter==None:
+			print(f'Not passed MuFilter to GetCorrectedTimes!!')
+			return
 
 		detID=hit.GetDetectorID()
 
@@ -1644,6 +1670,8 @@ class Analysis(object):
 		clocks, qdcs=hit.GetAllTimes(), hit.GetAllSignals()
 		for i in clocks:
 			SiPM, clock = i 
+			if self.IsSmallSiPMchannel(SiPM): continue 
+			
 			fixed_ch=f'{detID}_{SiPM}'
 			
 			# Using qdc == -1 as a flag to only correct tof, for simulation data
@@ -1651,11 +1679,11 @@ class Analysis(object):
 			else: qdc=self.GetChannelVal(SiPM, qdcs)
 
 			correctedtime=self.MuFilterCorrectedTime(mufilter, fixed_ch, qdc, clock, x)
-			if not correctedtime: continue
+			if correctedtime==None: 
+				# print(f'no corrected time')
+				continue
 			if mode=='aligned' and not self.simulation: 
 				d = self.alignmentparameters[f'{detID}_{SiPM}']
-				if fixed_ch=='21000_0':
-					print(f'Event number: {self.task.M.EventNumber}, reft: {self.task.reft}, twtoft: {self.task.reft-correctedtime}, d: {d[0]}')		
 				correctedtime = self.task.reft - correctedtime - d[0]
 			alignedtimes.append((SiPM, correctedtime))
 		return alignedtimes
@@ -1667,8 +1695,10 @@ class Analysis(object):
 			
 			# To correct time: need tw params, alignment param and cscint value if correcting for signal ToF
 			if not fixed_ch in self.twparameters:
+				print(f'no tw params for {fixed_ch}')
 				return 
 			if not fixed_ch in self.alignmentparameters:
+				print('no d param')
 				return
 			if fixed_ch not in self.cscintvalues and x!=0:
 				return
@@ -1701,7 +1731,7 @@ class Analysis(object):
 				ToFcorrectedtime=self.correct_ToF(fixed_ch, clock, x)[1]
 			return ToFcorrectedtime
 
-	def GetTimingDiscriminant(self, hits):
+	def GetTimingDiscriminant(self, hits, mufilter):
 
 		US1hits=[h.GetDetectorID() for h in hits if all([h.GetDetectorID()//10000==2, self.parseDetID(h.GetDetectorID())[1]==0])]
 
@@ -1734,7 +1764,7 @@ class Analysis(object):
 
 		# Manual determination of timing disc.
 		res=[]
-		us1correctedtimes = self.GetCorrectedTimes(us1hit)
+		us1correctedtimes = self.GetCorrectedTimes(us1hit, mode='aligned', MuFilter=mufilter)
 		detID = us1hit.GetDetectorID()
 		for x in us1correctedtimes:
 			SiPM, ctime = x 
@@ -1974,13 +2004,12 @@ class Analysis(object):
 
 	### Make dictionary of the alignment parameter determined as the truncated y-mean of tw-corr (tds0 - tSiPM)
 	def MakeAlignmentParameterDict(self):
-
-		# Update stored string for alignment params stored
-		# self.timealignment=alignment
-
-		# if alignment=='old': run=str(5097).zfill(6)
-		# elif alignment=='new': run=str(5408).zfill(6)
-		# elif alignment=='new+LHCsynch': run=str(5999).zfill(6)
+		
+		print(f'Making alignment parameter dict for {self.timealignment} alignment.')
+		
+		if self.timealignment=='old': run=str(5097).zfill(6)
+		elif self.timealignment=='new': run=str(5408).zfill(6)
+		elif self.timealignment=='new+LHCsynch': run=str(5999).zfill(6)
 
 		d={}
 		for s in (2,): # Just US
@@ -1988,7 +2017,7 @@ class Analysis(object):
 				for b in range(self.systemAndBars[s]):
 					for SiPM in self.systemAndSiPMs[s]:
 						fixed_ch=self.MakeFixedCh((s,p,b,SiPM))
-						correction=self.GetAlignmentParameters(self.runNr, fixed_ch)
+						correction=self.GetAlignmentParameters(run, fixed_ch)
 						if not correction: continue
 						d[fixed_ch]=correction
 		if len(d)==0: self.alignmentparameters=None
@@ -2003,10 +2032,14 @@ class Analysis(object):
 			json.dump(self.alignmentparameters, jf)
 		print(f'Alignment param dict written to {alignmentparamsfilename}')
 
-	def MakeTimingCovarianceDict(self, runNr, mode='truncated'):
+	def MakeTimingCovarianceDict(self, mode='truncated'):
 
-		if mode=='truncated': filename=f'{self.path}TimingCovariance/run{runNr}/run{runNr}_truncatedcovariance.json'
-		elif mode=='full': filename=f'{self.path}TimingCovariance/run{runNr}/timingcovariance.json'
+		if self.timealignment=='old': run=str(5097).zfill(6)
+		elif self.timealignment=='new': run=str(5408).zfill(6)
+		elif self.timealignment=='new+LHCsynch': run=str(5999).zfill(6)
+
+		if mode=='truncated': filename=f'{self.path}TimingCovariance/run{run}/run{run}_truncatedcovariance.json'
+		elif mode=='full': filename=f'{self.path}TimingCovariance/run{run}/timingcovariance.json'
 		else: return
 
 		with open(filename, 'r') as x:
@@ -2042,7 +2075,7 @@ class Analysis(object):
 	def GetAverageSiPMTimingCovariance(self, runNr):
 		r={}
 		
-		if not hasattr(self, 'timingcovariance'): self.MakeTimingCovarianceDict(runNr)
+		if not hasattr(self, 'timingcovariance'): self.MakeTimingCovarianceDict()
 
 		for key in self.timingcovariance:
 			if key=='timingxt_tds0_Veto' or key =='timingxt_tds0_US': continue
@@ -2068,7 +2101,7 @@ class Analysis(object):
 	
 	def GetCovariance(self, runNr, detID, SiPMs):
 		if not hasattr(self, 'timingcovariance'):
-			self.MakeTimingCovarianceDict(runNr)
+			self.MakeTimingCovarianceDict()
 
 		key=f'timingxt_{detID}_SiPMs{SiPMs[0]}-{SiPMs[1]}'
 		if not key in self.timingcovariance: return

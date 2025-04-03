@@ -79,7 +79,7 @@ logger.SetLogVerbosityLevel('low')
 logger.SetLogScreenLevel('WARNING')
 logger.SetLogToScreen(True)
 
-run      = ROOT.FairRunAna()
+run = ROOT.FairRunAna()
 ioman = ROOT.FairRootManager.Instance()
 
 if options.inputFile=="":
@@ -379,7 +379,9 @@ def loopEvents(
     if goodEvents and not goodEvent(event): continue
     nHoughtracks = 0
     OT.Reco_MuonTracks = ROOT.TObjArray(10)
-    
+
+ hasMuon=False 
+ if mc:    
     ### Only display events that contain a muon
     if abs(event.MCTrack[1].GetPdgCode()) == 13: hasMuon=True 
     else: hasMuon=False
@@ -390,7 +392,7 @@ def loopEvents(
          return
       if not hasMuon: 
          print(f'No muon')
-         continue
+         return
     elif not outgoingMuon and hasMuon: print(f'Event has muon')
     elif not outgoingMuon and not hasMuon: print(f'Event does NOT have muon')
 
@@ -430,7 +432,7 @@ def loopEvents(
           ntracks = len(OT.Reco_MuonTracks) - nHoughtracks
           if ntracks>0: print('number of tracks by ST:', ntracks)
     nAlltracks = len(OT.Reco_MuonTracks)
-    if nAlltracks<nTracks: continue
+    if nAlltracks<nTracks: return 
 
     if verbose>0:
        for aTrack in OT.Reco_MuonTracks:
@@ -455,7 +457,7 @@ def loopEvents(
        if x.GetEntries()>0:
          if empty: print( "event -> %i"%N)
          empty = False
-    if empty: continue
+    if empty: return 
     h['hitCollectionX']= {'Veto':[0,ROOT.TGraphErrors()],'Scifi':[0,ROOT.TGraphErrors()],'DS':[0,ROOT.TGraphErrors()]}
     h['hitCollectionY']= {'Veto':[0,ROOT.TGraphErrors()],'Scifi':[0,ROOT.TGraphErrors()],'US':[0,ROOT.TGraphErrors()],'DS':[0,ROOT.TGraphErrors()]}
     if hitColour:
@@ -637,7 +639,7 @@ def loopEvents(
             h['simpleDisplay'].Print(f"/afs/cern.ch/user/a/aconsnd/Pictures/EventDisplays/{simMode}_{filekey}_{N}.png")         
             #  h['simpleDisplay'].Print(options.storePic+str(runId)+'-event_'+str(event.EventHeader.GetEventNumber())+'.png')
        elif rc == 'q':
-          break
+          return 
        else:
           eventComment[f"{runId}-event_{event.EventHeader.GetEventNumber()}"] = rc
  if save: os.system("convert -delay 60 -loop 0 event*.png animated.gif")

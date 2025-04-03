@@ -822,18 +822,4 @@ Int_t MuFilter::GetnSides(Int_t detID){
 	}
 }
 
-Int_t MuFilter::GetnSides(Int_t detID){
-	int subsystem     = floor(detID/10000)-1;
-	if (subsystem==0){
-		// vertical Veto 3 has the readout on the top only
-		if (detID>=12000) return conf_ints["MuFilter/VetonSides"]-1;
-		else {return conf_ints["MuFilter/VetonSides"];}
-	}
-	else if (subsystem==1){return conf_ints["MuFilter/UpstreamnSides"];}
-	else {
-		if (detID%1000>59) return conf_ints["MuFilter/DownstreamnSides"]-1;
-		else {return conf_ints["MuFilter/DownstreamnSides"];}
-	}
-}
-
 ClassImp(MuFilter)

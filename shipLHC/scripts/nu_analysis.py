@@ -14,17 +14,19 @@ def pyExit():
     os.system('kill '+str(os.getpid()))
 atexit.register(pyExit)
 
-
 from argparse import ArgumentParser
 from args_config import add_arguments
 
 parser = ArgumentParser()
-parser.add_argument('--analysisName', dest='analysisName', type=str, default='nue')
+parser.add_argument('--analysisName', dest='analysisName', type=str, default='numu')
 parser.add_argument('--load_hists', dest='load_hists', action='store_true')
 parser.add_argument('--updateGeoFile', dest='updateGeoFile', action='store_true')
 add_arguments(parser)
 
 options = parser.parse_args()
+
+if options.analysisName=='numu': options.numuStudy=True 
+elif options.analysisName=='nue': options.nueStudy=True 
 
 class Numusignaleventtiming(object):
 
@@ -34,8 +36,7 @@ class Numusignaleventtiming(object):
         self.options=options
         self.afswork=f'{options.afswork}-physics2022/'
         self.hists={}
-        self.muAna = Analysis.Analysis(options)
-        self.numucandidatescale=5
+        # self.muAna = Analysis.Analysis(options)
         self.legend=ROOT.TLegend(0.14, 0.60, 0.40, 0.85)
         self.planelegends={i:ROOT.TLegend(0.14, 0.60, 0.40, 0.85) for i in range(5)}
 
@@ -46,7 +47,6 @@ class Numusignaleventtiming(object):
 
         else:
             self.MakeSignalPartitions()
-        options.numuStudy=True
 
     def MakeSignalPartitions(self):
         
@@ -76,13 +76,13 @@ class Numusignaleventtiming(object):
         # self.eventChain.SetBranchStatus("EventHeader.", 0) # To be able to run on old MC. Bizarre....?
         
         for runNr in self.signal_events:
-            year = self.muAna.GetRunYear(runNr)
-            self.path = f'/eos/experiment/sndlhc/convertedData/physics/{year}'
+            year = self.GetRunYear(runNr)
+            path = f'/eos/experiment/sndlhc/convertedData/physics/{year}'
             eventNumber=self.signal_events[runNr][0]
             runNumber = str(runNr).zfill(6)
             partition = int(eventNumber // 1E6)
 
-            partitionfile=f'{self.path}/run_{runNumber}/sndsw_raw-{str(partition).zfill(4)}.root'  
+            partitionfile=f'{path}/run_{runNumber}/sndsw_raw-{str(partition).zfill(4)}.root'  
             print(partitionfile)
             if not os.path.exists(partitionfile):
                 print(f'No file: {partitionfile}')
@@ -91,12 +91,12 @@ class Numusignaleventtiming(object):
             self.eventChain.Add(partitionfile)
 
         options.signalpartitions = self.signalpartitions
-        options.customEventChain=self.eventChain
+        options.customEventChain = self.eventChain
 
         # Set initial geofile to instance Monitor
         options.runNumber = list(self.signal_events.keys())[0]
         options.geoFile = 'geofile_sndlhc_TI18.root'
-        start_year = self.muAna.GetRunYear(options.runNumber)
+        start_year = self.GetRunYear(options.runNumber)
         options.path = f'/eos/experiment/sndlhc/convertedData/physics/{start_year}/'
 
         FairTasks=[]
@@ -119,26 +119,46 @@ class Numusignaleventtiming(object):
         
         self.hists=self.tw.hists
 
+    def GetRunYear(self, runNr):
+        if isinstance(runNr, str): runNr=int(runNr)
+
+        if runNr < 5485: year='2022'
+        elif 5485 <= runNr < 7656 : year='2023'
+        else: year='2024'
+
+        return year
+
     def InvestigateSignalEvents(self):
 
         runs=self.signal_events.keys()
         self.muAna.MakeTWCorrectionDict()
 
         for runNr in runs:
-            self.InvestigateEvent(runNr)
+            if runNr==4752: continue
+            tmp = self.InvestigateEvent(runNr)
+            if not all(self.tw.sp.pass_cuts.values()):
+                # print(f'Not all cuts are passing! Must be wrong event for run {runNr}!')
+                print(self.tw.sp.pass_cuts)
+            if tmp==-999: return
         self.tw.sp.WriteOutRecordedTimes()
         self.tw.sp.SaveScifiHits()
-        self.MakeAngularPlots()
+        # self.MakeAngularPlots()
         
     def InvestigateEvent(self, runNr):
         evt_number=self.GetSignalEventNumber(runNr)
         self.M.GetEvent(evt_number) # Runs tracking task
-        
+
         eventheader = self.M.eventTree.EventHeader
+        eventheader_eventnumber = self.M.eventTree.EventHeader.GetEventNumber()
         runId = eventheader.GetRunId()
-        
-        # print(f'RunNr: {runNr}, runId: {runId}')
-        # print(f'signal event in M.eventTree: {evt_number}, M.EventNumber: {self.M.EventNumber}, event number in partition: {eventheader.GetEventNumber()}')
+        if not runId==runNr:
+            print(f'FUCKED. runId={runId}, runNr={runNr}')
+            return
+
+        if eventheader_eventnumber != self.signal_events[runNr][0]:
+            print(f'Event number in run not equal to event number in event header!')        
+            print(f'run event number: {self.signal_events[runNr][0]}, event header number: {eventheader_eventnumber}')
+            print(f'==='*5)
 
         if options.updateGeoFile:
             if runNr < 4575:     options.geoFile =  "geofile_sndlhc_TI18_V3_08August2022.root"
@@ -147,7 +167,9 @@ class Numusignaleventtiming(object):
             elif runNr < 5485:   options.geoFile =  "geofile_sndlhc_TI18_V7_22November2022.root"
             else:                options.geoFile =  "geofile_sndlhc_TI18_V1_2023.root"            
 
-            self.M.snd_geo = SndlhcGeo.GeoInterface(self.path+options.geoFile)
+            year = self.GetRunYear(runNr)
+            path = f'/eos/experiment/sndlhc/convertedData/physics/{year}'
+            self.M.snd_geo = SndlhcGeo.GeoInterface(path+options.geoFile)
             self.M.MuFilter = self.M.snd_geo.modules['MuFilter']
             self.M.Scifi       = self.M.snd_geo.modules['Scifi']
             self.M.zPos = self.M.getAverageZpositions()
@@ -162,15 +184,17 @@ class Numusignaleventtiming(object):
 
         # Get time alignment type of signal event
         alignment = self.muAna.GetTimeAlignmentType(runId)
-        print('Alignment:', alignment)
+        print(f'run: {runId}, alignment: {alignment}')
         self.tw.timealignment=alignment
         self.muAna.timealignment=alignment
         self.muAna.MakeAlignmentParameterDict() # Load appropriate alignment parameters into muAna
+        self.muAna.MakeTimingCovarianceDict()
 
         for m in self.monitorTasks:
             self.monitorTasks[m].ExecuteEvent(self.M.eventTree)
             
     def GetSignalEventNumber(self, runNr):
+        # This gets the event number in the custom chain! 
         n_partition = list(self.signal_events.keys()).index(runNr)
         evt_number = int(n_partition * 1e6 + self.signal_events[runNr][0] % 1e6)
         return evt_number
@@ -185,7 +209,6 @@ class Numusignaleventtiming(object):
             self.fired_detIDs[run] = [i.GetDetectorID() for i in hits if i.GetDetectorID()//10000!=3]
             
     def LoadSignalHists(self):
-
         fname = f'{self.afswork}Results/SignalComparisonPlots.root'
         f=ROOT.TFile.Open(fname, 'read')
 
@@ -221,6 +244,16 @@ class Numusignaleventtiming(object):
         for p in self.planesignalhists:
             for key in self.planesignalhists[p]:
                 for idx, hist in enumerate(self.planesignalhists[p][key]): hist.SetLineColor(self.colours[idx]) 
+
+    def CheckEventNumber(self, runNr):
+        evt_number = self.GetSignalEventNumber(runNr)
+        self.M.eventTree.GetEvent(evt_number)
+
+        eventheader_eventnumber = self.M.eventTree.EventHeader.GetEventNumber()
+        event_inRun = self.signal_events[runNr][0]
+        
+        sameEvent = eventheader_eventnumber==event_inRun
+        print(f'{event_inRun}, {eventheader_eventnumber}, {sameEvent}')
 
     def LoadPassingMuonHists(self):
 
@@ -416,8 +449,6 @@ class Numusignaleventtiming(object):
 
         zPositions = [self.M.zPos['MuFilter'][20+i] for i in range(5)]
 
-        # self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
-        # 'dx':[], 'ybarycentre':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
         self.data={'runNr':[], 'planes':[], 'xbarycentre':[],
         'dx':[], 'dy':[], 'xEx':[], 'yEx':[], 'interaction wall':[]}
         
@@ -430,8 +461,8 @@ class Numusignaleventtiming(object):
                         }
         """
 
-        for runNr in self.tw.sp.barycentres.keys():
-            barycentres = self.tw.sp.barycentres[runNr] # { plane: [ [(x_barycentre,dxbc), (y_barycentre,dxbc)], [xEx, yEx]] }
+        for runNr in self.tw.sp.all_barycentres.keys():
+            barycentres = self.tw.sp.all_barycentres[runNr] # { plane: [ [(x_barycentre,dxbc), (y_barycentre,dxbc)], [xEx, yEx]] }
             
             planes = [i for i in barycentres.keys() if len(barycentres[i])!=0]
             
@@ -450,7 +481,7 @@ class Numusignaleventtiming(object):
             self.data['planes'].append(planes)
             self.data['xbarycentre'].append(xbarycentres)
             self.data['dx'].append(dxs) # uncertainty on xbarycentre
-            # self.data['ybarycentre'].append(ybarycentres)
+            self.data['ybarycentre'].append(ybarycentres)
             self.data['dy'].append(dys) # uncertainty on xbarycentre
             self.data['xEx'].append(xExs) # DS track extrapolated to plane 
             self.data['yEx'].append(yExs) # DS track extrapolated to plane
@@ -459,11 +490,7 @@ class Numusignaleventtiming(object):
         self.barycentres_df=pd.DataFrame(self.data)
 
         filename='/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/barycentres'
-        if self.options.notDSbar: filename+='-notDSbar'
-        elif self.options.dycut: filename+='-dycut'
-        
-        if self.options.SiPMmediantimeCut: filename+='-SiPMmediantimeCut'
-        if self.options.SiPMtimeCut: filename+='-SiPMtimeCut'
+
         self.barycentres_df.to_csv(f'{filename}.csv')
         print(f'Data written to {filename}.csv')
 

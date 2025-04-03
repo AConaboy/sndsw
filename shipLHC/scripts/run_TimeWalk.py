@@ -19,7 +19,7 @@ add_arguments(parser)
 options = parser.parse_args()
 # if no geofile given, use defaults according to run number
 
-if options.runNumber < 0 and not options.geoFile and not options.numusignalevents: 
+if options.runNumber < 0 and not options.geoFile: 
     print('No run number given and no geoFile. Do not know what to do. Exit.')
     exit()
 if not options.geoFile:
@@ -36,7 +36,6 @@ if not options.geoFile:
 # to be extended for future new alignments.
 
 # works only for runs on EOS
-# if not options.numusignalevents:
 if not options.server.find('eos')<0 and not options.simulation:
     if options.path.find('2023')!=-1:
         rawDataPath='/eos/experiment/sndlhc/raw_data/physics/2023/'
@@ -76,16 +75,10 @@ monitorTasks = {}
 
 if options.nEvents < 0 :   options.nEvents = M.GetEntries()
 
-if options.numusignalevents:
-    import numusignals 
-    numu = numusignals(options)
-    numu.InvestigateSignalEvents()
-
 if options.Task=='TimeWalk':
     if not options.mode:
         print('=='*20+f'\nNo mode given for time walk task. Give mode as zeroth, tof or tw.\n'+'=='*20)
         pyExit()
-    if options.numusignalevents: options.mode='numusignalevents'
     monitorTasks['TimeWalk'] = TimeWalk.TimeWalk(options, M) 
 
 start, nEvents=options.nStart, options.nEvents

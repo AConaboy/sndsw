@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ROOT, csv, os, pickle
+import ROOT, csv, os, json
 import numpy as np
 from pathlib import Path
 from HCALTools import HCALTools 
@@ -9,7 +9,6 @@ class ShowerProfiles(object):
 
     def __init__(self, options, tw):
        
-        self.options=options
         self.tw=tw
         self.simulation=tw.simulation
         self.runNr = tw.runNr
@@ -41,18 +40,17 @@ class ShowerProfiles(object):
 
         self.sides=('left', 'right')
 
-        # self.hists=tw.hists
-        # if self.tw.mode=='r':
         from buildhistograms import MakeShowerProfilesHistograms
         self.hists = MakeShowerProfilesHistograms()
-        
-        # self.sigmatds0=0.263 # ns 
         
         self.A, self.B = ROOT.TVector3(), ROOT.TVector3()
         
         if options.signalpartitions: self.Loadnumuevents()
         
-        self.nuStudy=True if options.numuStudy or options.nueStudy else False 
+        if options.numuStudy or options.nueStudy: self.nuStudy=True 
+        else: self.nuStudy=False 
+
+        if self.nuStudy: self.all_barycentres={}
     
         self.barycentres={}
         self.clusters={}
@@ -139,7 +137,7 @@ class ShowerProfiles(object):
             frac_n = ( len(found_large_SiPMs) + len(found_small_SiPMs) ) / 16
             self.hists[fractionSiPMs_histname].Fill(frac_n) 
 
-            if self.options.SmallSiPMcheck:
+            if self.tw.options.SmallSiPMcheck:
                 """
                 Soooo now I make the delta evt_timestamp histogram.
                 Fill it with 0 for each small SiPM that fires in the hit.
@@ -207,10 +205,12 @@ class ShowerProfiles(object):
         self.barycentres = self.muAna.GetBarycentres(hits, MuFilter=self.tw.MuFilter)
         self.x_methods_dict = {mode:self.muAna.GetOverallXBarycentre(self.barycentres, mode=mode) for mode in ('relQDC', 'maxQDC')}        
         
-        # For numu study, 
+        # For numu/nue study, 
         if self.nuStudy: 
             self.runId = self.tw.M.eventTree.EventHeader.GetRunId()
-            if not int(self.runId) in self.barycentres: self.barycentres[self.runId] = {}
+            if int(self.runId) in self.all_barycentres: 
+                print(f'run number {self.runId} already in all barycentres dict')
+            self.all_barycentres[self.runId] = self.barycentres 
 
         """
         1. Plot shower barycentre in y (x) by using a QDC weighting, aligned timing
@@ -219,6 +219,10 @@ class ShowerProfiles(object):
         """
 
         self.FillBarycentrePlots(hits)
+
+        # Write out all SiPM information when looking at the numu data
+        if self.nuStudy: 
+            self.RecordAllSiPMdata(hits)
 
         self.pass_cuts = {k:v.passCut() for k,v in self.cuts.items()}  # should work with sim or not
         if self.simulation: self.StoreSimulationDetails()
@@ -234,9 +238,6 @@ class ShowerProfiles(object):
             # All planes are instanced as empty dictionaries
             # to retain the correct order for passing to the BDT
             if len(self.barycentres[plane])==0: continue 
-
-            # Write out all SiPM information when looking at the numu data
-            if self.nuStudy: self.RecordAllSiPMdata(hits, xEx, yEx)
 
             x_data, y_data = self.barycentres[plane].values()
 
@@ -334,7 +335,10 @@ class ShowerProfiles(object):
 
         output_dict = {k:None for k in self.column_names}
 
-        eventHasMuon=self.hcalTools.OutgoingMuon(self.tw.M.eventTree, self.options.simMode)
+        if self.tw.options.simMode=='neutrino':
+            output_dict['flav'] = self.GetNeutrinoIntType(self.tw.M.eventTree)
+
+        eventHasMuon=self.hcalTools.OutgoingMuon(self.tw.M.eventTree, self.tw.options.simMode)
         output_dict['EventNumber'] = self.EventNumber
         output_dict['scaled_weight'] = self.tw.scaled_event_weight
         output_dict['hasMuon'] = eventHasMuon # truth of whether there is a final state muon
@@ -384,27 +388,30 @@ class ShowerProfiles(object):
             b=self.barycentres[plane]['y-barycentre']['yB']
         return b
 
-    def RecordAllSiPMData(self, hits, xEx, yEx):
+    def RecordAllSiPMdata(self, hits):
         
         for hit in hits:
+            data={}
 
             detID = hit.GetDetectorID()
             s,p,b = self.muAna.parseDetID(detID)
+            if s==3: continue
             interactionWall = self.GetInteractionWall(self.runId)
+
+            xEx, yEx, zEx = self.muAna.GetExtrapolatedPosition(p)
 
             qdcs = [(SiPM, qdc) for SiPM,qdc in hit.GetAllSignals()]
             rawtimes = [(SiPM, cc*self.TDC2ns) for SiPM,cc in hit.GetAllTimes()]
-            twctimes = self.muAna.GetCorrectedTimes(hit)
-            atimes = self.muAna.GetCorrectedTimes(hit, mode='aligned')
-     
+            twctimes = self.muAna.GetCorrectedTimes(hit, MuFilter=self.MuFilter, mode='tw')
+            atimes = self.muAna.GetCorrectedTimes(hit, MuFilter=self.MuFilter, mode='aligned')
+            
             if self.muAna.GetExtrapolatedBarDetID(p) == detID: trackrelated = True
             else: trackrelated = False
 
-            data={}
             for idx, lst in enumerate([qdcs, rawtimes, twctimes, atimes]): 
                 for SiPM, t in lst:
-                    if not SiPM in data: 
-                        data[SiPM] = {} 
+                    if not SiPM in data: data[SiPM] = {} 
+
                     if idx==0:data[SiPM]['qdc']=t 
                     elif idx==1:data[SiPM]['rawtimes']=t 
                     elif idx==2:data[SiPM]['twctimes']=t 
@@ -421,11 +428,9 @@ class ShowerProfiles(object):
                             data[SiPM]['xEx'] = xEx
                             data[SiPM]['yEx'] = yEx
                             data[SiPM]['Interaction wall'] = interactionWall 
-        if not self.runId in self.data: self.data[self.runId]={}
-        if not detID in self.data[self.runId]: self.data[self.runId][detID]={}
-        self.data[self.runId][detID][self.tw.M.EventNumber]=data  
-
-        # return data
+            if not self.runId in self.data: self.data[self.runId]={}
+            if not self.tw.M.EventNumber in self.data[self.runId]: self.data[self.runId][self.tw.M.EventNumber]={}
+            self.data[self.runId][self.tw.M.EventNumber][detID]=data  
 
     def GetInteractionWall(self, runNr):
         interactionwall = self.muAna.nu_mu_events[runNr][1]
@@ -461,7 +466,7 @@ class ShowerProfiles(object):
 
     def EvaluateShowerSlopes(self):
 
-        if self.options.simMode=='neutrino':
+        if self.tw.options.simMode=='neutrino':
             i_flav = self.GetNeutrinoIntType(self.tw.M.eventTree)
 
         # Just make a single hist per proj for evaluating slopes
@@ -523,7 +528,8 @@ class ShowerProfiles(object):
             self.hists['xz-slope'].SetBinError(zbin, xBerror)
 
         # Now all data is in the histograms I can determine the slope
-        angles={'y':np.nan, 'x':np.nan}
+        angles={'polar':np.nan, 'azimuthal':np.nan}
+        gradients={'x':np.nan, 'y':np.nan}
 
         for p in ['x', 'y']:
             hist = self.hists[f'{p}z-slope']
@@ -534,29 +540,31 @@ class ShowerProfiles(object):
             res=rc.Get()
             if not res: continue
             
-            gradient = res.Parameter(1)
+            gradients[p] = res.Parameter(1)
             gradient_error = res.ParError(1) 
-            
-            angles[p] = np.degrees(np.arctan(gradient))
+        
+        r = np.sqrt(1 + gradients['x']**2 + gradients['y']**2)
+        angles['polar'] = np.degrees(np.arccos(1/r))
+        angles['azimuthal'] = np.degrees(np.arctan2(gradients['y'], gradients['x']))
 
         # Fill these angles into a plot
-        Xtheta = 'X-theta'
-        if not Xtheta in self.hists:
-            title = '#theta_{X} measured with both Scifi and HCAL;#theta_{X} [degrees];Counts'
-            self.hists[Xtheta] = ROOT.TH1D(Xtheta, title, 90, -90, 90)
-        if not np.isnan(angles['y']): self.hists[Xtheta].Fill(angles['y'])
+        name = 'polar'
+        if not name in self.hists:
+            title = '#theta measured with both Scifi and HCAL;Polar angle, #theta_{X} [degrees];Counts'
+            self.hists[name] = ROOT.TH1D(name, title, 90, -90, 90)
+        if not np.isnan(angles['polar']): self.hists[name].Fill(angles['polar'])
         
-        Xphi = 'X-phi'
-        if not Xphi in self.hists:
-            title = '#phi_{X} measured with both Scifi and HCAL;#phi_{X} [degrees];Counts'
-            self.hists[Xphi] = ROOT.TH1D(Xphi, title, 90, -90, 90)
-        if not np.isnan(angles['x']):  self.hists[Xphi].Fill(angles['x'])
+        name = 'azimuthal'
+        if not name in self.hists:
+            title = '#phi measured with both Scifi and HCAL;Azimuthal angle, #phi_{X} [degrees];Counts'
+            self.hists[name] = ROOT.TH1D(name, title, 100, -100, 100)
+        if not np.isnan(angles['azimuthal']):  self.hists[name].Fill(angles['azimuthal'])
 
-        thetavphi='thetavphi'
-        if not thetavphi in self.hists:
-            title = '#theta_{X} v #phi_{X} measured with both Scifi and HCAL;#phi [degrees];#theta [degrees];Counts'
-            self.hists[thetavphi] = ROOT.TH2D(thetavphi, title, 90, -90, 90, 90, -90, 90)
-        if not np.isnan(angles['x']) and not np.isnan(angles['y']):  self.hists[thetavphi].Fill(angles['x'], angles['y'])
+        # thetavphi='thetavphi'
+        # if not thetavphi in self.hists:
+        #     title = '#theta_{X} v #phi_{X} measured with both Scifi and HCAL;#phi [degrees];#theta [degrees];Counts'
+        #     self.hists[thetavphi] = ROOT.TH2D(thetavphi, title, 90, -90, 90, 90, -90, 90)
+        # if not np.isnan(angles['x']) and not np.isnan(angles['y']):  self.hists[thetavphi].Fill(angles['x'], angles['y'])
 
         # Make a plot of the difference between X angle and muon angle
         # Fill these angles into a plot
@@ -566,21 +574,33 @@ class ShowerProfiles(object):
             return
 
         slopeX, slopeY = self.tw.mom.x()/self.tw.mom.z(), self.tw.mom.y()/self.tw.mom.z()
-        muon_theta = np.degrees(np.arctan(slopeY))
-        muon_phi = np.degrees(np.arctan(slopeX))
 
-        dXmutheta = f'dXmu-theta'
+        r = np.sqrt(1 + slopeX**2 + slopeY**2)
+        muon_polar = np.degrees(np.arccos(1/r))
+        muon_azimuthal = np.degrees(np.arctan2(slopeY, slopeX))
+
+        dXmutheta = f'dXmu-polar'
         if not dXmutheta in self.hists:
-            title = '#Delta(#theta_{X}, #theta_{#mu}) measured with both Scifi and HCAL;#Delta(#theta_{X}, #theta_{#mu}) [degrees];Counts'
+            title = '#splitline{Difference in polar angle between shower and fitted track, #Delta(#theta_{X}, #theta_{#mu})}{measured with both Scifi and HCAL};Difference in polar angle, #Delta(#theta_{X}, #theta_{#mu}) [degrees];Counts'
             self.hists[dXmutheta] = ROOT.TH1D(dXmutheta, title, 90, -90, 90)
-        if not np.isnan(angles['y']):  self.hists[dXmutheta].Fill(angles['y'] - muon_theta)
+        if not np.isnan(angles['polar']):  self.hists[dXmutheta].Fill(angles['polar'] - muon_polar)
        
-        dXmuphi = f'dXmu-phi'
+        dXmuphi = f'dXmu-azimuthal'
         if not dXmuphi in self.hists:
-            title = '#Delta(#phi_{X}, #phi_{#mu}) measured with both Scifi and HCAL;#Delta(#phi_{X}, #phi_{#mu}) [degrees];Counts'
-            self.hists[dXmuphi] = ROOT.TH1D(dXmuphi, title, 90, -90, 90)
-        if not np.isnan(angles['x']): self.hists[dXmuphi].Fill(angles['x'] - muon_phi)
-            
+            title = '#splitline{Difference in azimuthal angle between shower and fitted track, #Delta(#phi_{X}, #phi_{#mu})}{measured with both Scifi and HCAL};Difference in azimuthal angle, #Delta(#phi_{X}, #phi_{#mu}) [degrees];Counts'
+            self.hists[dXmuphi] = ROOT.TH1D(dXmuphi, title, 100, -100, 100)
+        if not np.isnan(angles['azimuthal']): self.hists[dXmuphi].Fill(angles['azimuthal'] - muon_azimuthal)
+
+        name='scatteringangle'
+        if not name in self.hists:
+            title = '#splitline{3D scattering angle between shower and fitted track, #theta_{scatt}}{measured with both Scifi and HCAL};3D scattering angle, #theta_{scatt} [degrees];Counts'
+            self.hists[name] = ROOT.TH1D(name, title, 90, -90, 90)
+        if not np.isnan(gradients['x']) and not np.isnan(gradients['y']):
+            dotprod = slopeX*gradients['x'] + slopeY*gradients['y'] + 1
+            norm = np.sqrt(slopeX**2 + slopeY**2 + 1)*np.sqrt(gradients['x']**2 + gradients['y']**2 + 1)
+            scatteringangle = np.arccos(dotprod/norm)            
+            self.hists[name].Fill(scatteringangle)
+
     def GetScifiMedians(self):
         scifi_hits = self.tw.M.eventTree.Digi_ScifiHits
 
@@ -632,8 +652,8 @@ class ShowerProfiles(object):
         runNr = self.tw.M.eventTree.EventHeader.GetRunId()
         large_eventtime = sndeventheader.GetEventTime() # clock cycles since run started
 
-        if self.options.signalpartitions: # If I'm looking at mu_nu candidates
-            n_partition = list(self.options.signalpartitions.keys()).index(f'{str(runNr).zfill(6)}')
+        if self.tw.options.signalpartitions: # If I'm looking at mu_nu candidates
+            n_partition = list(self.tw.options.signalpartitions.keys()).index(f'{str(runNr).zfill(6)}')
             event_in_partition = self.nu_mu_events[runNr][0] % 1e6 # self.nu_mu_events[runNr] stores: (event in partition, interaction wall)
             
             # signal_event = int(n_partition * 1e6 + self.nu_mu_events[runNr] % 1e6) 
@@ -745,65 +765,50 @@ class ShowerProfiles(object):
 
         filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/numuhits'
 
-        if self.options.notDSbar==True: filename+='-notDSbar'
-        elif self.options.dycut==True: filename+='-dycut'
-        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
-        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
-
-        with open(f'{filename}.data', 'wb') as f:
-            pickle.dump(self.data, f)
-        print(f'File saved to {filename}.data')
+        with open(f'{filename}.json', 'w') as f:
+            json.dump(self.data, f, indent=4)
+        print(f'File saved to {filename}.json')
 
     def SaveClusters(self):
 
         filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/clusterInfo'
 
-        if self.options.notDSbar==True: filename+='-notDSbar'
-        elif self.options.dycut==True: filename+='-dycut'
-        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
-        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
-        elif self.options.scifiClustersQDC==True: filename+='-QDCweightedClusters'
+        with open(f'{filename}.json', "w") as f:
+            json.dump(self.clusters, f, indent=4)
 
-        with open(f'{filename}.data', 'wb') as f:
-            pickle.dump(self.clusters, f)
-        print(f'File saved to {filename}.data')                
+        print(f'File saved to {filename}.json')                
 
     def SaveScifiHits(self):
 
         filename=f'/eos/home-a/aconsnd/SWAN_projects/numuInvestigation/data/ScifiHits'
 
-        if self.options.notDSbar==True: filename+='-notDSbar'
-        elif self.options.dycut==True: filename+='-dycut'
-        if self.options.SiPMmediantimeCut==True: filename+='-SiPMmediantimeCut'
-        elif self.options.SiPMtimeCut==True: filename+='-SiPMtimeCut'
-
-        with open(f'{filename}.data', 'wb') as f:
-            pickle.dump(self.scifidata, f)
-        print(f'File saved to {filename}.data')                
+        with open(f'{filename}.json', 'w') as f:
+            json.dump(self.scifidata, f, indent=4)
+        print(f'File saved to {filename}.json')                
 
     def GetOutFileName(self):
         if not self.simulation: 
             d = f'{self.outpath}splitfiles/run{self.runNr}/showerprofiles/'
-            outfilename_noExt=f'showerprofiles_{self.options.nStart}'
+            outfilename_noExt=f'showerprofiles_{self.tw.options.nStart}'
         else: d = f'{self.outpath}showerprofiles/'
         
         # Conditions for parsing the filenames of different simulation types
-        if self.simulation and self.options.simMode == 'muonDIS':
-            preamble, key1, key2, end = self.options.fname.split('_')
+        if self.simulation and self.tw.options.simMode == 'muonDIS':
+            preamble, key1, key2, end = self.tw.options.fname.split('_')
             outfilename_noExt=f'showerprofiles_{key1}_{key2}'
 
-        elif self.simulation and self.options.simMode == 'neutrino':
-            simulation_details, filename = self.options.fname.split('/')
+        elif self.simulation and self.tw.options.simMode == 'neutrino':
+            simulation_details, filename = self.tw.options.fname.split('/')
             key=filename.split('_')[1]
             d+=simulation_details+'/'
             outfilename_noExt=f'showerprofiles_{key}'
 
-        elif self.simulation and self.options.simMode == 'neutralhadron':
-            particle_type, Emin, Emax, key = self.options.fname.split('_')[3:7]
+        elif self.simulation and self.tw.options.simMode == 'neutralhadron':
+            particle_type, Emin, Emax, key = self.tw.options.fname.split('_')[3:7]
             outfilename_noExt=f'showerprofiles_{particle_type}_{Emin}_{Emax}_{key}'
 
-        elif self.simulation and self.options.simMode == 'passingmuon':
-            keys=self.options.fname.split('_')[1:3]
+        elif self.simulation and self.tw.options.simMode == 'passingmuon':
+            keys=self.tw.options.fname.split('_')[1:3]
             outfilename_noExt=f'showerprofiles_{keys[0]}_{keys[1]}'
         
         else: 
@@ -826,7 +831,7 @@ class ShowerProfiles(object):
 
         for hname in self.hists:
 
-            if hname in ['X-phi', 'X-theta','thetavphi', 'dXmu-theta', 'dXmu-phi']:
+            if hname in ['polar', 'azimuthal','thetavphi', 'dXmu-polar', 'dXmu-azimuthal', 'scatteringangle']:
                 outfile.WriteObject(self.hists[hname], hname)
                 continue
 

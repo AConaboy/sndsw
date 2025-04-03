@@ -163,7 +163,9 @@ class Monitoring():
       ioman = ROOT.FairRootManager.Instance()
       ioman.SetTreeName(eventChain.GetName())
       outFile = ROOT.TMemFile('dummy','CREATE')
-      source = ROOT.FairFileSource(eventChain.GetCurrentFile()) # first file in chain is added here
+      first_file = eventChain.GetListOfFiles().First().GetTitle()
+      print(f'Starting FairFileSource with: {first_file}')
+      source = ROOT.FairFileSource(first_file) # first file in chain is added here
       
       if self.simulation: 
          # Only need to add more files to source if multiple files are being used
@@ -171,7 +173,10 @@ class Monitoring():
 
       elif options.customEventChain: # Code run when investigating numu candidates
          for idx, runNr in enumerate(options.signalpartitions):
-            if idx!=0: source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
+            if idx!=0: 
+               tmp=path+'run_'+runNr+'/'+partitions[idx]
+               print(f'Adding {tmp} to source')
+               source.AddFile(path+'run_'+runNr+'/'+partitions[idx]) # skip first partition which is added to the FairFileSource when it is instanced.
 
       else:
          for i in range(1,len(partitions)):

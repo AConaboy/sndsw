@@ -16,7 +16,7 @@ BASE_FILTERED_DIR = Path("/eos/user/c/cvilela/SND_nue_analysis_May24/")
 ch = ROOT.TChain("rawConv")
 
 import SndlhcGeo
-snd_geo = SndlhcGeo.GeoInterface("/eos/experiment/sndlhc/users/aconsnd/simulation/muonDIS/data/geofile_full.muonDIS-TGeant4-0.root")
+snd_geo = SndlhcGeo.GeoInterface("/afs/cern.ch/user/a/aconsnd/geofile_full.Ntuple-TGeant4-0.root") # geofile that contains the most up to date sim parameters
 scifiDet = ROOT.gROOT.GetListOfGlobals().FindObject('Scifi')
 muFilterDet = ROOT.gROOT.GetListOfGlobals().FindObject('MuFilter')
 
@@ -53,6 +53,9 @@ hcalTools.filekey=0
 # Load in trained BDT
 hcalTools.model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
 hcalTools.model.load_model('/eos/home-a/aconsnd/SWAN_projects/Data analysis/bdt_model.json')
+
+from numpy import load
+hcalTools.BDTthreshold = load('/eos/home-a/aconsnd/SWAN_projects/Data analysis/best_threshold.npy')
 
 # Load in the features used to train the bdt
 # with open('/eos/home-a/aconsnd/SWAN_projects/Data analysis/bdt_features.json') as jf:
@@ -113,13 +116,12 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
     else:
         flav_list = [""]
 
-    if BDT_cut==True: 
-        BDT_weights = []
+    BDT_weights = []
 
     for flav in flav_list:
 
         # Histograms for BDT signal probabilities
-        BDT_weights.append(ROOT.TH1D("BDT_signalProb"+flav+name, "Prob event has no muon", 100, 0, 1+1/100))
+        BDT_weights.append(ROOT.TH1D("BDT_signalProb"+flav+name, "Prob event has no muon", 100, 0.0, 1.0 + 1e-6))
 
         h_n_hits.append(ROOT.TH1D("n_hits"+flav+name, ";Number of in-time SciFi hits", 1000, 0, 5000))
         h_n_hits_sel.append(ROOT.TH1D("n_hits_sel"+flav+name, ";Number of in-time SciFi hits", 1000, 0, 5000))
@@ -141,8 +143,8 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
             
         h_theta.append(ROOT.TH1D("theta"+flav+name, ";#theta", 100, 0, 1))
         h_theta_density.append(ROOT.TH2D("theta_density"+flav+name, ";#theta;Sum of hit densities", 100, 0, 1, 200, 0, 40000))
-    
-    BDT_weights.append(ROOT.TH1D("BDT_signalProb_all", "Prob event has no muon", 100, 0, 1))
+
+    BDT_weights.append(ROOT.TH1D("BDT_signalProb_all", "Prob event has no muon", 100, 0.0, 1.0 + 1e-6))
 
     if isNeutralHad:
         totWeight = 0
@@ -182,8 +184,10 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
 
             if ch.GetName()=='cbmsim':
                 hcalTools.setsimulation(True) # Set simulation bool for hcalTools.muAna as well
-                hcalTools.eventHasMuon=hcalTools.OutgoingMuon(event)
+                hcalTools.eventHasMuon=hcalTools.OutgoingMuon(event, 'neutrino')
+                hcalTools.NeutrinoIntType=i_flav
             elif ch.GetName()=='rawConv':
+                # hcalTools.eventHasMuon=np.nan
                 runNr = event.EventHeader.GetRunId() 
                 hcalTools.setsimulation(False, runNr) # For real data, ensure the correct timewalk and time alignment parameters are being used
             hcalTools.EventNumber=i_event 
@@ -194,14 +198,13 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
             sndsw/python/AnalysisFunctions.py. These should eventually be incorporated into the MuFilter class. 
             """
 
-            bdt_probs = hcalTools.BDT_cut(event, muFilterDet,scifiDet)
-            # print(type(bdt_probs), bdt_probs)
+            bdt_probs = hcalTools.zeromuBDTcut(event, muFilterDet,scifiDet)
             prob_noMuon, prob_Muon = bdt_probs[0,0], bdt_probs[0,1]
             
             BDT_weights[i_flav].Fill(prob_noMuon)
             BDT_weights[-1].Fill(prob_noMuon)
             
-            if prob_noMuon < 0.5:  # If BDT assigns less than 50% probability that event is signal (no final state muon) then ditch it
+            if prob_noMuon <= hcalTools.BDTthreshold:  # If BDT assigns less than opt. thres. probability that event is signal (no final state muon) then ditch it
                 print(f'BDT cut event {i_event}')
                 continue
 
@@ -239,7 +242,6 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
             continue
 
         h_hit_density_sel_after_dens2[i_flav].Fill(dens_sel, weight)
-
 
         if dens_sel < 2000:
             continue
@@ -294,14 +296,14 @@ def makePlots(ch, BDT_cut, name = "", isNuMC = False,
     return (BDT_weights, h_n_hits, h_n_hits_sel, h_hit_density, h_hit_density_sel, h_SciFiAngle, h_SciFiAngle_v_chi2, h_SciFiAngle_h_chi2, h_theta, h_theta_density, h_min_chi2, h_log_hit_density_sel, h_log_min_chi2, h_hit_density_sel_precut, h_hit_density2_sel, h_hit_density2_sel_precut, h_hit_density_sel_after_dens2, h_hit_density_sel_after_dens)
 
 out_file_name = f"checkDataCuts_BDTcut{options.BDTcut}.root"
-out_file = ROOT.TFile(out_file_name, "RECREATE")
+out_file = ROOT.TFile(out_file_name, "recreate")
 
-# print(f'Making plots with data:\n')
-# plots_data  = makePlots(ch, options.BDTcut)
+print(f'Making plots with data:\n')
+plots_data  = makePlots(ch, options.BDTcut)
 print(f'Making plots with neutrino MC:\n')
 plots_MC = makePlots(chMC, options.BDTcut, isNuMC = True, name = "_MC")
-# print(f'Making plots with neutral hadron MC:\n')
-# plots_hadMC = makePlots(chNeutral, options.BDTcut, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
+print(f'Making plots with neutral hadron MC:\n')
+plots_hadMC = makePlots(chNeutral, options.BDTcut, isNeutralHad = True, name = "_hadMC", preselection = 1.0)
 
 out_file.Write()
 out_file.Close()

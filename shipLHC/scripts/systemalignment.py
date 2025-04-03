@@ -54,14 +54,12 @@ class SystemAlignment(object):
         s,p,b=self.muAna.parseDetID(detID)
 
         if not self.simulation: 
-            correctedtimes=self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=self.tw.Ex[p].x(), mode='aligned')
+            correctedtimes=self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter, x=self.tw.Ex[p].x(), mode='aligned')
         else: # simulation
             correctedtimes=hit.GetAllTimes()
 
         for ch in correctedtimes:
             SiPM, time = ch
-            d = self.muAna.alignmentparameters[f'{detID}_{SiPM}']
-            fixed_ch=f'{detID}_{SiPM}'
 
             ReadableDetID=self.muAna.MakeHumanReadableFixedCh(fixed_ch)
             SiPMtime=f'AlignedSiPMtime_{fixed_ch}'
@@ -88,7 +86,7 @@ class SystemAlignment(object):
             tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter,x=self.tw.Ex[p].x(), mode='aligned')
         else: 
             correctedtimes = hit.GetAllTimes()
-            tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, x=self.tw.Ex[p].x(), mode='tof')
+            tofcorrectedtimes = self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter, x=self.tw.Ex[p].x(), mode='tof')
 
         aligned_times={'left':{}, 'right':{}}
         tofaligned_times={'left':{}, 'right':{}}
@@ -195,7 +193,7 @@ class SystemAlignment(object):
     def ScifiCorrectedTimes(self, hit):
         detID=hit.GetDetectorID()
 
-        correctedtimes=self.muAna.GetCorrectedTimes(hit, self.tw.Ex[p].x(), mode='aligned')
+        correctedtimes=self.muAna.GetCorrectedTimes(hit, MuFilter=self.tw.MuFilter, self.tw.Ex[p].x(), mode='aligned')
     
         for ch in correctedtimes:
             SiPM, time=ch

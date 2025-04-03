@@ -166,7 +166,12 @@ class MuonSelectionCriteria(object):
             # if coord=='y': bins=(80, 0, 80, 80, 0, 80)
             # else: bins=(70, -60, 10, 70, -60, 10)
             bins=(30, -15, 15), (6,0,6)
-            self.hists[f'pull_{3*10+plane}']=ROOT.TH2F(f'pullvclustermultiplicity_{plane}', title, *bins)
+            self.hists[f'pull_{3*10+plane}']=ROOT.TH2F(f'pullvclustermultiplicity_{plane}', title, 30, -15, 15, 6, 0, 6)
+
+            # Make hists of the times in each DS plane
+            name=f'DSplane{plane}-time'
+            title=f'Times measured in DS plane {plane+1};Time [ns];Counts'
+            self.hists[name]=ROOT.TH1F(name, title, 100, 0, 25)
 
         for plane in range(self.systemAndPlanes[2]):
             for bar in range(self.systemAndBars[2]):
@@ -300,14 +305,16 @@ class MuonSelectionCriteria(object):
 
         if not all([self.tw.passslopecut, self.tw.passredchi2cut]): return 
 
+        stations = {i.GetDetectorID():i for i in hits if i.GetDetectorID()//10000==3}
+        station_times = {station:[] for station in range(7)}
         # for hit in hits:
         track = self.tw.M.Reco_MuonTracks[0]
         nM = track.getNumPointsWithMeasurement()
         for n in range(nM):
-            M=track.getPointsWithMeasurement(n)
+            M=track.getPointWithMeasurement(n)
             W=M.getRawMeasurement()
             nbars = int(W.getRawHitCoords()[6])
-            detID=hit.GetDetectorID()
+            detID = W.getDetId()
             s,p,b=self.muAna.parseDetID(detID)
             if s!=3: continue
 
@@ -319,6 +326,14 @@ class MuonSelectionCriteria(object):
             z=self.zPos['MuFilter'][key]
             self.tw.MuFilter.GetPosition(detID, A, B)
 
+            # Stores times for planes
+            hit = stations[detID]
+            # station_times[plane].append([i*self.TDC2ns for i in hit.GetAllTimes()])
+            for x in hit.GetAllTimes():
+                SiPM, cc = x
+                dscorrectedtime=self.tw.MuFilter.GetCorrectedTime(detID, SiPM, cc*self.TDC2ns, 0)
+                self.hists[f'DSplane{plane}-time'].Fill(dscorrectedtime)
+
             vertical=False
             if self.muAna.DSVcheck(detID): vertical=True 
             
@@ -327,14 +342,14 @@ class MuonSelectionCriteria(object):
                 lam=(z-self.tw.pos.z())/self.tw.mom.z()
                 tmp=ROOT.TVector3(self.tw.pos.x()+lam*self.tw.mom.x(), self.tw.pos.y()+lam*self.tw.mom.y(), self.tw.pos.z()+lam*self.tw.mom.z())             
                 histname=f'pull_{key}'
-                self.hists[histname].Fill(barposition - tmp.x())  
+                self.hists[histname].Fill(barposition - tmp.x(), nbars)  
             
             else: 
                 barposition=0.5*(A.y()+B.y()) 
                 lam=(z-self.tw.pos.z())/self.tw.mom.z()
                 tmp=ROOT.TVector3(self.tw.pos.x()+lam*self.tw.mom.x(), self.tw.pos.y()+lam*self.tw.mom.y(), self.tw.pos.z()+lam*self.tw.mom.z())             
                 histname=f'pull_{key}'
-                self.hists[histname].Fill(barposition - tmp.y())
+                self.hists[histname].Fill(barposition - tmp.y(), nbars)
          
     def FillAverageBarTime(self, hits, state=None):
         if not state: state=self.state
@@ -373,7 +388,7 @@ class MuonSelectionCriteria(object):
                 
     def FillTimingDiscriminantHists(self, hits):
         
-        timingdiscriminant=self.muAna.GetTimingDiscriminant(hits)
+        timingdiscriminant=self.muAna.GetTimingDiscriminant(hits, self.tw.MuFilter)
         if timingdiscriminant==-420:
             return
         
@@ -421,6 +436,8 @@ class MuonSelectionCriteria(object):
         if self.tw.passslopecut:
             self.deltads32vcuts['slope'].Fill(res['delta32'])
             self.deltads21vcuts['slope'].Fill(res['delta21'])
+
+        # Fill times for DSH planes
 
     def FilldeltaSF(self, scifihits):
         res=self.muAna.GetScifiAverageTime(self.Scifi, scifihits, 'deltastations')
@@ -502,7 +519,7 @@ class MuonSelectionCriteria(object):
 
         outpath=f'{self.outpath}splitfiles/run{self.runNr}/selectioncriteria/'
         path_obj=Path(outpath)
-        path_obj.mkdir(parents=True, exist_ok=True)        
+        path_obj.mkdir(parents=True, exist_ok=True)
         outfile=f'selectioncriteria_{self.options.nStart}.root'
         f=ROOT.TFile.Open(outpath+outfile, 'recreate')
         
