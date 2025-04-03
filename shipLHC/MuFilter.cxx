@@ -623,10 +623,7 @@ Float_t MuFilter::GetCorrectedTime(Int_t fDetectorID, Int_t channel, Double_t ra
 	// DS time alignment first order
 	if (ichannel60<30){cor += conf_floats["MuFilter/DSTcorslope"+last_time_alignment_tag]*(ichannel60-15);}
 	else{              cor -= conf_floats["MuFilter/DSTcorslope"+last_time_alignment_tag]*(ichannel60-45);}
-	if (ichannel60<30){cor += conf_floats["MuFilter/DSTcorslope"+last_time_alignment_tag]*(ichannel60-15);}
-	else{              cor -= conf_floats["MuFilter/DSTcorslope"+last_time_alignment_tag]*(ichannel60-45);}
 	string si = to_string(p);
-	cor -= conf_floats["MuFilter/DSTcorC"+si+last_time_alignment_tag];
 	cor -= conf_floats["MuFilter/DSTcorC"+si+last_time_alignment_tag];
 	cor -= L/conf_floats["MuFilter/DsPropSpeed"];
 	return cor;
